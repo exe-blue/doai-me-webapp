@@ -18,7 +18,7 @@
 // =============================================
 var BASE_PATH = '/sdcard/Scripts/doai-bot';
 var Utils, SupabaseClient, EvidenceManager, ErrorRecovery, YouTubeActions;
-var SearchFlow, AdSkipper, RandomSurf;
+var SearchFlow, AdSkipper, RandomSurf, Logger;
 
 (function loadModules() {
     var corePath = BASE_PATH + '/core/';
@@ -30,6 +30,7 @@ var SearchFlow, AdSkipper, RandomSurf;
     }
 
     var modules = [
+        { name: 'Logger', file: 'Logger.js' },  // Logger 먼저 로드
         { name: 'Utils', file: 'Utils.js' },
         { name: 'SupabaseClient', file: 'SupabaseClient.js' },
         { name: 'EvidenceManager', file: 'EvidenceManager.js' },
@@ -46,6 +47,7 @@ var SearchFlow, AdSkipper, RandomSurf;
             if (files.exists(path)) {
                 var loaded = require(path);
                 switch (mod.name) {
+                    case 'Logger': Logger = loaded; break;
                     case 'Utils': Utils = loaded; break;
                     case 'SupabaseClient': SupabaseClient = loaded; break;
                     case 'EvidenceManager': EvidenceManager = loaded; break;
@@ -63,6 +65,11 @@ var SearchFlow, AdSkipper, RandomSurf;
             console.error('[Bot] ' + mod.name + ' 로드 실패:', e.message);
         }
     });
+    
+    // Logger 초기화
+    if (Logger) {
+        Logger.init();
+    }
 })();
 
 // =============================================
@@ -172,14 +179,27 @@ var targetDurationSec = Math.floor(
     Math.random() * (params.duration_max_sec - params.duration_min_sec + 1)
 ) + params.duration_min_sec;
 
-console.log('=== Bot v4.0 Started ===');
-console.log('Job ID:', params.job_id);
-console.log('Video:', params.video_url);
-console.log('Keyword:', params.keyword || '(없음 - 제목 사용)');
-console.log('Target Duration:', targetDurationSec + 's');
-console.log('Features: Search=' + params.enable_search + 
-            ', Forward=' + params.enable_forward_action + 
-            ', Surf=' + params.enable_random_surf);
+// =============================================
+// 로그 헬퍼 함수
+// =============================================
+function log(step, msg) {
+    if (Logger) {
+        Logger.step(step, msg);
+    } else {
+        console.log('[Step ' + step + '] ' + msg);
+    }
+}
+
+function logDelay(minMs, maxMs) {
+    if (Logger) {
+        return Logger.randomDelay(minMs, maxMs);
+    } else {
+        var delay = Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
+        console.log('[Delay] Sleeping for ' + delay + 'ms...');
+        sleep(delay);
+        return delay;
+    }
+}
 
 // =============================================
 // 메인 실행
@@ -187,44 +207,77 @@ console.log('Features: Search=' + params.enable_search +
 
 var startTime = Date.now();
 
+// Logger 세션 시작
+if (Logger) {
+    Logger.startSession(params.job_id);
+}
+
+log(0, '작업 시작: ' + (params.video_title || params.video_url));
+log(0, 'Target Duration: ' + targetDurationSec + 's, Search=' + params.enable_search + 
+       ', Forward=' + params.enable_forward_action + ', Surf=' + params.enable_random_surf);
+
 // 1. YouTube 앱 실행
-console.log('[Step 1] YouTube 앱 실행');
+log(1, 'YouTube 앱 실행');
 app.launchApp('YouTube');
 waitForPackage('com.google.android.youtube', 10000);
-sleep(random(2000, 4000));
+logDelay(2000, 7000);  // +3000ms 랜덤 범위
 
 // 2. 광고 스킵 스레드 시작
-console.log('[Step 2] 광고 스킵 스레드 시작');
+log(2, '광고 스킵 스레드 시작');
 if (AdSkipper) {
     AdSkipper.start(function(count) {
         jobResult.adsSkipped = count;
+        if (Logger) {
+            Logger.ads('광고 스킵 버튼 감지 및 클릭 (총 ' + count + '회)');
+        }
     });
 }
 
-// 3. 키워드 검색 또는 URL 직접 진입
-console.log('[Step 3] 영상 진입');
-if (params.enable_search && SearchFlow) {
+// 3. URL 보정 및 키워드 설정
+var normalizedUrl = params.video_url;
+if (SearchFlow && normalizedUrl.includes('youtu.be')) {
+    normalizedUrl = SearchFlow.normalizeUrl(normalizedUrl);
+    log(3, 'URL 보정 완료: ' + normalizedUrl);
+}
+
+// 4. 키워드 설정 (없으면 제목 사용)
+var searchKeyword = params.keyword;
+if (!searchKeyword || searchKeyword.trim() === '') {
+    searchKeyword = params.video_title;
+    log(4, '키워드 부재로 제목을 키워드로 설정');
+} else {
+    log(4, '키워드 설정: ' + searchKeyword);
+}
+
+// 5. 키워드 검색 또는 URL 직접 진입
+if (params.enable_search && SearchFlow && searchKeyword) {
+    log(5, '검색 수행: ' + searchKeyword);
+    
     var searchResult = SearchFlow.executeSearchFlow({
-        keyword: params.keyword,
+        keyword: searchKeyword,
         videoTitle: params.video_title,
-        videoUrl: params.video_url
+        videoUrl: normalizedUrl
     });
     jobResult.entryMethod = searchResult.method;
     
-    if (!searchResult.success) {
+    if (searchResult.success) {
+        log(6, '영상 발견 및 클릭 (방식: ' + searchResult.method + ')');
+    } else {
+        log(6, '검색 실패 → URL 직접 진입');
         jobResult.errors.push('entry: 영상 진입 실패');
     }
 } else {
+    log(5, 'URL 직접 진입: ' + normalizedUrl);
     // URL 직접 진입
     if (YouTubeActions) {
-        YouTubeActions.launchYouTube(params.video_url);
+        YouTubeActions.launchYouTube(normalizedUrl);
     } else {
         app.startActivity({
             action: 'android.intent.action.VIEW',
-            data: params.video_url,
+            data: normalizedUrl,
             packageName: 'com.google.android.youtube'
         });
-        sleep(5000);
+        logDelay(5000, 8000);  // +3000ms 랜덤 범위
     }
     jobResult.entryMethod = 'url';
 }
@@ -234,28 +287,33 @@ if (EvidenceManager) {
     EvidenceManager.startJob(params.assignment_id);
 }
 
-// 4. 초기 시청 + 앞으로가기 액션
-console.log('[Step 4] 초기 시청 및 앞으로가기 액션');
-sleep(10000); // 초기 10초 시청
+// 7. 광고 대기 (광고 스킵 스레드가 처리)
+log(7, '광고 대기 중... (AdSkipper가 자동 처리)');
+logDelay(3000, 8000);  // +3000ms 랜덤 범위
+
+// 8. 시청 시작 및 앞으로가기 액션
+log(8, '시청 시작 (예정: ' + targetDurationSec + '초)');
+logDelay(10000, 13000);  // 초기 10~13초 시청 (+3000ms 랜덤 범위)
 
 if (params.enable_forward_action) {
     performForwardActions(params.forward_action_count);
 }
 
-// 5. 메인 시청 루프
-console.log('[Step 5] 메인 시청 시작');
+// 9. 메인 시청 루프 및 상호작용
 threads.start(function() {
     var elapsed = 10 + (jobResult.forwardActions * 12); // 초기 10초 + 앞으로가기 시간
     var actionsPerformed = false;
 
     // 시청 루프
     while (elapsed < targetDurationSec) {
-        sleep(10000); // 10초 대기
-        elapsed += 10;
+        // +3000ms 랜덤 범위로 노드별 다른 대기시간
+        var loopDelay = Math.floor(Math.random() * 3001) + 10000;  // 10~13초
+        sleep(loopDelay);
+        elapsed += Math.round(loopDelay / 1000);
 
         // 진행률 계산 및 보고
         var progressPct = Math.round(Math.min(100, (elapsed / targetDurationSec) * 100));
-        console.log('Watching...', elapsed + 's /', targetDurationSec + 's (' + progressPct + '%)');
+        log(8, '시청 중... ' + elapsed + 's / ' + targetDurationSec + 's (' + progressPct + '%)');
 
         if (SupabaseClient) {
             SupabaseClient.updateProgress(params.assignment_id, progressPct);
@@ -263,24 +321,34 @@ threads.start(function() {
 
         // 50% 시청 후 액션 수행 (한 번만)
         if (!actionsPerformed && elapsed >= targetDurationSec * 0.5) {
-            console.log('[Step 6] 상호작용 액션');
+            log(9, '상호작용 액션 시작');
             performActions();
             actionsPerformed = true;
         }
     }
 
-    // 7. 랜덤 서핑
+    // 10. 본 영상 시청 종료
+    log(10, '본 영상 시청 종료');
+
+    // 11. 랜덤 서핑
     if (params.enable_random_surf && RandomSurf) {
-        console.log('[Step 7] 랜덤 피드 서핑');
+        log(11, '추가 랜덤 시청 프로세스 진입');
         var surfResult = RandomSurf.executeSurfFlow({
             videoCount: params.surf_video_count,
             watchTimeMin: 30000,
             watchTimeMax: 60000
         });
         jobResult.surfVideosWatched = surfResult.videosWatched;
+        
+        if (surfResult.videosWatched === 0) {
+            log(11, "피드 영상 없음 → '투자' 검색 시도");
+        } else {
+            log(11, '랜덤 영상 시청 완료: ' + surfResult.videosWatched + '개');
+        }
     }
 
-    // 8. 작업 완료
+    // 12. 작업 완료
+    log(12, '모든 작업 완료. 결과 보고 전송');
     completeJob();
 });
 
@@ -292,10 +360,10 @@ function performForwardActions(count) {
     var width = device.width;
     var height = device.height;
 
-    console.log('[ForwardAction] 앞으로가기 ' + count + '회 시작');
+    log(8, '앞으로가기 액션 시작 (' + count + '회 예정)');
 
     for (var i = 0; i < count; i++) {
-        console.log('[ForwardAction] (' + (i + 1) + '/' + count + ')');
+        log(8, '앞으로가기 액션 (' + (i + 1) + '/' + count + ')');
         
         // 화면 오른쪽 더블 탭 (10초 앞으로 건너뛰기)
         var tapX = width * 0.8;  // 오른쪽 80% 지점
@@ -307,11 +375,11 @@ function performForwardActions(count) {
 
         jobResult.forwardActions++;
         
-        // 랜덤 대기
-        sleep(random(2000, 5000));
+        // 랜덤 대기 (+3000ms 범위)
+        logDelay(2000, 8000);
     }
 
-    console.log('[ForwardAction] 완료. 총 ' + jobResult.forwardActions + '회');
+    log(8, '앞으로가기 완료. 총 ' + jobResult.forwardActions + '회');
 }
 
 // =============================================
@@ -323,23 +391,25 @@ function performActions() {
 
     // 좋아요
     if (shouldPerform(params.prob_like)) {
-        console.log('[Action] 좋아요 시도...');
+        if (Logger) Logger.action('좋아요', '시도 중...');
         try {
             var likeSuccess = actions.performLike ? actions.performLike() : false;
             if (likeSuccess) {
                 jobResult.didLike = true;
-                console.log('[Action] 좋아요 성공!');
+                if (Logger) Logger.action('좋아요', '성공');
+            } else {
+                if (Logger) Logger.action('좋아요', '버튼 찾지 못함');
             }
         } catch (e) {
-            console.error('[Action] 좋아요 실패:', e.message);
+            if (Logger) Logger.error('좋아요 실패: ' + e.message);
             jobResult.errors.push('like: ' + e.message);
         }
-        sleep(2000);
+        logDelay(1500, 5500);  // +3000ms 랜덤 범위
     }
 
     // 구독
     if (shouldPerform(params.prob_subscribe)) {
-        console.log('[Action] 구독 시도...');
+        if (Logger) Logger.action('구독', '시도 중...');
         try {
             var subBtn = null;
             if (typeof text !== 'undefined') {
@@ -349,18 +419,20 @@ function performActions() {
             if (subBtn) {
                 subBtn.click();
                 jobResult.didSubscribe = true;
-                console.log('[Action] 구독 성공!');
+                if (Logger) Logger.action('구독', '성공');
+            } else {
+                if (Logger) Logger.action('구독', '버튼 찾지 못함');
             }
         } catch (e) {
-            console.error('[Action] 구독 실패:', e.message);
+            if (Logger) Logger.error('구독 실패: ' + e.message);
             jobResult.errors.push('subscribe: ' + e.message);
         }
-        sleep(2000);
+        logDelay(1500, 5500);  // +3000ms 랜덤 범위
     }
 
     // 댓글 (서버에서 미리 생성: 확률 * 노드수 * 2)
     if (shouldPerform(params.prob_comment)) {
-        console.log('[Action] 댓글 시도...');
+        if (Logger) Logger.action('댓글', '시도 중...');
         try {
             var comment = null;
             
@@ -368,49 +440,56 @@ function performActions() {
             if (params.comments && params.comments.length > 0) {
                 // 순차적으로 사용 (FIFO) - 이미 사용한 댓글은 제거
                 comment = params.comments.shift();
-                console.log('[Action] 서버 생성 댓글 사용 (남은 ' + params.comments.length + '개)');
+                if (Logger) Logger.info('Comment', '서버 생성 댓글 사용 (남은 ' + params.comments.length + '개)');
             }
             
             // 2순위: Supabase API (백업 - 서버에서 못 받은 경우)
             if (!comment && SupabaseClient) {
                 comment = SupabaseClient.fetchRandomComment(params.device_id, params.job_id);
                 if (comment) {
-                    console.log('[Action] Supabase에서 댓글 로드');
+                    if (Logger) Logger.info('Comment', 'Supabase에서 댓글 로드');
                 }
             }
             
             // 댓글이 없으면 스킵 (AI 생성 시스템이므로 기본 댓글 사용 안함)
             if (!comment) {
-                console.log('[Action] 사용 가능한 댓글 없음 - 스킵');
+                if (Logger) Logger.action('댓글', '사용 가능한 댓글 없음 - 스킵');
             } else {
                 var commentSuccess = actions.performComment ? actions.performComment(comment) : false;
                 if (commentSuccess) {
                     jobResult.didComment = true;
                     jobResult.commentText = comment;
-                    console.log('[Action] 댓글 성공:', comment);
+                    if (Logger) Logger.action('댓글', '성공: ' + comment);
+                } else {
+                    if (Logger) Logger.action('댓글', '입력 실패');
                 }
             }
         } catch (e) {
-            console.error('[Action] 댓글 실패:', e.message);
+            if (Logger) Logger.error('댓글 실패: ' + e.message);
             jobResult.errors.push('comment: ' + e.message);
         }
-        sleep(2000);
+        logDelay(1500, 5500);  // +3000ms 랜덤 범위
     }
 
     // 재생목록 저장
     if (shouldPerform(params.prob_playlist)) {
-        console.log('[Action] 재생목록 저장 시도...');
+        if (Logger) Logger.action('재생목록', '시도 중...');
         try {
             var playlistSuccess = actions.performPlaylistSave ? actions.performPlaylistSave() : false;
             if (playlistSuccess) {
                 jobResult.didPlaylist = true;
-                console.log('[Action] 재생목록 저장 성공!');
+                if (Logger) Logger.action('재생목록', '저장 성공');
+            } else {
+                if (Logger) Logger.action('재생목록', '버튼 찾지 못함');
             }
         } catch (e) {
-            console.error('[Action] 재생목록 저장 실패:', e.message);
+            if (Logger) Logger.error('재생목록 저장 실패: ' + e.message);
             jobResult.errors.push('playlist: ' + e.message);
         }
     }
+    
+    log(9, '상호작용 완료 - Like:' + jobResult.didLike + ', Sub:' + jobResult.didSubscribe + 
+           ', Comment:' + jobResult.didComment + ', Playlist:' + jobResult.didPlaylist);
 }
 
 // [Deprecated] 기본 댓글 풀 - AI 자동 생성 시스템 사용
@@ -430,18 +509,17 @@ function completeJob() {
     var elapsedMs = Date.now() - startTime;
     var elapsedSec = Math.round(elapsedMs / 1000);
 
-    console.log('=== Job Completed ===');
-    console.log('Entry Method:', jobResult.entryMethod);
-    console.log('Duration:', elapsedSec + 's (target: ' + targetDurationSec + 's)');
-    console.log('Forward Actions:', jobResult.forwardActions);
-    console.log('Ads Skipped:', jobResult.adsSkipped);
-    console.log('Like:', jobResult.didLike);
-    console.log('Subscribe:', jobResult.didSubscribe);
-    console.log('Comment:', jobResult.didComment, jobResult.commentText ? '(' + jobResult.commentText + ')' : '');
-    console.log('Playlist:', jobResult.didPlaylist);
-    console.log('Surf Videos:', jobResult.surfVideosWatched);
-    if (jobResult.errors.length > 0) {
-        console.log('Errors:', jobResult.errors.join(', '));
+    // 완료 로그
+    if (Logger) {
+        Logger.info('Result', 'Entry: ' + jobResult.entryMethod + ', Duration: ' + elapsedSec + 's');
+        Logger.info('Result', 'Forward: ' + jobResult.forwardActions + ', Ads Skipped: ' + jobResult.adsSkipped);
+        Logger.info('Result', 'Like: ' + jobResult.didLike + ', Sub: ' + jobResult.didSubscribe + 
+                              ', Comment: ' + jobResult.didComment + ', Playlist: ' + jobResult.didPlaylist);
+        Logger.info('Result', 'Surf Videos: ' + jobResult.surfVideosWatched);
+        
+        if (jobResult.errors.length > 0) {
+            Logger.error('Errors: ' + jobResult.errors.join(', '));
+        }
     }
 
     // 증거 캡처
@@ -472,6 +550,11 @@ function completeJob() {
             adsSkipped: jobResult.adsSkipped,
             surfVideos: jobResult.surfVideosWatched
         });
+    }
+
+    // Logger 세션 종료
+    if (Logger) {
+        Logger.endSession();
     }
 
     // 스크립트 종료

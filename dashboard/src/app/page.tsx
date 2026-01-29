@@ -1,32 +1,38 @@
 "use client";
 
-import { Header } from "@/components/sections/header";
-import { Hero } from "@/components/sections/hero";
-import { Features } from "@/components/sections/features";
-import { Statistics } from "@/components/sections/statistics";
-import { Philosophy } from "@/components/sections/philosophy";
-import { CTA } from "@/components/sections/cta";
-import { Footer } from "@/components/sections/footer";
+import {
+  Header,
+  Hero,
+  Features,
+  Statistics,
+  Testimonials,
+  Pricing,
+  CTA,
+  Footer,
+} from "@/components/landing/sections";
 
 export default function LandingPage() {
   return (
     <main id="main-content" className="min-h-screen">
-      {/* Header */}
+      {/* Header - Sticky navigation with DoAi.Me branding */}
       <Header />
 
-      {/* Hero Section */}
+      {/* Hero Section - Project introduction with orbiting circles animation */}
       <Hero />
 
-      {/* Statistics Section */}
+      {/* Statistics Section - 600 phones, 5 nodes, 24/7 operation */}
       <Statistics />
 
-      {/* Features Section */}
+      {/* Features Section - Core philosophy: Echotion, Aidentity, Gam-eung, Kyeolsso */}
       <Features />
 
-      {/* Philosophy Section */}
-      <Philosophy />
+      {/* Testimonials Section - Philosophical quotes */}
+      <Testimonials />
 
-      {/* CTA Section */}
+      {/* Pricing Section - Roadmap phases */}
+      <Pricing />
+
+      {/* CTA Section - Call to action */}
       <CTA />
 
       {/* Footer */}

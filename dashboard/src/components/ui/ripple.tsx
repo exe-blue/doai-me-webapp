@@ -1,5 +1,6 @@
-import { CSSProperties, memo } from "react";
+"use client";
 
+import { CSSProperties, memo } from "react";
 import { cn } from "@/lib/utils";
 
 interface RippleProps {
