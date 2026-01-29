@@ -8,6 +8,10 @@
  * - Channel management
  */
 
+// Load env from root .env (ensure it's loaded before createClient)
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../../.env') });
+
 const { createClient } = require('@supabase/supabase-js');
 
 // Initialize Supabase client
@@ -16,6 +20,7 @@ const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !supabaseKey) {
   console.error('[SupabaseService] Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
+  console.error('[SupabaseService] Looked for .env at:', path.join(__dirname, '../../.env'));
 }
 
 const supabase = createClient(supabaseUrl, supabaseKey);

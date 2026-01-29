@@ -1,8 +1,23 @@
-require('dotenv').config();
-const { io } = require("socket.io-client");
-const { exec, spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+
+// Load .env.local first (for local testing), fallback to .env
+const localEnvPath = path.join(__dirname, '.env.local');
+const defaultEnvPath = path.join(__dirname, '.env');
+
+if (fs.existsSync(localEnvPath)) {
+    require('dotenv').config({ path: localEnvPath });
+    console.log('[Config] Loaded .env.local (Local Test Mode)');
+} else if (fs.existsSync(defaultEnvPath)) {
+    require('dotenv').config({ path: defaultEnvPath });
+    console.log('[Config] Loaded .env');
+} else {
+    require('dotenv').config();
+    console.log('[Config] No local .env found, using defaults');
+}
+
+const { io } = require("socket.io-client");
+const { exec, spawn } = require('child_process');
 
 // --- [환경 설정] ---
 const PC_CODE = process.env.PC_CODE || 'P01'; // .env에 P01 필수
