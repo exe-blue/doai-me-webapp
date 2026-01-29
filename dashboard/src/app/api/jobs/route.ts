@@ -1,0 +1,400 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+
+// Server-side Supabase client with service role
+function getSupabase() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!url || !key) {
+    throw new Error('Missing Supabase credentials');
+  }
+
+  return createClient(url, key);
+}
+
+// GET /api/jobs - 작업 목록 조회
+export async function GET(request: NextRequest) {
+  try {
+    const supabase = getSupabase();
+    const { searchParams } = new URL(request.url);
+
+    const status = searchParams.get('status'); // active, paused, completed, cancelled
+    const limit = parseInt(searchParams.get('limit') || '50');
+    const offset = parseInt(searchParams.get('offset') || '0');
+
+    let query = supabase
+      .from('jobs')
+      .select('*', { count: 'exact' })
+      .order('priority', { ascending: false })  // Priority jobs first
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    // 상태 필터
+    if (status) {
+      query = query.eq('status', status);
+    } else {
+      // 기본: 활성/일시정지 작업만
+      query = query.in('status', ['active', 'paused']);
+    }
+
+    const { data: jobs, error, count } = await query;
+
+    if (error) {
+      console.error('[API] Jobs query error:', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    // 각 작업별 실시간 assignment 통계 조회
+    const jobsWithStats = await Promise.all(
+      (jobs || []).map(async (job) => {
+        const { data: stats } = await supabase
+          .from('job_assignments')
+          .select('status')
+          .eq('job_id', job.id);
+
+        const statusCounts = {
+          pending: 0,
+          paused: 0,
+          running: 0,
+          completed: 0,
+          failed: 0,
+          cancelled: 0,
+        };
+
+        (stats || []).forEach((a) => {
+          if (a.status in statusCounts) {
+            statusCounts[a.status as keyof typeof statusCounts]++;
+          }
+        });
+
+        return {
+          ...job,
+          stats: statusCounts,
+          total_assigned: (stats || []).length,
+        };
+      })
+    );
+
+    return NextResponse.json({
+      jobs: jobsWithStats,
+      total: count,
+      limit,
+      offset,
+    });
+  } catch (error) {
+    console.error('[API] Jobs GET error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * Generate job display name in format: YYMMDD-{ChannelShort}-{Source}
+ * @param channelName - 채널명 (예: "짐승남", "YouTube Channel")
+ * @param source - 'A' (Auto) or 'N' (Normal/Manual)
+ * @returns display name like "260130-짐승남-N"
+ */
+function generateJobDisplayName(channelName: string, source: 'A' | 'N' = 'N'): string {
+  const now = new Date();
+  const yy = now.getFullYear().toString().slice(-2);
+  const mm = (now.getMonth() + 1).toString().padStart(2, '0');
+  const dd = now.getDate().toString().padStart(2, '0');
+
+  // Channel short: 첫 3글자 또는 전체 (3자 미만인 경우)
+  const channelShort = channelName.slice(0, 5) || 'JOB';
+
+  return `${yy}${mm}${dd}-${channelShort}-${source}`;
+}
+
+/**
+ * Extract channel name from YouTube URL (simple heuristic)
+ * In production, would use YouTube API
+ */
+function extractChannelHint(url: string, title?: string): string {
+  // If title provided, use first meaningful word
+  if (title && title.trim()) {
+    const words = title.trim().split(/\s+/);
+    return words[0].slice(0, 5) || 'JOB';
+  }
+
+  // Fallback: use part of video ID or generic
+  const match = url.match(/[?&]v=([^&]+)/);
+  if (match) {
+    return match[1].slice(0, 4).toUpperCase();
+  }
+
+  return 'VIDEO';
+}
+
+// POST /api/jobs - 새 작업 생성 + 자동 분배
+// Supports two modes:
+// 1. VIDEO_URL: 단일 영상 URL 직접 재생
+// 2. CHANNEL_AUTO: 채널 등록 (백엔드가 주기적으로 최신 영상 자동 생성)
+export async function POST(request: NextRequest) {
+  try {
+    const supabase = getSupabase();
+    const body = await request.json();
+
+    const {
+      title,
+      channel_name,  // Optional: 채널명 (없으면 자동 추출)
+      source_type = 'N',  // 'A' (Auto) or 'N' (Normal/Manual)
+      job_type = 'VIDEO_URL',  // 'VIDEO_URL' or 'CHANNEL_AUTO'
+      target_url,
+      channel_url,  // For CHANNEL_AUTO mode
+      duration_sec = 60,
+      target_type = 'all_devices',
+      target_value = 100,
+      prob_like = 0,
+      prob_comment = 0,
+      prob_playlist = 0,
+      script_type = 'youtube_watch',
+      priority = false,  // Priority flag for queue ordering
+      comments = '',  // 댓글 목록 (줄바꿈으로 구분)
+    } = body;
+
+    // YouTube URL 검증 패턴
+    const youtubeVideoRegex = /^https?:\/\/(www\.)?(youtube\.com|youtu\.be|m\.youtube\.com)\/(watch\?v=|shorts\/|embed\/|v\/)/i;
+    const youtubeChannelRegex = /^https?:\/\/(www\.)?(youtube\.com)\/(channel\/|c\/|@|user\/)/i;
+
+    // 모드별 검증
+    if (job_type === 'CHANNEL_AUTO') {
+      // 채널 모드: channel_url 필수
+      if (!channel_url) {
+        return NextResponse.json(
+          { error: 'channel_url is required for CHANNEL_AUTO mode' },
+          { status: 400 }
+        );
+      }
+      if (!youtubeChannelRegex.test(channel_url)) {
+        return NextResponse.json(
+          { error: 'Invalid YouTube Channel URL' },
+          { status: 400 }
+        );
+      }
+    } else {
+      // VIDEO_URL 모드: target_url 필수
+      if (!target_url) {
+        return NextResponse.json(
+          { error: 'target_url is required' },
+          { status: 400 }
+        );
+      }
+      if (!youtubeVideoRegex.test(target_url)) {
+        return NextResponse.json(
+          { error: 'Invalid YouTube Video URL' },
+          { status: 400 }
+        );
+      }
+    }
+
+    // 1. 연결된 idle 기기 조회
+    const { data: idleDevices, error: devicesError } = await supabase
+      .from('devices')
+      .select('id, serial_number, pc_id')
+      .eq('status', 'idle')
+      .not('last_seen_at', 'is', null);
+
+    if (devicesError) {
+      console.error('[API] Devices query error:', devicesError);
+      return NextResponse.json(
+        { error: 'Failed to fetch devices' },
+        { status: 500 }
+      );
+    }
+
+    // 연결된 기기가 없으면 경고
+    if (!idleDevices || idleDevices.length === 0) {
+      return NextResponse.json(
+        { error: 'No idle devices available', devices_count: 0 },
+        { status: 400 }
+      );
+    }
+
+    // 2. 목표에 따라 할당 대상 결정
+    let targetDevices = [...idleDevices];
+
+    if (target_type === 'percentage') {
+      const count = Math.ceil((idleDevices.length * target_value) / 100);
+      targetDevices = idleDevices.slice(0, count);
+    } else if (target_type === 'device_count') {
+      targetDevices = idleDevices.slice(0, Math.min(target_value, idleDevices.length));
+    }
+    // target_type === 'all_devices' 는 전체 사용
+
+    // 3. 채널 모드 처리 (CHANNEL_AUTO)
+    let channelRecord = null;
+    if (job_type === 'CHANNEL_AUTO') {
+      // 채널 ID 추출 (YouTube URL에서)
+      const channelIdMatch = channel_url.match(/\/(channel\/|c\/|@|user\/)([^/?]+)/);
+      const channelId = channelIdMatch ? channelIdMatch[2] : channel_url;
+
+      // 채널 등록 또는 조회
+      const { data: existingChannel } = await supabase
+        .from('channels')
+        .select('*')
+        .eq('channel_id', channelId)
+        .single();
+
+      if (existingChannel) {
+        channelRecord = existingChannel;
+        // 기존 채널 활성화
+        await supabase
+          .from('channels')
+          .update({ is_active: true, updated_at: new Date().toISOString() })
+          .eq('id', existingChannel.id);
+      } else {
+        // 새 채널 등록
+        const { data: newChannel, error: channelError } = await supabase
+          .from('channels')
+          .insert({
+            channel_id: channelId,
+            channel_name: channel_name || channelId,
+            channel_url: channel_url,
+            is_active: true,
+            default_duration_sec: duration_sec,
+            default_prob_like: prob_like,
+            default_prob_comment: prob_comment,
+            default_prob_playlist: prob_playlist,
+          })
+          .select()
+          .single();
+
+        if (channelError) {
+          console.error('[API] Channel creation error:', channelError);
+          return NextResponse.json(
+            { error: 'Failed to register channel' },
+            { status: 500 }
+          );
+        }
+        channelRecord = newChannel;
+      }
+
+      // 채널 모드는 즉시 작업을 생성하지 않음 - 백엔드 스케줄러가 처리
+      return NextResponse.json({
+        success: true,
+        mode: 'CHANNEL_AUTO',
+        channel: channelRecord,
+        message: '채널이 등록되었습니다. 새 영상이 감지되면 자동으로 작업이 생성됩니다.',
+      });
+    }
+
+    // 4. VIDEO_URL 모드: 작업 생성
+    // Generate display name: YYMMDD-{Channel}-{Source}
+    const channelHint = channel_name || extractChannelHint(target_url, title);
+    const displayName = generateJobDisplayName(channelHint, source_type as 'A' | 'N');
+
+    const jobData = {
+      title: title || `YouTube Job ${new Date().toLocaleString('ko-KR')}`,
+      display_name: displayName,  // NEW: 260130-짐승남-N format
+      type: 'VIDEO_URL',
+      target_url,
+      duration_sec,
+      duration_min_pct: 80,
+      duration_max_pct: 100,
+      prob_like,
+      prob_comment,
+      prob_playlist,
+      script_type,
+      is_active: true,
+      status: 'active',
+      target_type,
+      target_value,
+      assigned_count: targetDevices.length,
+      completed_count: 0,
+      failed_count: 0,
+      total_assignments: targetDevices.length,
+      priority: priority || false,  // NEW: priority flag
+    };
+
+    const { data: job, error: jobError } = await supabase
+      .from('jobs')
+      .insert(jobData)
+      .select()
+      .single();
+
+    if (jobError || !job) {
+      console.error('[API] Job creation error:', jobError);
+      return NextResponse.json(
+        { error: 'Failed to create job' },
+        { status: 500 }
+      );
+    }
+
+    // 5. 댓글 풀 생성 (comments가 제공된 경우)
+    if (comments && comments.trim()) {
+      const commentLines = comments
+        .split('\n')
+        .map((line: string) => line.trim())
+        .filter((line: string) => line.length > 0);
+
+      if (commentLines.length > 0) {
+        const commentRecords = commentLines.map((content: string) => ({
+          job_id: job.id,
+          content,
+          is_used: false,
+        }));
+
+        const { error: commentError } = await supabase
+          .from('comments')
+          .insert(commentRecords);
+
+        if (commentError) {
+          console.error('[API] Comments insertion error:', commentError);
+          // 댓글 삽입 실패해도 작업은 계속 진행
+        } else {
+          console.log(`[API] ${commentLines.length} comments inserted for job ${job.id}`);
+        }
+      }
+    }
+
+    // 6. Assignment 생성 (bulk insert)
+    const assignments = targetDevices.map((device) => ({
+      job_id: job.id,
+      device_id: device.id,
+      device_serial: device.serial_number,
+      status: 'pending',
+      progress_pct: 0,
+      assigned_at: new Date().toISOString(),
+    }));
+
+    const { data: createdAssignments, error: assignError } = await supabase
+      .from('job_assignments')
+      .insert(assignments)
+      .select();
+
+    if (assignError) {
+      console.error('[API] Assignment creation error:', assignError);
+      // 작업은 생성됐지만 할당 실패 - 부분 성공으로 처리
+    }
+
+    // 7. 댓글 풀 개수 조회
+    const { count: commentCount } = await supabase
+      .from('comments')
+      .select('*', { count: 'exact', head: true })
+      .eq('job_id', job.id);
+
+    // 8. Socket.io로 Worker에게 전송 (서버 사이드에서는 직접 불가 - 클라이언트가 처리)
+    // 대신 응답에 assignments 포함하여 클라이언트가 Socket으로 전송할 수 있게 함
+
+    return NextResponse.json({
+      success: true,
+      job,
+      assignments: createdAssignments || [],
+      stats: {
+        total_devices: idleDevices.length,
+        assigned_devices: targetDevices.length,
+        comments_count: commentCount || 0,
+      },
+    });
+  } catch (error) {
+    console.error('[API] Jobs POST error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}

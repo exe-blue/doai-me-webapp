@@ -32,10 +32,16 @@ export interface Device {
   scrcpy_running?: boolean;
   scrcpy_pid?: number | null;
   // Fixed Inventory System 추가 필드 (Socket.io heartbeat에서 수신)
-  ip?: string;  // 기기 IP 주소 (예: 192.168.0.123)
+  ip?: string;  // 기기 IP 주소 (예: 192.168.0.123) - from Socket.io
+  ip_address?: string;  // 기기 IP 주소 - from DB (003 migration)
   slotNum?: number;  // 슬롯 번호 (1-20)
   boardId?: string;  // 보드 ID (예: B01)
   slotId?: string;   // 슬롯 ID (예: S01)
+  connection_info?: {
+    pcCode?: string;
+    slotNum?: number;
+    adbConnected?: boolean;
+  };
 }
 
 // jobs 테이블 - Simplified V2 Schema
@@ -99,7 +105,37 @@ export interface ScrcpyCommand {
   completed_at?: string | null;
 }
 
-// monitored_channels 테이블
+// channels 테이블 (자동 모니터링 채널)
+export interface Channel {
+  id: string;  // UUID
+  channel_id: string;  // YouTube Channel ID (UC...)
+  channel_name: string;
+  channel_url: string;
+  is_active: boolean;
+  last_video_id?: string;
+  last_checked_at?: string;
+  check_interval_min: number;
+  default_duration_sec: number;
+  default_prob_like: number;
+  default_prob_comment: number;
+  default_prob_playlist: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// comments 테이블 (댓글 풀)
+export interface Comment {
+  id: string;  // UUID
+  job_id?: string;  // 작업별 댓글
+  channel_id?: string;  // 채널별 공용 댓글
+  content: string;
+  is_used: boolean;
+  used_by_device_id?: string;
+  used_at?: string;
+  created_at: string;
+}
+
+// Legacy: monitored_channels 테이블 (하위 호환성)
 export interface MonitoredChannel {
   id: string;  // UUID
   channel_id: string;  // UNIQUE

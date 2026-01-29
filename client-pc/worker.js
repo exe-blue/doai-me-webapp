@@ -1,7 +1,10 @@
 /**
- * [Agent-Node] Worker Client v3.0
+ * [Agent-Node] Worker Client v4.0
  * 역할: ADB 장치 감시, Supabase 등록, 작업 폴링 및 자동 실행
  * 추가: Socket.io 실시간 통신 (Heartbeat, Remote Control, Streaming)
+ * v4.0: 자동 등록 시스템 (device-map.json 자동 생성, 순차 번호 할당)
+ *       - 새 기기 연결 시 자동으로 P01-001, P01-002, ... 형식 할당
+ *       - device-map.json 수동 작성 불필요
  */
 
 const fs = require('fs');
@@ -19,7 +22,7 @@ if (fs.existsSync(localEnvPath)) {
     console.log('[Config] Loaded ../.env (Production Mode)');
 }
 const { createClient } = require('@supabase/supabase-js');
-const { exec, execFile } = require('child_process');
+const { exec, execFile, spawn } = require('child_process');
 const { io } = require('socket.io-client');
 const config = require('./config.json');
 
@@ -78,45 +81,151 @@ try {
 }
 
 /**
- * [확정된 네이밍 로직 v3]
- * Generate device name: P{PC}-B{Board}S{Slot}
- * Example: P01-B01S01 (PC01의 보드1 슬롯1)
+ * [자동 등록 네이밍 로직 v4]
+ * Generate device name: P{PC}-{순차번호}
+ * Example: P01-001, P01-002, ... (연결 순서대로 자동 할당)
  *
- * Priority:
- * 1. Use device-map.json mapping if exists (serial -> B{Board}S{Slot})
- * 2. Fallback to P{PC}-UNKNOWN-{SerialLast4}
+ * 자동 등록 방식:
+ * 1. device-map.json에 이미 등록된 시리얼 → 기존 번호 사용
+ * 2. 새 시리얼 → 빈 번호 중 가장 작은 번호 자동 할당 & device-map.json 저장
  */
-function getDeviceName(serial) {
-    // 1. PC 코드 가져오기 (.env에서 PC_CODE 설정 필수) - P01 or 01 -> P01
-    const pcId = PC_CODE.startsWith('P') ? PC_CODE : `P${PC_CODE}`;
 
-    // 2. device-map.json에서 보드/슬롯 매핑 확인
-    const boardSlot = deviceMap[serial];
+const DEVICE_MAP_PATH = path.join(__dirname, 'device-map.json');
 
-    if (boardSlot) {
-        // 매핑 존재: P01-B01S01 형식
-        return `${pcId}-${boardSlot}`;
+/**
+ * device-map.json을 파일에서 읽어오기 (실시간)
+ */
+function loadDeviceMap() {
+    try {
+        if (fs.existsSync(DEVICE_MAP_PATH)) {
+            const mapData = JSON.parse(fs.readFileSync(DEVICE_MAP_PATH, 'utf8'));
+            // Filter out comment fields
+            return Object.fromEntries(
+                Object.entries(mapData).filter(([key]) => !key.startsWith('_'))
+            );
+        }
+    } catch (e) {
+        console.warn('[Config] device-map.json 읽기 실패:', e.message);
     }
-
-    // 3. 매핑 없음: P01-UNKNOWN-{SerialLast4} 형식
-    const serialSuffix = serial.slice(-4).toUpperCase();
-    return `${pcId}-UNKNOWN-${serialSuffix}`;
+    return {};
 }
 
 /**
- * Extract board ID from device name (e.g., "P01-B01S01" -> "B01")
+ * device-map.json에 저장하기
  */
+function saveDeviceMap(map) {
+    try {
+        const dataToSave = {
+            _comment: `Auto-generated device map for ${PC_CODE}. Format: serial -> slot_number`,
+            _updated: new Date().toISOString(),
+            ...map
+        };
+        fs.writeFileSync(DEVICE_MAP_PATH, JSON.stringify(dataToSave, null, 2), 'utf8');
+        console.log(`[Config] device-map.json 저장됨 (${Object.keys(map).length}개 기기)`);
+    } catch (e) {
+        console.error('[Config] device-map.json 저장 실패:', e.message);
+    }
+}
+
+/**
+ * 새 기기에 빈 슬롯 번호 할당
+ * @param {Object} existingMap - 현재 device-map (serial -> slotNum)
+ * @returns {string} - 할당된 슬롯 번호 (예: "001", "002", ...)
+ */
+function findNextAvailableSlot(existingMap) {
+    // 이미 사용 중인 슬롯 번호 Set
+    const usedSlots = new Set(Object.values(existingMap));
+
+    // 001부터 MAX_SLOTS까지 순회하며 빈 슬롯 찾기
+    for (let i = 1; i <= MAX_SLOTS; i++) {
+        const slotNum = i.toString().padStart(3, '0'); // "001", "002", ...
+        if (!usedSlots.has(slotNum)) {
+            return slotNum;
+        }
+    }
+
+    // 모든 슬롯이 찬 경우, 다음 번호 할당 (MAX_SLOTS 초과)
+    const maxUsed = Math.max(0, ...Array.from(usedSlots).map(s => parseInt(s, 10)));
+    return (maxUsed + 1).toString().padStart(3, '0');
+}
+
+/**
+ * 기기 자동 등록: 새 시리얼이면 자동으로 슬롯 할당 & 저장
+ * @param {string} serial - ADB 시리얼 번호
+ * @returns {string} - 슬롯 번호 (예: "001")
+ */
+function getOrRegisterDevice(serial) {
+    // 1. 현재 device-map 로드
+    const currentMap = loadDeviceMap();
+
+    // 2. 이미 등록된 시리얼이면 기존 슬롯 반환
+    if (currentMap[serial]) {
+        return currentMap[serial];
+    }
+
+    // 3. 새 시리얼: 빈 슬롯 찾아서 할당
+    const newSlot = findNextAvailableSlot(currentMap);
+    currentMap[serial] = newSlot;
+
+    // 4. device-map.json에 저장
+    saveDeviceMap(currentMap);
+
+    console.log(`[Auto-Register] 새 기기 등록: ${serial.slice(-6)} → ${newSlot}`);
+    return newSlot;
+}
+
+/**
+ * Generate device name: P{PC}-{순차번호}
+ * Example: P01-001 (PC01의 1번 기기)
+ */
+function getDeviceName(serial) {
+    const pcId = PC_CODE.startsWith('P') ? PC_CODE : `P${PC_CODE}`;
+    const slotNum = getOrRegisterDevice(serial);
+    return `${pcId}-${slotNum}`;
+}
+
+/**
+ * Extract slot number from device name (e.g., "P01-001" -> "001")
+ */
+function getSlotNum(deviceName) {
+    const match = deviceName.match(/-(\d{3})$/);
+    return match ? match[1] : null;
+}
+
+// Legacy functions for backwards compatibility (deprecated)
 function getBoardId(deviceName) {
+    // Legacy: P01-B01S01 형식 지원 (하위 호환성)
     const match = deviceName.match(/B(\d+)/);
     return match ? `B${match[1].padStart(2, '0')}` : null;
 }
 
-/**
- * Extract slot ID from device name (e.g., "P01-B01S01" -> "S01")
- */
 function getSlotId(deviceName) {
+    // Legacy: P01-B01S01 형식 지원 (하위 호환성)
     const match = deviceName.match(/S(\d+)/);
     return match ? `S${match[1].padStart(2, '0')}` : null;
+}
+
+/**
+ * [스마트폰 검증 로직]
+ * ro.product.model이 조회되면 스마트폰으로 간주 (PC나 USB허브는 이 명령에 응답 못함)
+ * @param {string} serial - ADB 시리얼 번호
+ * @returns {Promise<boolean>} - 스마트폰이면 true
+ */
+async function isSmartphone(serial) {
+    return new Promise((resolve) => {
+        execFile(ADB_PATH, ['-s', serial, 'shell', 'getprop', 'ro.product.model'],
+            { timeout: 3000 },
+            (error, stdout) => {
+                if (error) {
+                    resolve(false);
+                    return;
+                }
+                // 모델명이 존재하면 스마트폰으로 간주
+                const model = stdout.trim();
+                resolve(model && model.length > 0);
+            }
+        );
+    });
 }
 
 /**
@@ -143,6 +252,45 @@ async function getDeviceIp(serial) {
 // 로컬 캐시: serial_number -> device UUID 매핑
 const deviceIdCache = new Map();
 
+/**
+ * [댓글 풀에서 댓글 가져오기]
+ * API를 통해 미사용 댓글을 가져오고 사용 처리
+ * @param {string} jobId - 작업 ID
+ * @param {string} deviceId - 기기 ID
+ * @returns {Promise<string|null>} - 댓글 내용 또는 null
+ */
+async function getCommentFromPool(jobId, deviceId) {
+    try {
+        const response = await fetch(
+            `${SERVER_URL}/api/comments?job_id=${jobId}&device_id=${deviceId}`,
+            {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            }
+        );
+
+        if (!response.ok) {
+            console.error(`[Comment] API error: ${response.status}`);
+            return null;
+        }
+
+        const data = await response.json();
+
+        if (data.success && data.comment) {
+            console.log(`[Comment] Got comment: "${data.comment.content.slice(0, 30)}..."`);
+            return data.comment.content;
+        }
+
+        console.log(`[Comment] No comments available for job ${jobId}`);
+        return null;
+    } catch (err) {
+        console.error(`[Comment] Failed to fetch comment: ${err.message}`);
+        return null;
+    }
+}
+
 // 순차 기기 번호 캐시: serial_number -> sequential number (PC당 연결 순서)
 const deviceSequenceCache = new Map();
 let nextSequenceNumber = 1;
@@ -154,9 +302,10 @@ let isProcessing = false;
 // Streaming state
 const activeStreams = new Map(); // deviceId -> interval
 
-console.log(`[System] PC-Client v3.0 Starting...`);
-console.log(`[System] PC Code: ${PC_CODE} (기기명 형식: PC${PC_CODE.replace(/^P/i, '')}-###)`);
+console.log(`[System] PC-Client v4.0 Starting... (Auto-Registration Enabled)`);
+console.log(`[System] PC Code: ${PC_CODE} (기기명 형식: ${PC_CODE}-001, ${PC_CODE}-002, ...)`);
 console.log(`[System] ADB Path: ${ADB_PATH}`);
+console.log(`[System] Max Slots: ${MAX_SLOTS}`);
 console.log(`[System] Default Group: ${DEFAULT_GROUP}`);
 console.log(`[System] Server URL: ${SERVER_URL}`);
 
@@ -464,12 +613,11 @@ async function sendHeartbeat() {
     const deviceStatuses = fixedDevices.map(device => ({
         serial: device.serial,
         deviceId: device.serial !== 'Empty' && device.serial !== '-' ? deviceIdCache.get(device.serial) : null,
-        name: device.slotId,           // P01-B01S01 (slot-based name)
+        name: device.slotId,           // P01-001 (순차 번호 기반)
         deviceName: device.slotId,     // 호환성 유지
         pcId: device.pcId,             // P01
-        boardId: getBoardId(device.slotId),  // B01
-        slotId: getSlotId(device.slotId),    // S01
         slotNum: device.slotNum,       // 1, 2, 3, ...
+        slotNumStr: device.slotNum.toString().padStart(3, '0'), // "001", "002", ...
         pcCode: PC_CODE,               // 호환성 유지
         status: device.status,         // idle, busy, offline
         ip: device.ip,                 // 192.168.x.x or N/A
@@ -487,40 +635,80 @@ async function sendHeartbeat() {
         });
     }
 
-    // Also update Supabase for connected devices only
+    // UPSERT to Supabase for ALL devices (connected and offline)
+    // This ensures device list persists across page refreshes
     for (const device of fixedDevices) {
-        if (device.status !== 'offline' && device.serial !== 'Empty' && device.serial !== '-') {
+        if (device.serial !== 'Empty' && device.serial !== '-') {
             const deviceId = deviceIdCache.get(device.serial);
+            const isConnected = device.status !== 'offline';
+
             if (deviceId) {
+                // Update existing device
                 await supabase
                     .from('devices')
                     .update({
-                        last_heartbeat_at: new Date().toISOString(),
-                        last_seen_at: new Date().toISOString()
+                        pc_id: device.slotId,  // P01-001 format
+                        status: device.status,
+                        ip_address: isConnected ? device.ip : null,
+                        last_heartbeat_at: isConnected ? new Date().toISOString() : null,
+                        last_seen_at: isConnected ? new Date().toISOString() : null,
+                        connection_info: {
+                            pcCode: PC_CODE,
+                            slotNum: device.slotNum,
+                            adbConnected: isConnected
+                        }
                     })
                     .eq('id', deviceId);
+            } else if (isConnected) {
+                // New connected device - will be registered via syncDevices
+                // Just log for now
+                console.log(`[Heartbeat] New device detected: ${device.serial.slice(-6)} at slot ${device.slotNum}`);
             }
+        }
+    }
+
+    // Mark devices as offline if not in current fixedDevices
+    const connectedSerials = new Set(
+        fixedDevices
+            .filter(d => d.status !== 'offline' && d.serial !== 'Empty' && d.serial !== '-')
+            .map(d => d.serial)
+    );
+
+    for (const [serial, deviceId] of deviceIdCache.entries()) {
+        if (!connectedSerials.has(serial)) {
+            // Device was registered but not currently connected
+            await supabase
+                .from('devices')
+                .update({
+                    status: 'offline',
+                    last_heartbeat_at: null
+                })
+                .eq('id', deviceId);
         }
     }
 }
 
 // =============================================
-// 4. Screen Capture
+// 4. Screen Capture (바이너리 안전 방식 - spawn 사용)
 // =============================================
 
 async function captureScreen(serial) {
-    // Fixed streaming logic for Windows compatibility:
-    // 1. Capture to file on device (not piping base64 through shell)
-    // 2. Read raw PNG buffer via shell cat
-    // 3. Convert to base64 in Node.js
+    /**
+     * Windows 호환성을 위한 바이너리 안전 캡처:
+     * 1. 폰에 캡처 파일 생성 (screencap -p)
+     * 2. spawn으로 cat 명령 실행하여 바이너리 읽기
+     * 3. Node.js에서 Base64 변환
+     *
+     * exec는 버퍼 제한/인코딩 문제가 있어 spawn 사용 권장
+     */
 
-    const devicePath = '/sdcard/stream_capture.png';
+    const devicePath = '/sdcard/stream_v6.png';
 
     return new Promise(async (resolve, reject) => {
         try {
-            // Step 1: Capture screenshot to file on device
+            // Step 1: 폰에 스크린샷 파일 생성
             await new Promise((res, rej) => {
-                execFile(ADB_PATH, ['-s', serial, 'shell', 'screencap', '-p', devicePath],
+                exec(`"${ADB_PATH}" -s ${serial} shell screencap -p ${devicePath}`,
                     { timeout: 5000 },
                     (error) => {
                         if (error) return rej(error);
@@ -529,27 +717,41 @@ async function captureScreen(serial) {
                 );
             });
 
-            // Step 2: Read the file as raw buffer (NOT through base64 in shell)
-            execFile(ADB_PATH, ['-s', serial, 'exec-out', 'cat', devicePath],
-                { encoding: 'buffer', maxBuffer: 10 * 1024 * 1024, timeout: 5000 },
-                (error, stdout) => {
-                    if (error) {
-                        return reject(error);
-                    }
+            // Step 2: spawn으로 바이너리 안전하게 읽기
+            const child = spawn(ADB_PATH, ['-s', serial, 'shell', 'cat', devicePath]);
 
-                    if (!stdout || stdout.length === 0) {
+            const chunks = [];
+            child.stdout.on('data', (chunk) => chunks.push(chunk));
+            child.stderr.on('data', (data) => {
+                console.error(`[Capture] ADB Stderr: ${data}`);
+            });
+
+            child.on('error', (err) => {
+                reject(new Error(`Spawn error: ${err.message}`));
+            });
+
+            child.on('close', (code) => {
+                if (code === 0) {
+                    const buffer = Buffer.concat(chunks);
+
+                    if (buffer.length === 0) {
                         return reject(new Error('Empty screenshot buffer'));
                     }
 
-                    try {
-                        // Step 3: Convert buffer to base64 in Node.js
-                        const base64 = stdout.toString('base64');
-                        resolve(base64);
-                    } catch (e) {
-                        reject(e);
-                    }
+                    // Step 3: Node.js에서 Base64 변환
+                    const base64 = buffer.toString('base64');
+                    resolve(base64);
+                } else {
+                    reject(new Error(`ADB exited with code ${code}`));
                 }
-            );
+            });
+
+            // Timeout 처리
+            setTimeout(() => {
+                child.kill();
+                reject(new Error('Screenshot capture timeout'));
+            }, 10000);
+
         } catch (err) {
             reject(err);
         }
@@ -710,43 +912,58 @@ function getConnectedDevices() {
 }
 
 /**
- * [Fixed Inventory System] 고정 슬롯 기반 기기 목록 생성
- * 1번부터 MAX_SLOTS번까지의 슬롯을 항상 반환
- * 빈 슬롯은 Offline 상태로 표시
+ * [Auto-Registration Fixed Inventory System v4]
+ * 자동 등록 + 고정 슬롯 기반 기기 목록 생성
+ *
+ * 동작 방식:
+ * 1. 연결된 기기들을 자동으로 device-map.json에 등록 (getOrRegisterDevice)
+ * 2. 001부터 MAX_SLOTS까지의 슬롯을 항상 반환
+ * 3. 빈 슬롯은 Offline 상태로 표시
+ * 4. 스마트폰 검증: ro.product.model 존재 확인 (PC/허브 필터링)
  */
 async function getFixedInventoryDevices() {
     const { devices: connectedSerials, error } = await getConnectedDevicesRaw();
 
-    // 연결된 기기 Map 생성
-    const connectedMap = new Map();
+    // 연결된 기기 Map 생성 (스마트폰 검증 + 자동 등록)
+    const connectedMap = new Map(); // serial -> slotNum
     if (!error) {
         for (const serial of connectedSerials) {
-            connectedMap.set(serial, true);
+            // 스마트폰 검증: PC나 USB허브 필터링
+            const isPhone = await isSmartphone(serial);
+            if (isPhone) {
+                // 자동 등록: 새 기기면 자동으로 슬롯 할당
+                const slotNum = getOrRegisterDevice(serial);
+                connectedMap.set(serial, slotNum);
+            } else {
+                console.log(`[Filter] ${serial} - 스마트폰 아님 (필터링됨)`);
+            }
         }
     }
 
-    // device-map.json을 역방향으로 변환 (슬롯코드 -> 시리얼)
+    // 현재 device-map 로드 (자동 등록 후 최신 상태)
+    const currentDeviceMap = loadDeviceMap();
+
+    // device-map을 역방향으로 변환 (슬롯번호 -> 시리얼)
     const slotToSerial = {};
-    for (const [serial, slotCode] of Object.entries(deviceMap)) {
-        slotToSerial[slotCode] = serial;
+    for (const [serial, slotNum] of Object.entries(currentDeviceMap)) {
+        slotToSerial[slotNum] = serial;
     }
 
     // PC ID 정규화
     const pcId = PC_CODE.startsWith('P') ? PC_CODE : `P${PC_CODE}`;
 
-    // 고정 슬롯 목록 생성
+    // 고정 슬롯 목록 생성 (001 ~ MAX_SLOTS)
     const fixedDevices = [];
 
     for (let i = 1; i <= MAX_SLOTS; i++) {
-        const slotNum = i.toString().padStart(2, '0');
-        const slotCode = `B01S${slotNum}`; // 예: B01S01, B01S02, ...
-        const deviceName = `${pcId}-${slotCode}`; // 예: P01-B01S01
+        const slotNum = i.toString().padStart(3, '0'); // "001", "002", ...
+        const deviceName = `${pcId}-${slotNum}`; // 예: P01-001
 
         // 이 슬롯에 매핑된 시리얼 찾기
-        const mappedSerial = slotToSerial[slotCode];
+        const mappedSerial = slotToSerial[slotNum];
 
         let deviceData = {
-            slotId: deviceName,        // P01-B01S01
+            slotId: deviceName,        // P01-001
             serial: mappedSerial || '-',
             status: 'offline',
             ip: '-',
@@ -865,16 +1082,14 @@ async function syncDevices() {
 
     for (const serial of serials) {
         const groupId = config.groups?.mappings?.[serial] || DEFAULT_GROUP;
-        // 확정된 네이밍 v3: P{PC}-B{Board}S{Slot} 또는 P{PC}-UNKNOWN-{Serial}
+        // 자동 등록 네이밍 v4: P{PC}-{순차번호} (예: P01-001)
         const deviceName = getDeviceName(serial);
-        const boardId = getBoardId(deviceName);
-        const slotId = getSlotId(deviceName);
 
         const { data, error } = await supabase
             .from('devices')
             .upsert({
                 serial_number: serial,
-                pc_id: deviceName, // P01-B01S01 형식
+                pc_id: deviceName, // P01-001 형식
                 group_id: groupId,
                 status: 'idle',
                 last_seen_at: new Date().toISOString()
@@ -889,8 +1104,8 @@ async function syncDevices() {
             console.error('[DB Error]', error.message);
         } else if (data) {
             deviceIdCache.set(serial, data.id);
-            const boardSlotInfo = boardId && slotId ? `${boardId}${slotId}` : 'UNKNOWN';
-            console.log(`[Sync] Device registered: ${deviceName} [${boardSlotInfo}] (${serial.slice(-6)})`);
+            const slotNum = getSlotNum(deviceName) || 'NEW';
+            console.log(`[Sync] Device registered: ${deviceName} [Slot ${slotNum}] (${serial.slice(-6)})`);
         }
     }
 
@@ -1225,7 +1440,11 @@ async function executeJob(assignment) {
                     probLike: probLike,
                     probComment: probComment,
                     doInitialScroll: true,
-                    doMicroInteractions: true
+                    doMicroInteractions: true,
+                    // Comment pool getter for human simulation
+                    getComment: async () => {
+                        return await getCommentFromPool(job.id, device_id);
+                    }
                 };
 
                 // Start progress reporting in parallel
@@ -1275,6 +1494,50 @@ async function executeJob(assignment) {
                 if (probLike > 0 && Math.random() * 100 < probLike) {
                     console.log(`[Execute] ${device_serial}: 좋아요 시도 (기본 모드)`);
                     await executeAdbCommand(device_serial, 'shell input tap 130 820');
+                    await new Promise(resolve => setTimeout(resolve, 500));
+
+                    // Update did_like
+                    await supabase
+                        .from('job_assignments')
+                        .update({ did_like: true })
+                        .eq('id', id);
+                }
+
+                // Basic probabilistic comment (fallback with comment pool)
+                if (probComment > 0 && Math.random() * 100 < probComment) {
+                    console.log(`[Execute] ${device_serial}: 댓글 시도 (기본 모드)`);
+
+                    // Get comment from pool
+                    const commentText = await getCommentFromPool(job.id, device_id);
+
+                    if (commentText) {
+                        // Tap comment input area (approximate position)
+                        await executeAdbCommand(device_serial, 'shell input tap 540 1600');
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+
+                        // Type the comment (escape special characters)
+                        const escapedComment = commentText
+                            .replace(/[`$;|&]/g, '')
+                            .replace(/"/g, '\\"')
+                            .replace(/'/g, "\\'");
+
+                        await executeAdbCommand(device_serial, `shell input text "${escapedComment}"`);
+                        await new Promise(resolve => setTimeout(resolve, 500));
+
+                        // Submit comment (tap send button)
+                        await executeAdbCommand(device_serial, 'shell input tap 950 1600');
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+
+                        console.log(`[Execute] ${device_serial}: 댓글 작성 완료`);
+
+                        // Update did_comment
+                        await supabase
+                            .from('job_assignments')
+                            .update({ did_comment: true })
+                            .eq('id', id);
+                    } else {
+                        console.log(`[Execute] ${device_serial}: 사용 가능한 댓글이 없음`);
+                    }
                 }
             }
 
@@ -1376,5 +1639,6 @@ setInterval(sendHeartbeat, 5000);
 // Scrcpy command polling (2초마다) - Fallback for non-Socket.io commands
 setInterval(pollScrcpyCommands, 2000);
 
-console.log('[System] Worker v3.0 started with Socket.io support');
+console.log('[System] Worker v4.0 started with Socket.io support');
+console.log('[System] Auto-Registration: 새 기기 연결 시 자동으로 슬롯 할당');
 console.log('[System] Polling for jobs and commands...');
