@@ -497,11 +497,10 @@ async function executeJob(assignment) {
             console.log(`[Execute] job.json 푸시 완료: ${jobJsonPath}`);
             console.log(`[Execute] job.json 내용:`, JSON.stringify(jobConfig));
 
-            // AutoX.js WebView Bot 실행
-            // AutoX.js는 Intent로 스크립트 실행 가능
+            // AutoX.js WebView Bot 실행 (am start via RunIntentActivity)
             await executeAdbCommand(
                 device_serial,
-                `shell am start -n org.autojs.autoxjs.v6/.activity.SplashActivity --es file_path "/sdcard/Scripts/doai-bot/webview_bot.js"`
+                `shell am start -n org.autojs.autoxjs.v6/org.autojs.autojs.external.open.RunIntentActivity -d "file:///sdcard/Scripts/doai-bot/webview_bot.js" -t "text/javascript"`
             );
 
         } else {

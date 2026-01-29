@@ -11,6 +11,21 @@
  * - Supabase Edge Function 호출
  */
 
+// Debug checkpoint helper (writes files for external monitoring)
+// Uses setTimeout to work in UI mode when called before UI is ready
+function checkpoint(name, data) {
+    setTimeout(function() {
+        try {
+            files.write('/sdcard/checkpoint_' + name + '.txt',
+                new Date().toISOString() + ' - ' + (data || 'OK'));
+        } catch (e) {
+            // Ignore checkpoint write errors
+        }
+    }, 100);
+}
+
+checkpoint('01_script_started');
+
 console.log('[Bot] Starting WebView-based YouTube automation bot...');
 console.log('[Bot] Device:', device.serial);
 
@@ -34,6 +49,7 @@ function loadJobParams() {
 }
 
 const JOB_PARAMS = loadJobParams();
+checkpoint('02_job_loaded', JOB_PARAMS.assignment_id);
 console.log('[Bot] Job loaded:', JOB_PARAMS.assignment_id);
 console.log('[Bot] Keyword:', JOB_PARAMS.keyword);
 
@@ -77,6 +93,7 @@ const AndroidBridge = {
 };
 
 webView.addJavascriptInterface(AndroidBridge, "AndroidBridge");
+checkpoint('03_webview_initialized');
 
 // WebView Client 설정
 webView.setWebViewClient(new android.webkit.WebViewClient({
@@ -407,15 +424,18 @@ console.log('[Bot] Scenario functions loaded');
 
 async function main() {
     try {
+        checkpoint('04_main_started');
         console.log('[Main] ========== Starting Job Execution ==========');
 
         // 1. YouTube 모바일 홈 로드
         console.log('[Main] Loading YouTube mobile...');
         webView.loadUrl('https://m.youtube.com');
         await randomSleep(3000, 5000);
+        checkpoint('05_youtube_loaded');
 
         // 2. 검색 실행
         await performSearch(JOB_PARAMS.keyword);
+        checkpoint('06_search_completed');
 
         // 3. 검색 결과 클릭 (첫 번째 결과)
         await randomSleep(2000, 3000);
@@ -423,10 +443,12 @@ async function main() {
         if (!clickSuccess) {
             throw new Error('Failed to click search result');
         }
+        checkpoint('07_video_clicked');
 
         // 4. 동영상 시청
         await randomSleep(2000, 3000);
         await watchVideo(JOB_PARAMS.duration_sec);
+        checkpoint('08_video_watched');
 
         // 5. 증거 스크린샷 저장
         console.log('[Main] Capturing evidence screenshot...');
@@ -470,6 +492,7 @@ async function main() {
         toast('작업 완료!');
 
     } catch (error) {
+        checkpoint('99_error', error.message || error.toString());
         console.error('[Main] Job execution failed:', error);
         toast('작업 실패: ' + error.message);
 

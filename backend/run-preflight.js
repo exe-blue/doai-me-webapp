@@ -146,10 +146,11 @@ async function pushScript() {
 async function executeScript() {
   console.log('\n[Step 4] Executing pre-flight.js on device...');
 
-  const broadcastCommand = `shell am broadcast -a com.stardust.autojs.execute -d "file://${CONFIG.remoteScriptPath}"`;
+  // am start via RunIntentActivity (am broadcast blocked by Android OS)
+  const startCommand = `shell am start -n org.autojs.autoxjs.v6/org.autojs.autojs.external.open.RunIntentActivity -d "file://${CONFIG.remoteScriptPath}" -t "text/javascript"`;
 
   try {
-    await adbCommand(broadcastCommand);
+    await adbCommand(startCommand);
     console.log('[Step 4] ✅ Script execution triggered');
     console.log('[Step 4] Check device screen for test progress...');
 
