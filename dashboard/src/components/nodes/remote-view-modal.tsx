@@ -29,6 +29,12 @@ import type { Device } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { useSocketContext } from '@/contexts/socket-context';
 
+interface BroadcastDevice {
+  id: string;
+  name: string;
+  status: string;
+}
+
 interface RemoteViewModalProps {
   device: Device | null;
   open: boolean;
@@ -38,6 +44,7 @@ interface RemoteViewModalProps {
   broadcastEnabled?: boolean;
   onBroadcastToggle?: (enabled: boolean) => void;
   broadcastDeviceIds?: string[]; // All devices in broadcast group
+  broadcastDevices?: BroadcastDevice[]; // Full device info for broadcast targets
   deviceResolution?: { width: number; height: number };
 }
 
@@ -52,6 +59,7 @@ export function RemoteViewModal({
   broadcastEnabled = false,
   onBroadcastToggle,
   broadcastDeviceIds = [],
+  broadcastDevices = [],
   deviceResolution = DEFAULT_RESOLUTION
 }: RemoteViewModalProps) {
   const [screenshot, setScreenshot] = useState<string | null>(null);
@@ -192,11 +200,13 @@ export function RemoteViewModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <span>원격 제어</span>
-            <Badge variant="outline">{device.serial_number}</Badge>
+            <Badge variant="default" className="bg-blue-600">
+              MASTER
+            </Badge>
+            <span className="font-mono font-bold">{device.pc_id || device.serial_number}</span>
             {isStreaming && (
               <Badge variant="default" className="bg-red-500 animate-pulse">
                 <Radio className="h-3 w-3 mr-1" />
@@ -205,189 +215,248 @@ export function RemoteViewModal({
             )}
             {isConnected ? (
               <Badge variant="outline" className="text-green-600 border-green-600">
-                Socket.io 연결됨
+                Connected
               </Badge>
             ) : (
               <Badge variant="outline" className="text-red-600 border-red-600">
-                Socket.io 연결 안됨
+                Disconnected
               </Badge>
             )}
           </DialogTitle>
-          <DialogDescription>
-            화면을 클릭하여 기기를 제어합니다. 해상도: {deviceResolution.width}x{deviceResolution.height}
+          <DialogDescription className="font-mono text-xs">
+            Serial: {device.serial_number} | Resolution: {deviceResolution.width}x{deviceResolution.height}
           </DialogDescription>
         </DialogHeader>
 
-        {/* Broadcast Control Toggle */}
-        {onBroadcastToggle && (
-          <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border">
-            <div className="flex items-center gap-2">
-              <Radio className={cn(
-                "h-4 w-4",
-                broadcastEnabled ? "text-red-500" : "text-muted-foreground"
-              )} />
-              <div>
-                <Label htmlFor="broadcast-toggle" className="font-medium">
-                  브로드캐스트 모드
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  {broadcastEnabled
-                    ? `${broadcastDeviceIds.length}대 기기에 동시 전송`
-                    : '모든 동일 그룹 기기에 명령 동기화'}
-                </p>
+        {/* Main Layout: Screen + Broadcast Targets */}
+        <div className="flex gap-4">
+          {/* Left: Screen View */}
+          <div className="flex-1">
+            {/* Broadcast Control Toggle */}
+            {onBroadcastToggle && (
+              <div className="flex items-center justify-between p-3 mb-3 bg-zinc-900 rounded-lg border border-zinc-800">
+                <div className="flex items-center gap-2">
+                  <Radio className={cn(
+                    "h-4 w-4",
+                    broadcastEnabled ? "text-red-500" : "text-zinc-500"
+                  )} />
+                  <div>
+                    <Label htmlFor="broadcast-toggle" className="font-mono text-sm font-medium text-white">
+                      BROADCAST MODE
+                    </Label>
+                    <p className="font-mono text-[10px] text-zinc-500">
+                      {broadcastEnabled
+                        ? `Syncing to ${broadcastDeviceIds.length} devices`
+                        : 'Click to sync with group'}
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  id="broadcast-toggle"
+                  checked={broadcastEnabled}
+                  onCheckedChange={onBroadcastToggle}
+                />
               </div>
-            </div>
-            <Switch
-              id="broadcast-toggle"
-              checked={broadcastEnabled}
-              onCheckedChange={onBroadcastToggle}
-            />
-          </div>
-        )}
+            )}
 
-        {/* Screenshot Area */}
-        <div
-          ref={imageRef}
-          onClick={handleImageClick}
-          className={cn(
-            'relative bg-muted rounded-lg overflow-hidden cursor-crosshair mx-auto',
-            'border-2 border-dashed',
-            broadcastEnabled ? 'border-red-500/50' : 'border-muted-foreground/30',
-            isLoading && 'animate-pulse'
-          )}
-          style={{
-            width: '100%',
-            maxWidth: '400px',
-            aspectRatio: `${deviceResolution.width} / ${deviceResolution.height}`
-          }}
-        >
-          {screenshot ? (
-            <img
-              src={screenshot}
-              alt="Device screen"
-              className="w-full h-full object-contain"
-              draggable={false}
-            />
-          ) : (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="text-center text-muted-foreground">
-                <MousePointer className="h-8 w-8 mx-auto mb-2" />
-                <p>새로고침을 눌러 화면을 가져오세요</p>
-              </div>
-            </div>
-          )}
-
-          {isLoading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-background/50">
-              <Loader2 className="h-8 w-8 animate-spin" />
-            </div>
-          )}
-
-          {/* Click indicator */}
-          {clickPos && (
+            {/* Screenshot Area */}
             <div
-              className="absolute w-4 h-4 bg-red-500 rounded-full opacity-50 -translate-x-1/2 -translate-y-1/2 animate-ping"
+              ref={imageRef}
+              onClick={handleImageClick}
+              className={cn(
+                'relative bg-zinc-900 rounded-lg overflow-hidden cursor-crosshair mx-auto',
+                'border border-zinc-800',
+                broadcastEnabled && 'ring-2 ring-red-500/50'
+              )}
               style={{
-                left: `${(clickPos.x / deviceResolution.width) * 100}%`,
-                top: `${(clickPos.y / deviceResolution.height) * 100}%`
+                width: '100%',
+                maxWidth: '320px',
+                aspectRatio: `${deviceResolution.width} / ${deviceResolution.height}`
               }}
-            />
-          )}
+            >
+              {screenshot ? (
+                <img
+                  src={screenshot}
+                  alt="Device screen"
+                  className="w-full h-full object-contain"
+                  draggable={false}
+                />
+              ) : isStreaming ? (
+                <div className="absolute inset-0 flex items-center justify-center bg-zinc-900">
+                  <div className="text-center">
+                    <Loader2 className="h-8 w-8 mx-auto mb-2 text-red-500 animate-spin" />
+                    <p className="font-mono text-xs text-zinc-400">Waiting for stream...</p>
+                    <p className="font-mono text-[10px] text-zinc-600 mt-1">Connecting to device</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center bg-zinc-900">
+                  <div className="text-center">
+                    <MousePointer className="h-8 w-8 mx-auto mb-2 text-zinc-600" />
+                    <p className="font-mono text-xs text-zinc-500">Click START STREAM</p>
+                  </div>
+                </div>
+              )}
 
-          {/* Broadcast indicator overlay */}
-          {broadcastEnabled && (
-            <div className="absolute top-2 right-2">
-              <Badge variant="destructive" className="animate-pulse">
-                <Radio className="h-3 w-3 mr-1" />
-                동기화
-              </Badge>
+              {isLoading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-zinc-900/80">
+                  <Loader2 className="h-8 w-8 animate-spin text-zinc-500" />
+                </div>
+              )}
+
+              {/* Click indicator */}
+              {clickPos && (
+                <div
+                  className="absolute w-4 h-4 bg-red-500 rounded-full opacity-50 -translate-x-1/2 -translate-y-1/2 animate-ping"
+                  style={{
+                    left: `${(clickPos.x / deviceResolution.width) * 100}%`,
+                    top: `${(clickPos.y / deviceResolution.height) * 100}%`
+                  }}
+                />
+              )}
+
+              {/* Broadcast indicator overlay */}
+              {broadcastEnabled && (
+                <div className="absolute top-2 right-2">
+                  <Badge variant="destructive" className="animate-pulse font-mono text-[10px]">
+                    <Radio className="h-3 w-3 mr-1" />
+                    SYNC
+                  </Badge>
+                </div>
+              )}
+            </div>
+
+            {/* Click coordinates display */}
+            {clickPos && (
+              <p className="font-mono text-[10px] text-zinc-500 text-center">
+                Last tap: ({clickPos.x}, {clickPos.y})
+              </p>
+            )}
+
+            {/* Streaming Controls */}
+            <div className="flex justify-center gap-2">
+              {!isStreaming ? (
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={startStreaming}
+                  disabled={!isConnected}
+                  className="bg-red-500 hover:bg-red-600 disabled:bg-gray-400 font-mono text-xs"
+                >
+                  <Play className="h-4 w-4 mr-1" />
+                  START STREAM
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={stopStreaming}
+                  className="font-mono text-xs"
+                >
+                  <Pause className="h-4 w-4 mr-1" />
+                  STOP STREAM
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={startStreaming}
+                disabled={isLoading || !isConnected}
+                className="font-mono text-xs"
+              >
+                <RefreshCw className={cn('h-4 w-4 mr-1', isLoading && 'animate-spin')} />
+                RE-CONNECT
+              </Button>
+            </div>
+
+            {/* Control Buttons */}
+            <div className="flex justify-center gap-2 flex-wrap">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleKeyCommand(4)}
+                className="font-mono text-xs"
+              >
+                <ArrowLeft className="h-4 w-4 mr-1" />
+                BACK
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleKeyCommand(3)}
+                className="font-mono text-xs"
+              >
+                <Home className="h-4 w-4 mr-1" />
+                HOME
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleKeyCommand(187)}
+                className="font-mono text-xs"
+              >
+                <LayoutGrid className="h-4 w-4 mr-1" />
+                RECENT
+              </Button>
+            </div>
+
+            {/* Swipe Controls */}
+            <div className="flex justify-center gap-2">
+              <Button variant="ghost" size="sm" onClick={() => handleSwipe('up')} className="font-mono text-xs">
+                ↑ UP
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => handleSwipe('down')} className="font-mono text-xs">
+                ↓ DOWN
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => handleSwipe('left')} className="font-mono text-xs">
+                ← LEFT
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => handleSwipe('right')} className="font-mono text-xs">
+                → RIGHT
+              </Button>
+            </div>
+          </div>
+
+          {/* Right: Broadcast Targets Panel */}
+          {broadcastDevices.length > 0 && (
+            <div className="w-48 shrink-0">
+              <div className="rounded-md border border-zinc-800 bg-zinc-900 overflow-hidden">
+                <div className="px-3 py-2 border-b border-zinc-800 bg-zinc-800/50">
+                  <span className="font-mono text-[10px] text-zinc-500 uppercase">
+                    BROADCAST TARGETS
+                  </span>
+                </div>
+                <div className="p-2 space-y-1 max-h-[400px] overflow-y-auto">
+                  {broadcastDevices.map((bd) => (
+                    <div
+                      key={bd.id}
+                      className={cn(
+                        "flex items-center gap-2 px-2 py-1.5 rounded text-xs font-mono",
+                        broadcastEnabled ? "bg-red-500/10 border border-red-500/30" : "bg-zinc-800/50"
+                      )}
+                    >
+                      <div className={cn(
+                        "h-1.5 w-1.5 rounded-full",
+                        bd.status === 'busy' ? "bg-yellow-500" :
+                        bd.status === 'offline' ? "bg-zinc-600" : "bg-green-500"
+                      )} />
+                      <span className={cn(
+                        "truncate",
+                        broadcastEnabled ? "text-red-400" : "text-zinc-400"
+                      )}>
+                        {bd.name}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <div className="px-3 py-2 border-t border-zinc-800 bg-zinc-800/30">
+                  <span className="font-mono text-[10px] text-zinc-600">
+                    {broadcastEnabled ? `${broadcastDevices.length} synced` : `${broadcastDevices.length} available`}
+                  </span>
+                </div>
+              </div>
             </div>
           )}
-        </div>
-
-        {/* Click coordinates display */}
-        {clickPos && (
-          <p className="text-xs text-muted-foreground text-center">
-            마지막 터치: ({clickPos.x}, {clickPos.y})
-          </p>
-        )}
-
-        {/* Streaming Controls */}
-        <div className="flex justify-center gap-2">
-          {!isStreaming ? (
-            <Button
-              variant="default"
-              size="sm"
-              onClick={startStreaming}
-              disabled={!isConnected}
-              className="bg-red-500 hover:bg-red-600 disabled:bg-gray-400"
-            >
-              <Play className="h-4 w-4 mr-1" />
-              실시간 스트리밍
-            </Button>
-          ) : (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={stopStreaming}
-            >
-              <Pause className="h-4 w-4 mr-1" />
-              스트리밍 중지
-            </Button>
-          )}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={fetchScreenshot}
-            disabled={isLoading || isStreaming || !isConnected}
-          >
-            <RefreshCw className={cn('h-4 w-4 mr-1', isLoading && 'animate-spin')} />
-            새로고침
-          </Button>
-        </div>
-
-        {/* Control Buttons */}
-        <div className="flex justify-center gap-2 flex-wrap">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleKeyCommand(4)} // KEYCODE_BACK
-          >
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            뒤로
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleKeyCommand(3)} // KEYCODE_HOME
-          >
-            <Home className="h-4 w-4 mr-1" />
-            홈
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleKeyCommand(187)} // KEYCODE_APP_SWITCH
-          >
-            <LayoutGrid className="h-4 w-4 mr-1" />
-            최근
-          </Button>
-        </div>
-
-        {/* Swipe Controls */}
-        <div className="flex justify-center gap-2">
-          <Button variant="ghost" size="sm" onClick={() => handleSwipe('up')}>
-            ↑ 위로
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => handleSwipe('down')}>
-            ↓ 아래로
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => handleSwipe('left')}>
-            ← 왼쪽
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => handleSwipe('right')}>
-            → 오른쪽
-          </Button>
         </div>
       </DialogContent>
     </Dialog>

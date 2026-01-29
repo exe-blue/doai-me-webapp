@@ -1,9 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   Radio,
@@ -26,6 +24,17 @@ interface BroadcastControlProps {
   onBroadcastCommand: (command: string, params?: Record<string, number>) => void | Promise<void>;
   isActive: boolean;
   onToggleActive: () => void;
+}
+
+// Extract B{Board}S{Slot} format from pc_id (e.g., "P01-B01S02" -> "B01S02")
+function getSlotName(device: Device): string {
+  const pcId = device.pc_id;
+  if (pcId) {
+    const match = pcId.match(/(B\d+S\d+)/);
+    if (match) return match[1];
+  }
+  // Fallback to last 6 chars of serial
+  return device.serial_number?.slice(-6) || 'UNKNOWN';
 }
 
 export function BroadcastControl({
@@ -55,63 +64,72 @@ export function BroadcastControl({
   const onlineDevices = devices.filter(d => d.status !== 'offline');
 
   return (
-    <Card className={cn(
-      'transition-all',
-      isActive && 'ring-2 ring-blue-500'
+    <div className={cn(
+      'rounded-md border border-zinc-800 bg-black dark:bg-zinc-950 overflow-hidden transition-all',
+      isActive && 'ring-1 ring-blue-500/50 border-blue-500/50'
     )}>
-      <CardHeader>
-        <div className="flex items-center justify-between">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 bg-zinc-900/50">
+        <div className="flex items-center gap-3">
+          <Radio className="h-4 w-4 text-zinc-500" />
           <div>
-            <CardTitle className="flex items-center gap-2">
-              <Radio className="h-5 w-5" />
-              브로드캐스트 제어
-            </CardTitle>
-            <CardDescription>
-              마스터 기기의 동작을 슬레이브 기기들에 동기화
-            </CardDescription>
+            <span className="font-mono text-sm font-bold text-white">BROADCAST_CONTROL</span>
+            <p className="font-mono text-[10px] text-zinc-500 mt-0.5">
+              Sync master actions to slaves
+            </p>
           </div>
-          <Button
-            variant={isActive ? 'default' : 'outline'}
-            size="sm"
-            onClick={onToggleActive}
-          >
-            {isActive ? (
-              <>
-                <Pause className="h-4 w-4 mr-1" />
-                비활성화
-              </>
-            ) : (
-              <>
-                <Play className="h-4 w-4 mr-1" />
-                활성화
-              </>
-            )}
-          </Button>
         </div>
-      </CardHeader>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onToggleActive}
+          className={cn(
+            'font-mono text-xs border-zinc-700',
+            isActive
+              ? 'bg-blue-500/20 border-blue-500 text-blue-400 hover:bg-blue-500/30'
+              : 'hover:border-zinc-600 hover:bg-zinc-900'
+          )}
+        >
+          {isActive ? (
+            <>
+              <Pause className="h-3 w-3 mr-1" />
+              STOP
+            </>
+          ) : (
+            <>
+              <Play className="h-3 w-3 mr-1" />
+              START
+            </>
+          )}
+        </Button>
+      </div>
 
-      <CardContent className="space-y-4">
+      <div className="p-4 space-y-4">
         {/* Master Selection */}
         <div>
-          <label className="text-sm font-medium mb-2 block">마스터 기기</label>
-          <div className="flex flex-wrap gap-2">
-            {onlineDevices.map((device) => (
-              <Button
-                key={device.id}
-                variant={masterDeviceId === device.id ? 'default' : 'outline'}
-                size="sm"
+          <label className="font-mono text-[10px] text-zinc-500 uppercase block mb-2">
+            Master Device
+          </label>
+          <div className="flex flex-wrap gap-1.5">
+            {onlineDevices.map((device, index) => (
+              <button
+                key={device.serial_number || device.id || index}
                 onClick={() => onMasterChange(masterDeviceId === device.id ? null : device.id)}
                 className={cn(
-                  masterDeviceId === device.id && 'bg-blue-500 hover:bg-blue-600'
+                  'px-2 py-1 rounded text-xs font-mono transition-all',
+                  'border border-zinc-700 hover:border-zinc-600',
+                  masterDeviceId === device.id
+                    ? 'bg-blue-500/20 border-blue-500 text-blue-400'
+                    : 'bg-zinc-900 text-zinc-400 hover:bg-zinc-800'
                 )}
               >
-                {device.serial_number.slice(-6)}
-              </Button>
+                {getSlotName(device)}
+              </button>
             ))}
           </div>
           {masterDevice && (
-            <p className="text-xs text-muted-foreground mt-2">
-              선택됨: {masterDevice.serial_number}
+            <p className="font-mono text-[10px] text-zinc-600 mt-2">
+              Selected: {getSlotName(masterDevice)}
             </p>
           )}
         </div>
@@ -119,10 +137,10 @@ export function BroadcastControl({
         {/* Slave Selection */}
         <div>
           <div className="flex items-center justify-between mb-2">
-            <label className="text-sm font-medium">슬레이브 기기</label>
-            <Button
-              variant="ghost"
-              size="sm"
+            <label className="font-mono text-[10px] text-zinc-500 uppercase">
+              Slave Devices
+            </label>
+            <button
               onClick={() => {
                 const allIds = onlineDevices
                   .filter(d => d.id !== masterDeviceId)
@@ -133,31 +151,35 @@ export function BroadcastControl({
                   }
                 });
               }}
+              className="flex items-center gap-1 font-mono text-[10px] text-zinc-500 hover:text-zinc-400 transition-colors"
             >
-              <Users className="h-4 w-4 mr-1" />
-              전체 선택
-            </Button>
+              <Users className="h-3 w-3" />
+              SELECT_ALL
+            </button>
           </div>
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-2">
             {onlineDevices
               .filter(d => d.id !== masterDeviceId)
-              .map((device) => (
+              .map((device, index) => (
                 <label
-                  key={device.id}
-                  className="flex items-center gap-2 cursor-pointer"
+                  key={device.serial_number || device.id || index}
+                  className="flex items-center gap-2 cursor-pointer group"
                 >
                   <Checkbox
                     checked={slaveDeviceIds.includes(device.id)}
                     onCheckedChange={() => onSlaveToggle(device.id)}
                     disabled={!isActive}
+                    className="border-zinc-600 data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
                   />
-                  <span className="text-sm">{device.serial_number.slice(-6)}</span>
+                  <span className="font-mono text-xs text-zinc-500 group-hover:text-zinc-400 transition-colors">
+                    {getSlotName(device)}
+                  </span>
                 </label>
               ))}
           </div>
           {slaveDeviceIds.length > 0 && (
-            <p className="text-xs text-muted-foreground mt-2">
-              {slaveDeviceIds.length}대 선택됨
+            <p className="font-mono text-[10px] text-zinc-600 mt-2">
+              {slaveDeviceIds.length} devices selected
             </p>
           )}
         </div>
@@ -165,34 +187,39 @@ export function BroadcastControl({
         {/* Quick Commands */}
         {isActive && masterDeviceId && slaveDeviceIds.length > 0 && (
           <div>
-            <label className="text-sm font-medium mb-2 block">빠른 명령</label>
-            <div className="flex gap-2">
+            <label className="font-mono text-[10px] text-zinc-500 uppercase block mb-2">
+              Quick Commands
+            </label>
+            <div className="flex gap-1.5">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => handleCommand('keyevent', { keycode: 4 })}
                 disabled={isBroadcasting}
+                className="font-mono text-xs border-zinc-700 hover:border-zinc-600 hover:bg-zinc-900"
               >
-                <ArrowLeft className="h-4 w-4 mr-1" />
-                뒤로
+                <ArrowLeft className="h-3 w-3 mr-1" />
+                BACK
               </Button>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => handleCommand('keyevent', { keycode: 3 })}
                 disabled={isBroadcasting}
+                className="font-mono text-xs border-zinc-700 hover:border-zinc-600 hover:bg-zinc-900"
               >
-                <Home className="h-4 w-4 mr-1" />
-                홈
+                <Home className="h-3 w-3 mr-1" />
+                HOME
               </Button>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => handleCommand('tap', { x: 540, y: 1200 })}
                 disabled={isBroadcasting}
+                className="font-mono text-xs border-zinc-700 hover:border-zinc-600 hover:bg-zinc-900"
               >
-                <MousePointer className="h-4 w-4 mr-1" />
-                중앙 탭
+                <MousePointer className="h-3 w-3 mr-1" />
+                TAP
               </Button>
             </div>
           </div>
@@ -200,22 +227,22 @@ export function BroadcastControl({
 
         {/* Status */}
         {isActive && (
-          <div className="flex items-center gap-2 pt-2 border-t">
+          <div className="flex items-center gap-2 pt-3 border-t border-zinc-800">
             <div className={cn(
               'w-2 h-2 rounded-full',
               masterDeviceId && slaveDeviceIds.length > 0
-                ? 'bg-green-500 animate-pulse'
-                : 'bg-yellow-500'
+                ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]'
+                : 'bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.5)]'
             )} />
-            <span className="text-sm text-muted-foreground">
+            <span className="font-mono text-xs text-zinc-500">
               {masterDeviceId && slaveDeviceIds.length > 0
-                ? '브로드캐스트 준비됨'
-                : '마스터와 슬레이브를 선택하세요'
+                ? 'BROADCAST_READY'
+                : 'SELECT_MASTER_AND_SLAVES'
               }
             </span>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
