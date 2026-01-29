@@ -1,0 +1,20 @@
+{
+  "name": "doai-me-webapp",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "npm run dev --prefix dashboard",
+    "build": "npm run build --prefix dashboard",
+    "start": "npm run start --prefix dashboard",
+    "lint": "npm run lint --prefix dashboard",
+    "install:dashboard": "cd dashboard && npm install",
+    "install:client-pc": "cd client-pc && npm install",
+    "postinstall": "cd dashboard && npm install"
+  },
+  "dependencies": {
+    "next": "16.1.6"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -1,0 +1,176 @@
+<Window x:Class="DoaiDeviceFarm.Client.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="DOAI Device Farm - 입력 미러링" 
+        Height="500" Width="700"
+        WindowStartupLocation="CenterScreen"
+        Closing="Window_Closing">
+    
+    <Window.Resources>
+        <!-- 상태 표시용 스타일 -->
+        <Style x:Key="StatusIndicator" TargetType="Ellipse">
+            <Setter Property="Width" Value="16"/>
+            <Setter Property="Height" Value="16"/>
+            <Setter Property="Stroke" Value="#333"/>
+            <Setter Property="StrokeThickness" Value="1"/>
+        </Style>
+        
+        <Style x:Key="SectionHeader" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+            <Setter Property="Foreground" Value="#333"/>
+        </Style>
+    </Window.Resources>
+    
+    <Grid Background="#F5F5F5">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        
+        <!-- 헤더 -->
+        <Border Grid.Row="0" Background="#2196F3" Padding="16">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="🎮 DOAI Device Farm" FontSize="20" FontWeight="Bold" Foreground="White"/>
+                <TextBlock Text=" - 입력 미러링 클라이언트" FontSize="16" Foreground="#E3F2FD" VerticalAlignment="Bottom" Margin="8,0,0,2"/>
+            </StackPanel>
+        </Border>
+        
+        <!-- 메인 콘텐츠 -->
+        <Grid Grid.Row="1" Margin="16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            
+            <!-- 설정 패널 -->
+            <Border Grid.Column="0" Background="White" CornerRadius="8" Padding="16" Margin="0,0,8,0">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="8" ShadowDepth="2" Opacity="0.1"/>
+                </Border.Effect>
+                
+                <StackPanel>
+                    <TextBlock Text="⚙️ 설정" Style="{StaticResource SectionHeader}"/>
+                    
+                    <!-- ADB 경로 -->
+                    <TextBlock Text="ADB 경로:" Margin="0,8,0,4"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="txtAdbPath" Grid.Column="0" Padding="8" 
+                                 Text="C:\platform-tools\adb.exe"/>
+                        <Button Grid.Column="1" Content="찾기" Padding="12,8" Margin="4,0,0,0"
+                                Click="BtnBrowseAdb_Click"/>
+                    </Grid>
+                    
+                    <!-- 디바이스 선택 -->
+                    <TextBlock Text="대상 디바이스:" Margin="0,12,0,4"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <ComboBox x:Name="cmbDevices" Grid.Column="0" Padding="8"/>
+                        <Button Grid.Column="1" Content="새로고침" Padding="12,8" Margin="4,0,0,0"
+                                Click="BtnRefreshDevices_Click"/>
+                    </Grid>
+                    
+                    <!-- 모니터 선택 -->
+                    <TextBlock Text="미러링 모니터:" Margin="0,12,0,4"/>
+                    <ComboBox x:Name="cmbMonitors" Padding="8" SelectionChanged="CmbMonitors_SelectionChanged"/>
+                    
+                    <!-- 스마트폰 해상도 -->
+                    <TextBlock Text="스마트폰 해상도:" Margin="0,12,0,4"/>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBox x:Name="txtPhoneWidth" Width="80" Padding="8" Text="1080"/>
+                        <TextBlock Text=" x " VerticalAlignment="Center"/>
+                        <TextBox x:Name="txtPhoneHeight" Width="80" Padding="8" Text="2400"/>
+                        <Button Content="적용" Padding="12,8" Margin="8,0,0,0"
+                                Click="BtnApplyResolution_Click"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+            
+            <!-- 상태 패널 -->
+            <Border Grid.Column="1" Background="White" CornerRadius="8" Padding="16" Margin="8,0,0,0">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="8" ShadowDepth="2" Opacity="0.1"/>
+                </Border.Effect>
+                
+                <StackPanel>
+                    <TextBlock Text="📊 상태" Style="{StaticResource SectionHeader}"/>
+                    
+                    <!-- 캡처 상태 -->
+                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                        <Ellipse x:Name="indicatorCapture" Style="{StaticResource StatusIndicator}" Fill="#E0E0E0"/>
+                        <TextBlock x:Name="txtCaptureStatus" Text="캡처 중지됨" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    
+                    <!-- 안전 모드 상태 -->
+                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                        <Ellipse x:Name="indicatorSafeMode" Style="{StaticResource StatusIndicator}" Fill="#E0E0E0"/>
+                        <TextBlock x:Name="txtSafeModeStatus" Text="정상 모드" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    
+                    <!-- 좌표 정보 -->
+                    <TextBlock Text="마지막 좌표:" Margin="0,16,0,4"/>
+                    <Border Background="#F5F5F5" CornerRadius="4" Padding="12">
+                        <StackPanel>
+                            <TextBlock x:Name="txtLastPcCoord" Text="PC: (-, -)"/>
+                            <TextBlock x:Name="txtLastPhoneCoord" Text="Phone: (-, -)"/>
+                        </StackPanel>
+                    </Border>
+                    
+                    <!-- 스케일 정보 -->
+                    <TextBlock Text="스케일 비율:" Margin="0,12,0,4"/>
+                    <TextBlock x:Name="txtScaleInfo" Text="X: -, Y: -" Foreground="#666"/>
+                    
+                    <!-- 이벤트 카운터 -->
+                    <TextBlock Text="이벤트 수:" Margin="0,12,0,4"/>
+                    <TextBlock x:Name="txtEventCount" Text="전송: 0 / 오류: 0" Foreground="#666"/>
+                </StackPanel>
+            </Border>
+        </Grid>
+        
+        <!-- 하단 컨트롤 -->
+        <Border Grid.Row="2" Background="White" Padding="16">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="4" ShadowDepth="-2" Opacity="0.1" Direction="90"/>
+            </Border.Effect>
+            
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                
+                <!-- 로그 영역 -->
+                <Border Grid.Column="0" Background="#F5F5F5" CornerRadius="4" Padding="8" Margin="0,0,16,0">
+                    <TextBox x:Name="txtLog" IsReadOnly="True" BorderThickness="0" Background="Transparent"
+                             FontFamily="Consolas" FontSize="11" TextWrapping="Wrap"
+                             VerticalScrollBarVisibility="Auto" MaxHeight="60"
+                             Text="[시스템] 초기화 완료. 디바이스를 선택하고 캡처를 시작하세요."/>
+                </Border>
+                
+                <!-- 시작/중지 버튼 -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <Button x:Name="btnStart" Content="▶ 캡처 시작" Padding="24,12"
+                            Background="#4CAF50" Foreground="White" FontWeight="Bold"
+                            Click="BtnStart_Click"/>
+                    <Button x:Name="btnStop" Content="⏹ 중지" Padding="24,12" Margin="8,0,0,0"
+                            Background="#F44336" Foreground="White" FontWeight="Bold"
+                            IsEnabled="False" Click="BtnStop_Click"/>
+                    <Button x:Name="btnResetSafeMode" Content="🔄 안전모드 해제" Padding="16,12" Margin="8,0,0,0"
+                            Visibility="Collapsed" Click="BtnResetSafeMode_Click"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

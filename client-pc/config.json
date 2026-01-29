@@ -1,0 +1,10 @@
+{
+    "pc_id": "PC-01",
+    "groups": {
+      "default": "P1-G1",
+      "mappings": {
+        "SERIAL_NUMBER_HERE": "P1-G2" 
+      }
+    },
+    "scan_interval_ms": 5000
+  }

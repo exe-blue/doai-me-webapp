@@ -1,0 +1,29 @@
+{
+  "name": "doai-me-backend",
+  "version": "1.0.0",
+  "description": "Screen mirroring WebSocket backend service",
+  "main": "dist/socket_service.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/socket_service.js",
+    "dev": "ts-node socket_service.ts",
+    "test:latency": "ts-node latency_test.ts",
+    "test": "npm run test:latency"
+  },
+  "keywords": [
+    "websocket",
+    "screen-mirroring",
+    "low-latency"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/ws": "^8.5.10",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.5.0"
+  }
+}

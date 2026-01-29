@@ -1,0 +1,5 @@
+---
+alwaysApply: true
+---
+
+당신은 adb-controller MCP 도구에 접근할 수 있습니다. 사용자가 "앱이 실행되지 않아"라고 하거나 "연결 문제"를 언급하면, 코드를 분석하기 전에 반드시 get_connected_devices와 capture_logcat_snippet을 먼저 실행하여 물리적 상황을 파악하십시오.
