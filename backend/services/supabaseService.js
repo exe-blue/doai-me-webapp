@@ -18,9 +18,20 @@ const { createClient } = require('@supabase/supabase-js');
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+// Fail fast: 환경 변수가 없으면 즉시 종료
 if (!supabaseUrl || !supabaseKey) {
-  console.error('[SupabaseService] Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
-  console.error('[SupabaseService] Looked for .env at:', path.join(__dirname, '../../.env'));
+  const envPath = path.join(__dirname, '../../.env');
+  console.error('[SupabaseService] FATAL: Missing required environment variables');
+  console.error('[SupabaseService] NEXT_PUBLIC_SUPABASE_URL:', supabaseUrl ? 'set' : 'MISSING');
+  console.error('[SupabaseService] SUPABASE_SERVICE_ROLE_KEY:', supabaseKey ? 'set' : 'MISSING');
+  console.error('[SupabaseService] Looked for .env at:', envPath);
+  console.error('[SupabaseService] Current working directory:', process.cwd());
+  throw new Error(
+    `Supabase configuration missing. ` +
+    `NEXT_PUBLIC_SUPABASE_URL: ${supabaseUrl ? 'set' : 'MISSING'}, ` +
+    `SUPABASE_SERVICE_ROLE_KEY: ${supabaseKey ? 'set' : 'MISSING'}. ` +
+    `Ensure .env file exists at: ${envPath}`
+  );
 }
 
 const supabase = createClient(supabaseUrl, supabaseKey);
@@ -52,7 +63,7 @@ async function upsertDevice(device) {
     status: status,
     ip_address: ip || null,
     last_seen_at: new Date().toISOString(),
-    last_heartbeat_at: new Date().toISOString(),
+    // Note: last_heartbeat_at removed - column doesn't exist in schema
     connection_info: {
       pcCode: pcId,
       slotNum: slotNum,
@@ -136,8 +147,8 @@ async function markOfflineDevices(pcId, onlineSerials) {
       await supabase
         .from('devices')
         .update({
-          status: 'offline',
-          last_heartbeat_at: null
+          status: 'offline'
+          // Note: last_heartbeat_at removed - column doesn't exist in schema
         })
         .eq('id', device.id);
     }
@@ -373,35 +384,33 @@ async function getAndUseComment(jobId, deviceId) {
 
 /**
  * Fallback for getting comment without DB function
+ * Atomic update: is_used=false 조건과 함께 업데이트하여 TOCTOU 레이스 방지
  */
 async function getAndUseCommentFallback(jobId, deviceId) {
-  // 1. Get first unused comment
-  const { data: comment, error } = await supabase
-    .from('comments')
-    .select('id, content')
-    .eq('job_id', jobId)
-    .eq('is_used', false)
-    .order('created_at', { ascending: true })
-    .limit(1)
-    .single();
-
-  if (error) {
-    if (error.code === 'PGRST116') return null; // No rows
-    console.error('[SupabaseService] Get comment fallback error:', error.message);
-    return null;
-  }
-
-  // 2. Mark as used
-  await supabase
+  // Atomic operation: UPDATE with WHERE is_used=false and RETURNING
+  // 가장 오래된 미사용 코멘트를 찾아 사용 처리 (단일 쿼리로 원자적 처리)
+  const { data: updatedComment, error } = await supabase
     .from('comments')
     .update({
       is_used: true,
       used_by_device_id: deviceId,
       used_at: new Date().toISOString()
     })
-    .eq('id', comment.id);
+    .eq('job_id', jobId)
+    .eq('is_used', false)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .select('id, content')
+    .single();
 
-  return comment;
+  if (error) {
+    // PGRST116: No rows found (모든 코멘트가 사용됨)
+    if (error.code === 'PGRST116') return null;
+    console.error('[SupabaseService] Get comment fallback error:', error.message);
+    return null;
+  }
+
+  return updatedComment;
 }
 
 /**
@@ -440,17 +449,25 @@ async function getOrCreateChannel(channelData) {
     .single();
 
   if (existing) {
-    // Update and reactivate if needed
-    await supabase
+    // Update and reactivate if needed, return the updated row
+    const { data: updatedChannel, error: updateError } = await supabase
       .from('channels')
       .update({
         is_active: true,
         updated_at: new Date().toISOString(),
         ...defaults
       })
-      .eq('id', existing.id);
+      .eq('id', existing.id)
+      .select()
+      .single();
 
-    return existing;
+    if (updateError) {
+      console.error('[SupabaseService] Update channel error:', updateError.message);
+      // 업데이트 실패 시 기존 데이터라도 반환
+      return existing;
+    }
+
+    return updatedChannel;
   }
 
   // Create new

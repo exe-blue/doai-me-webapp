@@ -471,10 +471,10 @@ export function StatusBoard({ refreshTrigger }: StatusBoardProps) {
                     </p>
                     <div className="flex flex-wrap gap-2 mt-2">
                       <Badge variant="outline" className="text-xs">
-                        ⏱️ {job.duration_min_pct}-{job.duration_max_pct}%
+                        ⏱️ {job.duration_min_pct ?? '-'}-{job.duration_max_pct ?? '-'}%
                       </Badge>
                       <Badge variant="outline" className="text-xs text-red-500 border-red-200">
-                        ❤️ {job.prob_like}%
+                        ❤️ {job.like_probability ?? '-'}%
                       </Badge>
                       <Badge variant="outline" className="text-xs text-blue-500 border-blue-200">
                         💬 {job.prob_comment}%

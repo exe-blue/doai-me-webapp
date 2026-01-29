@@ -44,18 +44,27 @@ export interface Device {
   };
 }
 
-// jobs 테이블 - Simplified V2 Schema
+// jobs 테이블 - 실제 DB 스키마 기반 (supabase-schema.sql 참조)
 export interface Job {
   id: string;                    // UUID
-  name: string;                  // "260130-짐승남-N"
-  type: 'VIDEO' | 'CHANNEL';
-  targetUrl: string;
-  targetCount: number;           // 목표 조회수 (예: 100)
-  currentCount: number;          // 현재 완료수 (예: 45)
-  priority: boolean;             // 우선순위 여부 (True면 큐 맨 앞)
-  status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
-  assignedDevices: string[];     // ["P01-001", "P01-005"...] 현재 작업중인 기기들
-  createdAt: number;             // Unix timestamp
+  title: string;                 // 작업 제목
+  keyword?: string | null;       // 검색어. NULL이면 URL 직접 진입
+  duration_sec?: number;         // 영상 시청 시간(초) DEFAULT 60
+  target_group?: string | null;  // 대상 그룹
+  target_url: string;            // 목표 URL
+  video_url?: string | null;     // 호환성 (target_url의 alias)
+  script_type?: string;          // DEFAULT 'youtube_watch'
+  duration_min_pct?: number;     // 최소 시청 비율 DEFAULT 30
+  duration_max_pct?: number;     // 최대 시청 비율 DEFAULT 90
+  prob_like?: number;            // 좋아요 확률 DEFAULT 0
+  like_probability?: number;     // 호환성 (prob_like의 alias)
+  prob_comment?: number;         // 댓글 확률 DEFAULT 0
+  prob_playlist?: number;        // 저장 확률 DEFAULT 0
+  base_reward?: number;          // 기본 보상 DEFAULT 10
+  is_active?: boolean;           // 활성화 여부 DEFAULT true
+  total_assignments?: number;    // 총 할당 수 DEFAULT 0
+  created_at: string;            // 생성일시
+  updated_at?: string;           // 수정일시
 }
 
 // job_assignments 테이블

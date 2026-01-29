@@ -169,7 +169,8 @@ export async function POST(request: NextRequest) {
     const effectiveTargetValue = target_views || target_value;
 
     // YouTube URL 검증 패턴
-    const youtubeVideoRegex = /^https?:\/\/(www\.)?(youtube\.com|youtu\.be|m\.youtube\.com)\/(watch\?v=|shorts\/|embed\/|v\/)/i;
+    // youtu.be 단축 URL은 경로에 바로 video ID가 오므로 별도 처리
+    const youtubeVideoRegex = /^https?:\/\/(www\.)?(youtube\.com\/(watch\?v=|shorts\/|embed\/|v\/)|youtu\.be\/[a-zA-Z0-9_-]+|m\.youtube\.com\/(watch\?v=|shorts\/|embed\/|v\/))/i;
     const youtubeChannelRegex = /^https?:\/\/(www\.)?(youtube\.com)\/(channel\/|c\/|@|user\/)/i;
 
     // 모드별 검증
@@ -218,24 +219,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 연결된 기기가 없으면 경고
-    if (!idleDevices || idleDevices.length === 0) {
-      return NextResponse.json(
-        { error: 'No idle devices available', devices_count: 0 },
-        { status: 400 }
-      );
-    }
+    // 연결된 기기가 없어도 작업은 생성 (나중에 기기 연결 시 할당)
+    const hasIdleDevices = idleDevices && idleDevices.length > 0;
 
     // 2. 목표에 따라 할당 대상 결정
-    let targetDevices = [...idleDevices];
+    let targetDevices: typeof idleDevices = [];
+    
+    if (hasIdleDevices) {
+      targetDevices = [...(idleDevices || [])];
 
-    if (target_type === 'percentage') {
-      const count = Math.ceil((idleDevices.length * effectiveTargetValue) / 100);
-      targetDevices = idleDevices.slice(0, count);
-    } else if (target_type === 'device_count') {
-      targetDevices = idleDevices.slice(0, Math.min(effectiveTargetValue, idleDevices.length));
+      if (target_type === 'percentage') {
+        const count = Math.ceil((idleDevices!.length * effectiveTargetValue) / 100);
+        targetDevices = idleDevices!.slice(0, count);
+      } else if (target_type === 'device_count') {
+        targetDevices = idleDevices!.slice(0, Math.min(effectiveTargetValue, idleDevices!.length));
+      }
+      // target_type === 'all_devices' 는 전체 사용
     }
-    // target_type === 'all_devices' 는 전체 사용
 
     // 3. 채널 모드 처리 (CHANNEL_AUTO)
     let channelRecord = null;
@@ -310,30 +310,30 @@ export async function POST(request: NextRequest) {
       ? Math.round((watch_duration_min / watch_duration_max) * 100)
       : 80;
 
+    // jobs 테이블에 INSERT할 데이터
+    // 기본 스키마 + 마이그레이션으로 추가된 컬럼 모두 포함
     const jobData = {
       title: title || `YouTube Job ${new Date().toLocaleString('ko-KR')}`,
-      display_name: displayName,  // Custom or YYMMDD-짐승남-N format
-      type: 'VIDEO_URL',
       target_url: effectiveTargetUrl,
       duration_sec: effectiveDurationSec,
       duration_min_pct: effectiveDurationMinPct,
       duration_max_pct: 100,
-      watch_duration_min: watch_duration_min || null,  // Store raw values too
-      watch_duration_max: watch_duration_max || null,
       prob_like,
       prob_comment,
-      prob_subscribe: prob_subscribe || 0,  // New: subscribe probability
       prob_playlist,
       script_type,
       is_active: true,
+      total_assignments: targetDevices.length,
+      // 마이그레이션 컬럼 (002_job_system.sql, 003_channel_comment_system.sql 필요)
+      display_name: displayName,
+      type: 'VIDEO_URL',
       status: 'active',
       target_type,
       target_value: effectiveTargetValue,
       assigned_count: targetDevices.length,
       completed_count: 0,
       failed_count: 0,
-      total_assignments: targetDevices.length,
-      priority: priority || false,  // NEW: priority flag
+      priority: priority || false,
     };
 
     const { data: job, error: jobError } = await supabase
