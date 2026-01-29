@@ -12,6 +12,8 @@
     "postinstall": "cd dashboard && npm install"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.93.2",
+    "dotenv": "^17.2.3",
     "next": "16.1.6"
   },
   "engines": {

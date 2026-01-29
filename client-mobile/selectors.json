@@ -1,0 +1,87 @@
+{
+  "search": {
+    "searchBox": {
+      "priority": ["aria-label", "id", "structural"],
+      "selectors": [
+        "input[aria-label='검색']",
+        "input#search",
+        "ytm-search input[type='text']"
+      ]
+    },
+    "searchButton": {
+      "priority": ["aria-label", "id", "structural"],
+      "selectors": [
+        "button[aria-label='검색']",
+        "button#search-icon",
+        "ytm-search button.searchbox-button"
+      ]
+    },
+    "resultVideo": {
+      "priority": ["structural"],
+      "selectors": [
+        "ytm-video-with-context-renderer a.media-item-thumbnail-container",
+        "ytm-compact-video-renderer a",
+        ".compact-media-item a"
+      ]
+    }
+  },
+  "video": {
+    "player": {
+      "priority": ["id", "structural"],
+      "selectors": [
+        "video.html5-main-video",
+        "#player video",
+        ".player-container video"
+      ]
+    },
+    "likeButton": {
+      "priority": ["aria-label", "structural"],
+      "selectors": [
+        "button[aria-label*='좋아요']",
+        "ytm-like-button-renderer button",
+        "#like-button button"
+      ]
+    },
+    "commentButton": {
+      "priority": ["aria-label", "structural"],
+      "selectors": [
+        "ytm-comment-simplebox-renderer",
+        "button[aria-label*='댓글']",
+        "#comment-button"
+      ]
+    },
+    "commentInput": {
+      "priority": ["aria-label", "id", "structural"],
+      "selectors": [
+        "textarea[aria-label='댓글 추가...']",
+        "#comment-input textarea",
+        "ytm-comment-simplebox-renderer textarea"
+      ]
+    },
+    "commentSubmit": {
+      "priority": ["aria-label", "structural"],
+      "selectors": [
+        "button[aria-label='댓글 게시']",
+        "ytm-comment-simplebox-renderer button[aria-label*='게시']",
+        ".comment-submit-button"
+      ]
+    },
+    "saveToPlaylist": {
+      "priority": ["aria-label", "structural"],
+      "selectors": [
+        "button[aria-label*='저장']",
+        "ytm-save-button-renderer button",
+        "#save-button button"
+      ]
+    }
+  },
+  "fallback": {
+    "description": "Fallback strategies when primary selectors fail",
+    "strategies": [
+      "Wait 500ms and retry",
+      "Try next selector in priority list",
+      "Use structural parent-child traversal",
+      "Report selector failure with DOM snapshot"
+    ]
+  }
+}

@@ -83,15 +83,24 @@ async function checkMonitoredChannels() {
 
             // Job 자동 생성 (Preset 적용)
             const preset = ch.preset_settings || {};
+
+            // keyword: preset에서 custom keyword가 있으면 사용, 없으면 자동 생성
+            // NULL이면 URL 직접 진입 방식
+            const autoKeyword = preset.keyword || `${ch.channel_name} ${latestVideo.snippet.title}`;
+
             const { error: jobError } = await supabase.from('jobs').insert({
-                title: `[Auto] ${latestVideo.snippet.title}`,
+                title: latestVideo.snippet.title,  // 영상 제목 (video_title로 매핑됨)
+                keyword: autoKeyword,              // 검색어 (검색 유입용)
+                duration_sec: preset.duration_sec || 60,  // 시청 시간(초)
                 target_url: `https://youtu.be/${videoId}`,
+                script_type: preset.script_type || 'youtube_search',  // 검색 유입 모드 기본값
                 // Preset 적용
                 duration_min_pct: preset.duration_min_pct || 30,
                 duration_max_pct: preset.duration_max_pct || 90,
                 prob_like: preset.prob_like || 50,
                 prob_comment: preset.prob_comment || 30,
-                prob_playlist: preset.prob_playlist || 10
+                prob_playlist: preset.prob_playlist || 10,
+                base_reward: 10
             });
 
             if (!jobError) {

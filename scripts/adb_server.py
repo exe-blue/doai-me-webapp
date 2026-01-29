@@ -113,5 +113,118 @@ def capture_logcat_snippet(lines: int = 50, filter_tag: str = ""):
     
     return run_adb_command(cmd)
 
+@mcp.tool()
+def diagnose_connection(device_id: str = None):
+    """
+    연결 문제 진단 - SocketException, 연결 끊김 등의 원인 분석
+    
+    진단 항목:
+    1. 디바이스 연결 상태
+    2. 최근 로그캣에서 오류 패턴 검색
+    3. 연결 안정성 테스트
+    """
+    diagnostics = {
+        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "device_id": device_id or "default",
+        "checks": []
+    }
+    
+    # 1. 디바이스 상태 확인
+    devices_result = get_connected_devices()
+    target_device = None
+    
+    for device in devices_result.get("devices", []):
+        if device_id is None or device["id"] == device_id:
+            target_device = device
+            break
+    
+    if target_device:
+        diagnostics["checks"].append({
+            "name": "device_status",
+            "status": "pass" if target_device["status"] == "device" else "fail",
+            "detail": f"Device status: {target_device['status']}"
+        })
+    else:
+        diagnostics["checks"].append({
+            "name": "device_status",
+            "status": "fail",
+            "detail": "Device not found"
+        })
+        return diagnostics
+    
+    # 2. 로그캣 분석
+    logcat = capture_logcat_snippet(lines=100)
+    
+    socket_errors = 0
+    connection_resets = 0
+    crashes = 0
+    
+    for line in logcat.split('\n'):
+        lower_line = line.lower()
+        if 'socketexception' in lower_line:
+            socket_errors += 1
+        if 'connection reset' in lower_line or 'broken pipe' in lower_line:
+            connection_resets += 1
+        if 'fatal exception' in lower_line or 'anr' in lower_line:
+            crashes += 1
+    
+    diagnostics["checks"].append({
+        "name": "logcat_analysis",
+        "status": "pass" if (socket_errors == 0 and crashes == 0) else "warning",
+        "detail": f"SocketException: {socket_errors}, ConnectionReset: {connection_resets}, Crashes: {crashes}"
+    })
+    
+    # 3. 연결 안정성 테스트 (echo 명령 3회)
+    echo_success = 0
+    cmd = ["-s", target_device["id"], "shell", "echo", "test"] if device_id else ["shell", "echo", "test"]
+    
+    for _ in range(3):
+        result = run_adb_command(cmd, retries=1, timeout=3)
+        if "test" in result:
+            echo_success += 1
+        time.sleep(0.5)
+    
+    diagnostics["checks"].append({
+        "name": "connection_stability",
+        "status": "pass" if echo_success == 3 else ("warning" if echo_success > 0 else "fail"),
+        "detail": f"Echo test: {echo_success}/3 successful"
+    })
+    
+    # 종합 결과
+    failed_checks = [c for c in diagnostics["checks"] if c["status"] == "fail"]
+    warning_checks = [c for c in diagnostics["checks"] if c["status"] == "warning"]
+    
+    if failed_checks:
+        diagnostics["overall"] = "fail"
+        diagnostics["recommendation"] = "디바이스 연결을 확인하고 USB 케이블/ADB 서버를 재시작하세요."
+    elif warning_checks:
+        diagnostics["overall"] = "warning"
+        diagnostics["recommendation"] = "간헐적 연결 문제가 감지됨. 타임아웃 설정을 늘리고 재연결 로직을 확인하세요."
+    else:
+        diagnostics["overall"] = "pass"
+        diagnostics["recommendation"] = "연결 상태 양호"
+    
+    return diagnostics
+
+@mcp.tool()
+def restart_adb_server():
+    """ADB 서버를 재시작합니다. 연결 문제 해결에 유용합니다."""
+    # ADB 서버 종료
+    kill_result = run_adb_command(["kill-server"], retries=1, timeout=5)
+    time.sleep(1)
+    
+    # ADB 서버 시작
+    start_result = run_adb_command(["start-server"], retries=1, timeout=10)
+    time.sleep(2)
+    
+    # 디바이스 재확인
+    devices = get_connected_devices()
+    
+    return {
+        "kill_result": kill_result,
+        "start_result": start_result,
+        "devices_after_restart": devices
+    }
+
 if __name__ == "__main__":
     mcp.run()

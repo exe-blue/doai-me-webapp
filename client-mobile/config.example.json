@@ -1,0 +1,17 @@
+{
+  "supabase": {
+    "url": "https://your-project.supabase.co",
+    "anon_key": "your-supabase-anon-key-here"
+  },
+  "device": {
+    "group_id": "P1-G1"
+  },
+  "bot": {
+    "poll_interval_ms": 10000,
+    "max_retries": 3
+  },
+  "debug": {
+    "log_level": "info",
+    "save_screenshots": true
+  }
+}

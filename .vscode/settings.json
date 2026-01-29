@@ -1,0 +1,6 @@
+{
+    "sonarlint.connectedMode.project": {
+        "connectionId": "exe-blue",
+        "projectKey": "exe-blue_doai-me-webapp"
+    }
+}

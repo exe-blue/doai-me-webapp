@@ -6,3 +6,17 @@ adbkey
 adbkey.pub
 dist/
 .next/
+
+# Config files with credentials
+client-mobile/config.json
+client-pc/config.json
+preflight-config.json
+
+# Temporary files
+.preflight/
+supabase/.temp/
+test_job.json
+
+# Large binary files
+*.apk
+apk/

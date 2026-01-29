@@ -22,10 +22,10 @@ export default function Home() {
         const thirtySecondsAgo = new Date(Date.now() - 30 * 1000).toISOString();
         const { data, error } = await supabase
           .from('devices')
-          .select('id')
+          .select('id, serial_number')
           .gte('last_seen_at', thirtySecondsAgo)
           .limit(1);
-        
+
         if (error) {
           console.error('Worker 상태 확인 실패:', error);
           setIsWorkerConnected(false);

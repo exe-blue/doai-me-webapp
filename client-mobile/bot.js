@@ -1,42 +1,68 @@
 /**
- * [Agent-Mob] AutoX.js Worker Bot v2.0
+ * [Agent-Mob] AutoX.js Worker Bot v2.1 (Worker v5.1 Compatible)
  * 역할: 유튜브 시청, 좋아요/댓글/담기 자동화, 서버로 진행상황 보고
- * 
+ *
  * 주요 기능:
  * - 불확실성(랜덤) 시청 시간 결정
  * - 확률 기반 좋아요/댓글/담기 수행
  * - Supabase RPC로 댓글 인출 (Race Condition 방지)
  * - AutoX.js UI Selector로 유튜브 앱 조작
+ *
+ * Worker v5.1 Patches:
+ * - Patch 1: job.json 파일 기반 파라미터 로딩
+ * - Patch 2: 고유 증거 파일 경로
+ * - Patch 3: 완료 플래그 작성
  */
 
 "ui"; // UI 모드로 백그라운드 종료 방지
 
-var args = engines.myEngine().execArgv;
+// =============================================
+// 1. 파라미터 설정 (Patch 1: job.json 우선)
+// =============================================
+var params;
+var jobJsonPath = "/sdcard/job.json";
 
-// =============================================
-// 1. 파라미터 설정
-// =============================================
-var params = {
-    // 기본 정보
-    job_id: args.job_id || "test-job",
-    assignment_id: args.assignment_id || "test-assignment",
-    device_id: args.device_id || "test-device",
-    video_url: args.video_url || "https://m.youtube.com/watch?v=dQw4w9WgXcQ",
-    
-    // 시청 시간 설정
-    duration_min_pct: parseInt(args.duration_min_pct) || 30,
-    duration_max_pct: parseInt(args.duration_max_pct) || 90,
-    base_duration_sec: parseInt(args.base_duration_sec) || 300,
-    
-    // 확률 설정 (0-100)
-    prob_like: parseInt(args.prob_like) || 0,
-    prob_comment: parseInt(args.prob_comment) || 0,
-    prob_playlist: parseInt(args.prob_playlist) || 0,
-    
-    // Supabase 설정
-    supabase_url: args.supabase_url,
-    supabase_key: args.supabase_key
-};
+if (files.exists(jobJsonPath)) {
+    // Patch 1: Load from job.json
+    try {
+        var jobJson = files.read(jobJsonPath);
+        params = JSON.parse(jobJson);
+        console.log("✅ [v5.1] Parameters loaded from job.json");
+    } catch (e) {
+        console.error("❌ [v5.1] Failed to parse job.json: " + e.message);
+        console.log("⚠️ [v5.1] Falling back to args");
+        params = null;
+    }
+}
+
+// Fallback to args (backwards compatibility)
+if (!params) {
+    var args = engines.myEngine().execArgv;
+    params = {
+        // 기본 정보
+        job_id: args.job_id || "test-job",
+        assignment_id: args.assignment_id || "test-assignment",
+        device_id: args.device_id || "test-device",
+        video_url: args.video_url || "https://m.youtube.com/watch?v=dQw4w9WgXcQ",
+        keyword: args.keyword || "test video",
+
+        // 시청 시간 설정
+        duration_min_pct: parseInt(args.duration_min_pct) || 30,
+        duration_max_pct: parseInt(args.duration_max_pct) || 90,
+        base_duration_sec: parseInt(args.base_duration_sec) || 300,
+
+        // 확률 설정 (0-100)
+        prob_like: parseInt(args.prob_like) || 0,
+        prob_comment: parseInt(args.prob_comment) || 0,
+        prob_playlist: parseInt(args.prob_playlist) || 0,
+        prob_subscribe: parseInt(args.prob_subscribe) || 0,
+
+        // Supabase 설정
+        supabase_url: args.supabase_url,
+        supabase_key: args.supabase_key
+    };
+    console.log("⚠️ [v5.1] Using fallback args (job.json not found)");
+}
 
 // 작업 결과 추적
 var jobResult = {
@@ -418,7 +444,63 @@ function reportProgress(pct) {
 }
 
 // =============================================
-// 12. 작업 완료
+// 12. 증거 캡처 (Patch 2: 고유 경로)
+// =============================================
+function captureEvidence() {
+    try {
+        // Patch 2: Unique evidence path
+        var evidenceDir = "/sdcard/evidence/";
+
+        // Create evidence directory if not exists
+        if (!files.exists(evidenceDir)) {
+            files.createWithDirs(evidenceDir);
+        }
+
+        var timestamp = Date.now();
+        var filename = params.device_id + "_" + params.job_id + "_" + timestamp + ".png";
+        var filepath = evidenceDir + filename;
+
+        console.log("[Evidence] Capturing screenshot...");
+        var img = images.captureScreen();
+
+        if (img) {
+            images.save(img, filepath);
+            img.recycle();
+            console.log("[Evidence] ✅ Screenshot saved: " + filepath);
+            return filepath;
+        } else {
+            console.error("[Evidence] ❌ Screenshot failed");
+            return null;
+        }
+    } catch (e) {
+        console.error("[Evidence] ❌ Error: " + e.message);
+        return null;
+    }
+}
+
+// =============================================
+// 13. 완료 플래그 작성 (Patch 3)
+// =============================================
+function writeCompletionFlag(status, screenshotPath, errorMessage) {
+    try {
+        var flagPath = "/sdcard/completion_" + params.job_id + ".flag";
+        var flagData = {
+            status: status,
+            job_id: params.job_id,
+            completed_at: new Date().toISOString(),
+            screenshot_path: screenshotPath || null,
+            error: errorMessage || null
+        };
+
+        files.write(flagPath, JSON.stringify(flagData));
+        console.log("[v5.1] ✅ Completion flag written: " + flagPath);
+    } catch (e) {
+        console.error("[v5.1] ❌ Completion flag failed: " + e.message);
+    }
+}
+
+// =============================================
+// 14. 작업 완료
 // =============================================
 function completeJob(finalPct, durationSec) {
     console.log("=== Job Completed ===");
@@ -429,8 +511,13 @@ function completeJob(finalPct, durationSec) {
     if (jobResult.errors.length > 0) {
         console.log("Errors: " + jobResult.errors.join(", "));
     }
-    
+
+    // Patch 2: Capture evidence with unique path
+    var screenshotPath = captureEvidence();
+
     if (!params.supabase_url) {
+        // Patch 3: Write completion flag even without Supabase
+        writeCompletionFlag("success", screenshotPath, null);
         engines.myEngine().forceStop();
         return;
     }
@@ -447,6 +534,7 @@ function completeJob(finalPct, durationSec) {
             "did_like": jobResult.didLike,
             "did_comment": jobResult.didComment,
             "did_playlist": jobResult.didPlaylist
+            // screenshot_path는 Worker가 업로드 후 업데이트
         }, {
             headers: {
                 "apikey": params.supabase_key,
@@ -454,7 +542,7 @@ function completeJob(finalPct, durationSec) {
                 "Content-Type": "application/json"
             }
         });
-        
+
         // HTTP 응답 상태 확인 (2xx 범위만 성공으로 처리)
         if (response && response.statusCode) {
             if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -465,7 +553,10 @@ function completeJob(finalPct, durationSec) {
     } catch (e) {
         console.error("[Complete] 완료 보고 실패: " + e.message);
     }
-    
+
+    // Patch 3: Write completion flag
+    writeCompletionFlag("success", screenshotPath, null);
+
     // 스크립트 종료
     engines.myEngine().forceStop();
 }

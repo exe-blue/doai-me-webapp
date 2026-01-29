@@ -6,7 +6,12 @@
 require('dotenv').config({ path: '../.env' });
 const { createClient } = require('@supabase/supabase-js');
 const { exec, execFile } = require('child_process');
+const fs = require('fs');
+const path = require('path');
 const config = require('./config.json');
+
+// v5.1: 결과 수집 모듈 (파일 존재 확인 후 Pull)
+const resultCollector = require('../backend/result-collector.js');
 
 // =============================================
 // 1. 초기 설정
@@ -152,7 +157,7 @@ function executeAdbCommand(serial, command) {
 
 async function syncDevices() {
     const serials = await getConnectedDevices();
-    
+
     if (serials.length === 0) {
         console.log(`[Watchdog] 연결된 기기 없음. 대기중...`);
         return [];
@@ -161,7 +166,7 @@ async function syncDevices() {
     for (const serial of serials) {
         const groupId = config.groups.mappings[serial] || DEFAULT_GROUP;
 
-        // Upsert 기기 정보
+        // Upsert 기기 정보 (serial_number 기준으로 upsert, id는 자동 생성)
         const { data, error } = await supabase
             .from('devices')
             .upsert({
@@ -170,9 +175,9 @@ async function syncDevices() {
                 group_id: groupId,
                 status: 'idle',
                 last_seen_at: new Date().toISOString()
-            }, { 
+            }, {
                 onConflict: 'serial_number',
-                ignoreDuplicates: false 
+                ignoreDuplicates: false
             })
             .select('id, serial_number')
             .single();
@@ -180,8 +185,9 @@ async function syncDevices() {
         if (error) {
             console.error('[DB Error]', error.message);
         } else if (data) {
-            // 캐시 업데이트
+            // 캐시 업데이트: serial_number -> UUID id 매핑
             deviceIdCache.set(serial, data.id);
+            console.log(`[Sync] ${serial} -> ${data.id}`);
         }
     }
 
@@ -195,27 +201,27 @@ async function syncDevices() {
 
 async function pollForJobs() {
     try {
-        // 연결된 기기의 device ID 목록 가져오기
+        // 연결된 기기의 UUID device_id 목록 가져오기
         const connectedSerials = await getConnectedDevices();
         const connectedDeviceIds = [];
-        
+
         for (const serial of connectedSerials) {
             let deviceId = deviceIdCache.get(serial);
-            
+
             if (!deviceId) {
-                // 캐시에 없으면 DB에서 조회
+                // 캐시에 없으면 DB에서 조회 (serial_number로 검색 -> id 획득)
                 const { data } = await supabase
                     .from('devices')
-                    .select('id')
+                    .select('id, serial_number')
                     .eq('serial_number', serial)
                     .single();
-                
+
                 if (data) {
                     deviceId = data.id;
                     deviceIdCache.set(serial, deviceId);
                 }
             }
-            
+
             if (deviceId) {
                 connectedDeviceIds.push({ id: deviceId, serial });
             }
@@ -225,7 +231,7 @@ async function pollForJobs() {
             return;
         }
 
-        // pending 상태의 assignments 조회
+        // pending 상태의 assignments 조회 (device_id는 이제 UUID FK)
         const { data: assignments, error } = await supabase
             .from('job_assignments')
             .select(`
@@ -235,10 +241,16 @@ async function pollForJobs() {
                 status,
                 jobs (
                     id,
+                    title,
+                    keyword,
+                    duration_sec,
                     target_url,
+                    script_type,
                     duration_min_pct,
                     duration_max_pct,
-                    prob_like
+                    prob_like,
+                    prob_comment,
+                    prob_playlist
                 )
             `)
             .eq('status', 'pending')
@@ -264,7 +276,7 @@ async function pollForJobs() {
                     ...assignment,
                     device_serial: deviceInfo.serial
                 });
-                console.log(`[Queue] 작업 추가: ${assignment.id} (${deviceInfo.serial})`);
+                console.log(`[Queue] 작업 추가: ${assignment.id} (device_id: ${assignment.device_id}, serial: ${deviceInfo.serial})`);
             }
         }
 
@@ -362,23 +374,36 @@ function validateAndSanitizeUrl(url) {
 
 async function executeJob(assignment) {
     const { id, device_id, device_serial, jobs: job } = assignment;
-    
+
     if (!job) {
         console.error(`[Execute] Job 정보 없음: ${id}`);
+        // Job 정보 없음 에러를 DB에 기록
+        await supabase
+            .from('job_assignments')
+            .update({
+                status: 'failed',
+                error_log: 'Job 정보를 찾을 수 없음'
+            })
+            .eq('id', id);
         return;
     }
 
+    // 검색어 결정: keyword가 있으면 사용, 없으면 title로 fallback
+    const searchKeyword = job.keyword || job.title;
+    const scriptType = job.script_type || 'youtube_watch';
+
     console.log(`[Execute] 작업 시작: ${id}`);
-    console.log(`[Execute] 기기: ${device_serial}, URL: ${job.target_url}`);
+    console.log(`[Execute] 기기: ${device_serial} (device_id: ${device_id})`);
+    console.log(`[Execute] 스크립트: ${scriptType}, 검색어: "${searchKeyword}", 제목: "${job.title}"`);
 
     // 1. 상태를 running으로 업데이트 (에러 처리 포함)
     let assignmentUpdated = false;
     let deviceUpdated = false;
-    
+
     try {
         const { error: assignmentError } = await supabase
             .from('job_assignments')
-            .update({ 
+            .update({
                 status: 'running',
                 started_at: new Date().toISOString()
             })
@@ -390,7 +415,7 @@ async function executeJob(assignment) {
         }
         assignmentUpdated = true;
 
-        // 2. 기기 상태를 busy로 업데이트
+        // 2. 기기 상태를 busy로 업데이트 (device_id는 UUID FK)
         const { error: deviceError } = await supabase
             .from('devices')
             .update({ status: 'busy' })
@@ -413,7 +438,7 @@ async function executeJob(assignment) {
                 rollbackError = rbException;
                 console.error(`[DB Error] job_assignments 롤백 예외: ${rbException.message}`);
             }
-            
+
             // 원본 에러와 롤백 에러를 모두 포함한 에러 throw
             if (rollbackError) {
                 throw new Error(`devices 업데이트 실패: ${deviceError.message} (롤백도 실패: ${rollbackError.message})`);
@@ -431,27 +456,73 @@ async function executeJob(assignment) {
         await executeAdbCommand(device_serial, 'shell input keyevent 26');
         await new Promise(resolve => setTimeout(resolve, 500));
 
-        // 4. 유튜브 실행 - URL 검증 및 sanitize
-        const urlValidation = validateAndSanitizeUrl(job.target_url);
-        if (!urlValidation.valid) {
-            throw new Error(`유효하지 않은 URL: ${urlValidation.error}`);
+        // 4. 시청 시간: DB에서 가져온 duration_sec 사용 (기본값 60초)
+        const watchDuration = job.duration_sec || 60;
+
+        // 5. 스크립트 타입에 따른 실행 분기
+        if (scriptType === 'youtube_search') {
+            // ===== 검색 유입 모드 =====
+            console.log(`[Execute] 검색 유입 모드 - 키워드: "${searchKeyword}"`);
+
+            // Mobile Agent용 job.json 생성 (데이터 매핑 규칙 준수)
+            // DB -> Worker -> Mobile Agent 매핑:
+            // jobs.keyword -> keyword -> keyword
+            // jobs.title -> video_title -> video_title
+            // jobs.duration_sec -> duration_sec -> duration_sec
+            // job_assignments.id -> assignment_id -> assignment_id
+            const jobConfig = {
+                assignment_id: id,
+                keyword: searchKeyword,         // jobs.keyword (fallback: jobs.title)
+                video_title: job.title,         // jobs.title
+                duration_sec: watchDuration,    // jobs.duration_sec
+                prob_like: job.prob_like || 0,
+                prob_comment: job.prob_comment || 0,
+                prob_playlist: job.prob_playlist || 0
+            };
+
+            // job.json을 기기에 푸시 (job-loader.js와 동일한 경로 사용)
+            const jobJsonPath = `/sdcard/Scripts/doai-bot/job.json`;
+            const tempJobFile = path.join(__dirname, `temp_job_${device_serial}.json`);
+
+            // 로컬에 임시 파일 생성
+            fs.writeFileSync(tempJobFile, JSON.stringify(jobConfig, null, 2));
+
+            // ADB로 기기에 푸시 (디렉토리 생성 포함)
+            await executeAdbCommand(device_serial, `shell mkdir -p /sdcard/Scripts/doai-bot`);
+            await executeAdbCommand(device_serial, `push "${tempJobFile}" ${jobJsonPath}`);
+
+            // 임시 파일 삭제
+            fs.unlinkSync(tempJobFile);
+
+            console.log(`[Execute] job.json 푸시 완료: ${jobJsonPath}`);
+            console.log(`[Execute] job.json 내용:`, JSON.stringify(jobConfig));
+
+            // AutoX.js WebView Bot 실행
+            // AutoX.js는 Intent로 스크립트 실행 가능
+            await executeAdbCommand(
+                device_serial,
+                `shell am start -n org.autojs.autoxjs.v6/.activity.SplashActivity --es file_path "/sdcard/Scripts/doai-bot/webview_bot.js"`
+            );
+
+        } else {
+            // ===== 직접 URL 모드 (기존 방식) =====
+            console.log(`[Execute] 직접 URL 모드 - ${job.target_url}`);
+
+            // URL 검증 및 sanitize
+            const urlValidation = validateAndSanitizeUrl(job.target_url);
+            if (!urlValidation.valid) {
+                throw new Error(`유효하지 않은 URL: ${urlValidation.error}`);
+            }
+            const videoUrl = urlValidation.sanitized;
+
+            // execFile을 통해 실행되므로 shell 해석 없이 안전하게 전달
+            await executeAdbCommand(
+                device_serial,
+                `shell am start -a android.intent.action.VIEW -d "${videoUrl}" -n com.google.android.youtube/.UrlActivity`
+            );
         }
-        const videoUrl = urlValidation.sanitized;
-        
-        // execFile을 통해 실행되므로 shell 해석 없이 안전하게 전달
-        await executeAdbCommand(
-            device_serial,
-            `shell am start -a android.intent.action.VIEW -d "${videoUrl}" -n com.google.android.youtube/.UrlActivity`
-        );
 
-        // 5. 시청 시간 계산 (불확실성 적용)
-        const minPct = job.duration_min_pct;
-        const maxPct = job.duration_max_pct;
-        const randomPct = Math.floor(Math.random() * (maxPct - minPct + 1)) + minPct;
-        const baseDuration = 300; // 기본 5분 가정
-        const watchDuration = Math.floor(baseDuration * (randomPct / 100));
-
-        console.log(`[Execute] 시청 시간: ${watchDuration}초 (${randomPct}%)`);
+        console.log(`[Execute] 시청 시간: ${watchDuration}초`);
 
         // 6. 시청 시뮬레이션 (10초마다 진행률 업데이트)
         let elapsed = 0;
@@ -478,10 +549,44 @@ async function executeJob(assignment) {
             }
         }
 
-        // 8. 완료 처리
+        // 8. 증거 파일 수집 (v5.1: 파일 준비 확인 후 Pull)
+        console.log(`[Execute] ${device_serial}: 증거 파일 수집 중...`);
+
+        try {
+            // 결과 JSON 및 스크린샷 수집
+            const jobResult = await resultCollector.collectJobResult(
+                ADB_PATH,
+                device_serial,
+                id  // job_id로 assignment_id 사용
+            );
+
+            if (jobResult.success !== false) {
+                console.log(`[Execute] 증거 파일 수집 완료: ${jobResult.evidence_count || 0}개`);
+
+                // 수집된 파일 정보 업데이트
+                const evidenceCount = jobResult.evidencePullResults ?
+                    jobResult.evidencePullResults.filter(r => r.success).length : 0;
+
+                await supabase
+                    .from('job_assignments')
+                    .update({
+                        evidence_collected: true,
+                        evidence_count: evidenceCount,
+                        evidence_local_path: jobResult.localResultPath
+                    })
+                    .eq('id', id);
+            } else {
+                console.warn(`[Execute] 증거 파일 수집 실패: ${jobResult.error}`);
+            }
+        } catch (collectErr) {
+            console.error(`[Execute] 증거 수집 오류: ${collectErr.message}`);
+            // 증거 수집 실패해도 작업은 완료로 처리
+        }
+
+        // 9. 완료 처리
         await supabase
             .from('job_assignments')
-            .update({ 
+            .update({
                 status: 'completed',
                 progress_pct: 100,
                 final_duration_sec: watchDuration,
@@ -494,7 +599,7 @@ async function executeJob(assignment) {
     } catch (err) {
         throw err;
     } finally {
-        // 9. 기기 상태를 idle로 복구
+        // 10. 기기 상태를 idle로 복구
         await supabase
             .from('devices')
             .update({ status: 'idle' })

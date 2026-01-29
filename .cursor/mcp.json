@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "adb-controller": {
+      "command": "C:\\Users\\ChoiJoonho\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+      "args": [
+        "scripts/adb_server.py"
+      ]
+    }
+  }
+}

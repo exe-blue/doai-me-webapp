@@ -1,0 +1,70 @@
+# DoAi.me Device Farm - Cursor Rules
+
+## ADB Controller MCP Tools
+
+You have access to `adb-controller` MCP tools for Android device management and debugging.
+
+### Available Tools
+
+| Tool | Description |
+|------|-------------|
+| `get_connected_devices` | List connected Android devices with status and model |
+| `get_device_battery` | Query battery level and charging status |
+| `capture_logcat_snippet` | Retrieve recent logcat logs for debugging |
+| `diagnose_connection` | Comprehensive connection diagnostics |
+| `restart_adb_server` | Restart ADB server to fix connection issues |
+
+### When to Use
+
+**IMPORTANT**: When a user reports any of these issues, you MUST call the appropriate ADB tools BEFORE analyzing code:
+
+1. **"App not running"** or **"App crashed"**
+   - Call `get_connected_devices` to verify device is connected
+   - Call `capture_logcat_snippet(lines=100)` to check for crash logs
+
+2. **"Connection problem"** or **"Device disconnected"**
+   - Call `diagnose_connection` for full connection diagnostics
+   - If diagnostics fail, call `restart_adb_server`
+
+3. **"Intermittent disconnection"** or **"SocketException"**
+   - Call `capture_logcat_snippet(lines=100, filter_tag="")` to find error patterns
+   - Call `diagnose_connection` to test connection stability
+
+### Ralph-loop Integration
+
+When executing debugging tasks with ralph-loop:
+
+```
+1. [Diagnosis] Call `get_connected_devices` to verify device status is 'device'
+2. [Diagnosis] Call `capture_logcat_snippet(lines=100)` to check for crashes or SocketException
+3. [Fix] Analyze logs and modify code (e.g., timeout settings, reconnection logic)
+4. [Verify] Re-run `capture_logcat_snippet` to confirm errors are resolved
+```
+
+### Example Usage
+
+```markdown
+@backend/ConnectionManager.cs @scripts/adb_server.py
+Goal: Debug and fix intermittent connection drops during app execution.
+
+1. [Diagnosis] Call `get_connected_devices` to confirm device status
+2. [Diagnosis] Call `capture_logcat_snippet(lines=100)` to find 'SocketException' or crash logs
+3. [Fix] Based on log analysis, adjust timeout settings or add reconnection logic
+4. [Verify] Re-check logs to confirm no more exceptions
+```
+
+## Project Structure
+
+- `dashboard/` - Next.js web dashboard (Vercel deployed)
+- `client-pc/` - PC agent controlling Android devices via ADB
+- `client-mobile/` - Mobile client app
+- `backend/` - Backend services
+- `scripts/` - Utility scripts including MCP servers
+- `supabase/` - Supabase configuration
+
+## Tech Stack
+
+- **Frontend**: Next.js 16, React 19, Tailwind CSS 4
+- **Backend**: Supabase (Postgres + Realtime)
+- **Device Control**: ADB via MCP server
+- **Deployment**: Vercel

@@ -58,7 +58,7 @@ export function StatusBoard({ refreshTrigger }: StatusBoardProps) {
     const { data, error, count } = await supabase
       .from('devices')
       .select('*', { count: 'exact' });
-    
+
     // 에러 처리: 에러 발생 시 안전한 기본값 설정
     if (error) {
       console.error('Devices 로드 실패:', error);
@@ -66,10 +66,11 @@ export function StatusBoard({ refreshTrigger }: StatusBoardProps) {
       setDeviceCount(0);
       return;
     }
-    
+
     if (data) {
       const deviceMap: Record<string, Device> = {};
       data.forEach(d => {
+        // id (UUID)를 키로 사용 (device_id FK와 매칭)
         deviceMap[d.id] = d;
       });
       setDevices(deviceMap);
