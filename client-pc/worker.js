@@ -41,12 +41,17 @@ console.log(`[System] Default Group: ${DEFAULT_GROUP}`);
 // 2. ADB 유틸리티 함수
 // =============================================
 
+/**
+ * 연결된 ADB 기기 목록 조회
+ * @returns {Promise<{devices: string[], error: Error|null}>} - 기기 목록 및 에러
+ */
 function getConnectedDevices() {
     return new Promise((resolve) => {
         exec(`"${ADB_PATH}" devices`, (error, stdout) => {
             if (error) {
                 console.error(`[ADB Error] ${error.message}`);
-                resolve([]);
+                // 에러와 빈 배열 함께 반환 - 호출자가 구분 가능
+                resolve({ devices: [], error });
                 return;
             }
             
@@ -59,7 +64,7 @@ function getConnectedDevices() {
                     devices.push(parts[0].trim());
                 }
             }
-            resolve(devices);
+            resolve({ devices, error: null });
         });
     });
 }
@@ -156,7 +161,12 @@ function executeAdbCommand(serial, command) {
 // =============================================
 
 async function syncDevices() {
-    const serials = await getConnectedDevices();
+    const { devices: serials, error: adbError } = await getConnectedDevices();
+
+    if (adbError) {
+        console.error(`[Watchdog] ADB 조회 실패: ${adbError.message}`);
+        return [];
+    }
 
     if (serials.length === 0) {
         console.log(`[Watchdog] 연결된 기기 없음. 대기중...`);
@@ -202,7 +212,13 @@ async function syncDevices() {
 async function pollForJobs() {
     try {
         // 연결된 기기의 UUID device_id 목록 가져오기
-        const connectedSerials = await getConnectedDevices();
+        const { devices: connectedSerials, error: adbError } = await getConnectedDevices();
+        
+        if (adbError) {
+            console.error(`[Poll] ADB 조회 실패: ${adbError.message}`);
+            return; // ADB 에러 시 이번 폴링 건너뛰기
+        }
+        
         const connectedDeviceIds = [];
 
         for (const serial of connectedSerials) {
@@ -531,10 +547,15 @@ async function executeJob(assignment) {
 
             const progressPct = Math.min(100, Math.round((elapsed / watchDuration) * 100));
             
-            await supabase
+            // 진행률 업데이트 에러 핸들링 추가
+            const { error: progressError } = await supabase
                 .from('job_assignments')
                 .update({ progress_pct: progressPct })
                 .eq('id', id);
+            
+            if (progressError) {
+                console.error(`[Execute] ${device_serial}: 진행률 업데이트 실패 (${progressPct}%) - ${progressError.message}`);
+            }
 
             console.log(`[Execute] ${device_serial}: ${elapsed}s / ${watchDuration}s (${progressPct}%)`);
         }
@@ -566,7 +587,8 @@ async function executeJob(assignment) {
                 const evidenceCount = jobResult.evidencePullResults ?
                     jobResult.evidencePullResults.filter(r => r.success).length : 0;
 
-                await supabase
+                // 증거 수집 DB 업데이트 에러 핸들링 추가
+                const { error: evidenceUpdateError } = await supabase
                     .from('job_assignments')
                     .update({
                         evidence_collected: true,
@@ -574,6 +596,10 @@ async function executeJob(assignment) {
                         evidence_local_path: jobResult.localResultPath
                     })
                     .eq('id', id);
+                
+                if (evidenceUpdateError) {
+                    console.error(`[Execute] ${device_serial}: 증거 정보 DB 업데이트 실패 - ${evidenceUpdateError.message}`);
+                }
             } else {
                 console.warn(`[Execute] 증거 파일 수집 실패: ${jobResult.error}`);
             }
@@ -582,8 +608,8 @@ async function executeJob(assignment) {
             // 증거 수집 실패해도 작업은 완료로 처리
         }
 
-        // 9. 완료 처리
-        await supabase
+        // 9. 완료 처리 (에러 핸들링 추가)
+        const { error: completionError } = await supabase
             .from('job_assignments')
             .update({
                 status: 'completed',
@@ -593,16 +619,26 @@ async function executeJob(assignment) {
             })
             .eq('id', id);
 
-        console.log(`[Execute] 작업 완료: ${id}`);
+        if (completionError) {
+            console.error(`[Execute] ${device_serial}: 작업 완료 DB 업데이트 실패 - ${completionError.message}`);
+            // 작업 완료 기록 실패는 심각하므로 재시도 로직 추가 가능
+        } else {
+            console.log(`[Execute] 작업 완료: ${id}`);
+        }
 
     } catch (err) {
         throw err;
     } finally {
-        // 10. 기기 상태를 idle로 복구
-        await supabase
+        // 10. 기기 상태를 idle로 복구 (에러 핸들링 추가)
+        const { error: deviceResetError } = await supabase
             .from('devices')
             .update({ status: 'idle' })
             .eq('id', device_id);
+        
+        if (deviceResetError) {
+            console.error(`[Execute] 기기 상태 리셋 실패 (device_id: ${device_id}) - ${deviceResetError.message}`);
+            // 심각: 기기가 busy 상태로 고정될 수 있음. 재시도 필요.
+        }
     }
 }
 

@@ -31,11 +31,21 @@ export function StatusBoard({ refreshTrigger }: StatusBoardProps) {
   const [scrcpyStates, setScrcpyStates] = useState<Record<string, ScrcpyButtonState>>({});
   const [pendingScrcpyCommands, setPendingScrcpyCommands] = useState<Record<string, string>>({});
 
-  // 초기 데이터 로드
+  // 로드 에러 상태
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  // 초기 데이터 로드 (에러 핸들링 추가)
   useEffect(() => {
     const loadData = async () => {
-      await loadDevices();
-      await loadJobs();
+      try {
+        setLoadError(null);
+        await loadDevices();
+        await loadJobs();
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : '데이터 로드 실패';
+        console.error('[StatusBoard] 초기 데이터 로드 실패:', error);
+        setLoadError(errorMessage);
+      }
     };
     loadData();
   }, [refreshTrigger]);
@@ -80,16 +90,23 @@ export function StatusBoard({ refreshTrigger }: StatusBoardProps) {
           }
         }
       )
-      .subscribe((status) => {
+      .subscribe((status, err) => {
         if (status === 'SUBSCRIBED') {
           retryCount = 0;
+          console.log('[StatusBoard] Realtime 구독 성공');
         } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.error(`[StatusBoard] Realtime 구독 ${status}:`, err);
           retryCount++;
           if (retryCount <= maxRetries) {
             const delay = Math.pow(2, retryCount - 1) * 1000;
+            console.log(`[StatusBoard] ${delay}ms 후 재시도 (${retryCount}/${maxRetries})`);
             retryTimer = setTimeout(() => {
               supabase.removeChannel(channel);
             }, delay);
+          } else {
+            console.error('[StatusBoard] Realtime 최대 재시도 초과 - 실시간 업데이트 비활성화');
+            // 사용자에게 알림 (선택적)
+            setLoadError('실시간 업데이트 연결 실패. 새로고침이 필요합니다.');
           }
         }
       });
@@ -292,6 +309,11 @@ export function StatusBoard({ refreshTrigger }: StatusBoardProps) {
             오프라인: {healthStats.offline}
           </span>
         </CardDescription>
+        {loadError && (
+          <div className="mt-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-sm text-red-600 dark:text-red-400">
+            ⚠️ {loadError}
+          </div>
+        )}
       </CardHeader>
       <CardContent className="space-y-6">
         {/* 호버 정보 표시 영역 */}

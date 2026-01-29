@@ -10,6 +10,27 @@ const CONFIG = require('./preflight-config.json');
 // ADB path configuration (Windows compatible)
 const ADB_PATH = process.env.ADB_PATH || path.join(require('os').homedir(), 'adb.exe');
 
+// 디버그 모드 (환경변수로 활성화: DEBUG_PREFLIGHT=true)
+const DEBUG_PREFLIGHT = process.env.DEBUG_PREFLIGHT === 'true';
+const DEBUG_ENDPOINT = 'http://127.0.0.1:7243/ingest/f0c795db-60da-4b50-9d65-1c4ff0ccce9c';
+
+// 조건부 디버그 로깅 헬퍼
+function debugLog(location, message, data, hypothesisId) {
+    if (!DEBUG_PREFLIGHT) return;
+    fetch(DEBUG_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            location,
+            message,
+            data,
+            timestamp: Date.now(),
+            sessionId: 'debug-session',
+            hypothesisId
+        })
+    }).catch(() => {});
+}
+
 // Global state
 let deviceSerial = null;
 let logcatProcess = null;
@@ -28,9 +49,7 @@ let testResults = {
 async function main() {
     console.log('🚀 Pre-Flight Test - Worker v5.1 + WebView Bot\n');
 
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/f0c795db-60da-4b50-9d65-1c4ff0ccce9c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'run-preflight.js:main',message:'Preflight main started',data:{cwd:process.cwd(),configPath:path.resolve('./preflight-config.json'),adbPath:ADB_PATH},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'E'})}).catch(()=>{});
-    // #endregion
+    debugLog('run-preflight.js:main', 'Preflight main started', {cwd:process.cwd(),configPath:path.resolve('./preflight-config.json'),adbPath:ADB_PATH}, 'E');
 
     try {
         // Setup
@@ -140,7 +159,10 @@ async function cleanOldTestFiles(serial) {
         try {
             await runAdb(serial, ['shell', 'rm', file]);
         } catch (e) {
-            // File doesn't exist - OK
+            // "No such file" 에러만 무시, 다른 에러는 경고 출력
+            if (!e.message?.includes('No such file')) {
+                console.warn(`   [Warning] 파일 삭제 중 예상치 못한 에러 (${file}): ${e.message}`);
+            }
         }
     }
 }
@@ -246,16 +268,12 @@ async function deployBotFiles(serial) {
         { local: 'client-mobile/modules/search-flow.js', remote: `${SCRIPT_BASE_PATH}/modules/search-flow.js` }
     ];
 
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/f0c795db-60da-4b50-9d65-1c4ff0ccce9c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'run-preflight.js:deployBotFiles',message:'Starting file deployment',data:{serial,fileCount:filesToDeploy.length,files:filesToDeploy.map(f=>f.local)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,E'})}).catch(()=>{});
-    // #endregion
+    debugLog('run-preflight.js:deployBotFiles', 'Starting file deployment', {serial,fileCount:filesToDeploy.length,files:filesToDeploy.map(f=>f.local)}, 'A,E');
 
     for (const file of filesToDeploy) {
         const localPath = path.join(__dirname, file.local);
 
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/f0c795db-60da-4b50-9d65-1c4ff0ccce9c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'run-preflight.js:deployBotFiles:loop',message:'Checking local file',data:{localPath,exists:fs.existsSync(localPath),remote:file.remote},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
+        debugLog('run-preflight.js:deployBotFiles:loop', 'Checking local file', {localPath,exists:fs.existsSync(localPath),remote:file.remote}, 'A');
 
         // Check if local file exists
         if (!fs.existsSync(localPath)) {
@@ -289,9 +307,7 @@ async function checkpoint2_IntentBroadcast() {
         const checkResult = await runAdb(deviceSerial, ['shell', `ls -la "${scriptPath}"`]);
         console.log(`   Script file check: ${checkResult.trim()}`);
 
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/f0c795db-60da-4b50-9d65-1c4ff0ccce9c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'run-preflight.js:checkpoint2:preStart',message:'Pre-start file check',data:{scriptPath,checkResult:checkResult.trim(),deviceSerial},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'F'})}).catch(()=>{});
-        // #endregion
+        debugLog('run-preflight.js:checkpoint2:preStart', 'Pre-start file check', {scriptPath,checkResult:checkResult.trim(),deviceSerial}, 'F');
 
         // 1.5. Force stop AutoX.js to clear any stale state
         console.log('   Stopping any running AutoX.js scripts...');
@@ -308,9 +324,7 @@ async function checkpoint2_IntentBroadcast() {
         ]);
         console.log(`   am start result: ${amStartResult.trim()}`);
         
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/f0c795db-60da-4b50-9d65-1c4ff0ccce9c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'run-preflight.js:checkpoint2:postStart',message:'am start completed',data:{amStartResult:amStartResult.trim()},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'F'})}).catch(()=>{});
-        // #endregion
+        debugLog('run-preflight.js:checkpoint2:postStart', 'am start completed', {amStartResult:amStartResult.trim()}, 'F');
         
         console.log('   ✓ Script execution triggered');
 
@@ -349,6 +363,11 @@ async function isBotProcessRunning(serial) {
         const result = await runAdb(serial, ['shell', 'ps | grep autojs']);
         return result.length > 0;
     } catch (e) {
+        // grep은 결과가 없으면 exit code 1을 반환 - 이는 정상
+        // ADB 연결 에러 등 다른 에러는 로깅
+        if (!e.message?.includes('grep') && !e.message?.includes('exit code 1')) {
+            console.error(`   [Error] 프로세스 확인 중 ADB 에러: ${e.message}`);
+        }
         return false;
     }
 }
@@ -490,9 +509,7 @@ function runAdb(serial, args) {
 }
 
 async function waitForLogPattern(pattern, timeoutMs) {
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/f0c795db-60da-4b50-9d65-1c4ff0ccce9c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'run-preflight.js:waitForLogPattern',message:'Starting log pattern wait',data:{pattern,timeoutMs,logFilePath},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
-    // #endregion
+    debugLog('run-preflight.js:waitForLogPattern', 'Starting log pattern wait', {pattern,timeoutMs,logFilePath}, 'D');
 
     return new Promise((resolve) => {
         const regex = new RegExp(pattern);
@@ -503,27 +520,22 @@ async function waitForLogPattern(pattern, timeoutMs) {
                 const logs = fs.readFileSync(logFilePath, 'utf8');
                 const matched = regex.test(logs);
                 
-                // #region agent log
+                // 5초 이후 10초마다 체크 로그
                 if (Date.now() - startTime > 5000 && (Date.now() - startTime) % 10000 < 1000) {
-                    fetch('http://127.0.0.1:7243/ingest/f0c795db-60da-4b50-9d65-1c4ff0ccce9c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'run-preflight.js:waitForLogPattern:check',message:'Log pattern check',data:{matched,elapsed:Date.now()-startTime,logsLength:logs.length,pattern},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
+                    debugLog('run-preflight.js:waitForLogPattern:check', 'Log pattern check', {matched,elapsed:Date.now()-startTime,logsLength:logs.length,pattern}, 'D');
                 }
-                // #endregion
                 
                 if (matched) {
-                    // #region agent log
-                    fetch('http://127.0.0.1:7243/ingest/f0c795db-60da-4b50-9d65-1c4ff0ccce9c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'run-preflight.js:waitForLogPattern:matched',message:'Pattern MATCHED',data:{pattern,elapsed:Date.now()-startTime},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
-                    // #endregion
+                    debugLog('run-preflight.js:waitForLogPattern:matched', 'Pattern MATCHED', {pattern,elapsed:Date.now()-startTime}, 'D');
                     clearInterval(checkInterval);
                     resolve(true);
                 }
             } catch (e) {
-                // File not ready yet
+                // 파일이 아직 준비되지 않음 - 계속 폴링
             }
 
             if (Date.now() - startTime >= timeoutMs) {
-                // #region agent log
-                fetch('http://127.0.0.1:7243/ingest/f0c795db-60da-4b50-9d65-1c4ff0ccce9c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'run-preflight.js:waitForLogPattern:timeout',message:'Pattern TIMEOUT',data:{pattern,timeoutMs},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
-                // #endregion
+                debugLog('run-preflight.js:waitForLogPattern:timeout', 'Pattern TIMEOUT', {pattern,timeoutMs}, 'D');
                 clearInterval(checkInterval);
                 resolve(false);
             }
@@ -532,9 +544,7 @@ async function waitForLogPattern(pattern, timeoutMs) {
 }
 
 async function waitForFileExists(serial, remotePath, timeoutMs) {
-    // #region agent log
-    fetch('http://127.0.0.1:7243/ingest/f0c795db-60da-4b50-9d65-1c4ff0ccce9c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'run-preflight.js:waitForFileExists',message:'Starting file wait',data:{remotePath,timeoutMs},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C'})}).catch(()=>{});
-    // #endregion
+    debugLog('run-preflight.js:waitForFileExists', 'Starting file wait', {remotePath,timeoutMs}, 'C');
 
     return new Promise((resolve) => {
         const startTime = Date.now();
@@ -547,9 +557,7 @@ async function waitForFileExists(serial, remotePath, timeoutMs) {
             try {
                 const result = await runAdb(serial, ['shell', `[ -f "${remotePath}" ] && echo "EXISTS" || echo "NOTFOUND"`]);
                 
-                // #region agent log
-                fetch('http://127.0.0.1:7243/ingest/f0c795db-60da-4b50-9d65-1c4ff0ccce9c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'run-preflight.js:waitForFileExists:poll',message:'File poll result',data:{remotePath,result:result.trim(),elapsed:Date.now()-startTime},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C'})}).catch(()=>{});
-                // #endregion
+                debugLog('run-preflight.js:waitForFileExists:poll', 'File poll result', {remotePath,result:result.trim(),elapsed:Date.now()-startTime}, 'C');
                 
                 if (result.includes('EXISTS') && !isResolved) {
                     isResolved = true;
@@ -558,9 +566,7 @@ async function waitForFileExists(serial, remotePath, timeoutMs) {
                     return;
                 }
             } catch (e) {
-                // #region agent log
-                fetch('http://127.0.0.1:7243/ingest/f0c795db-60da-4b50-9d65-1c4ff0ccce9c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'run-preflight.js:waitForFileExists:error',message:'ADB poll error',data:{remotePath,error:e.message},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C'})}).catch(()=>{});
-                // #endregion
+                debugLog('run-preflight.js:waitForFileExists:error', 'ADB poll error', {remotePath,error:e.message}, 'C');
                 // ADB command failed - continue polling
             }
 
@@ -571,9 +577,7 @@ async function waitForFileExists(serial, remotePath, timeoutMs) {
                 isResolved = true;
                 clearInterval(checkInterval);
                 console.log(''); // New line after polling
-                // #region agent log
-                fetch('http://127.0.0.1:7243/ingest/f0c795db-60da-4b50-9d65-1c4ff0ccce9c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'run-preflight.js:waitForFileExists:timeout',message:'File wait TIMEOUT',data:{remotePath,timeoutMs},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C'})}).catch(()=>{});
-                // #endregion
+                debugLog('run-preflight.js:waitForFileExists:timeout', 'File wait TIMEOUT', {remotePath,timeoutMs}, 'C');
                 resolve(false);
             }
         }, pollInterval);

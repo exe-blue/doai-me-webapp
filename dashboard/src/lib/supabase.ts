@@ -19,6 +19,15 @@ export interface Device {
   status: 'idle' | 'busy' | 'offline';
   last_seen_at: string;
   created_at: string;
+  // 001_scrcpy_heartbeat 마이그레이션 추가 컬럼
+  last_heartbeat_at?: string | null;  // TIMESTAMPTZ nullable
+  last_job_activity_at?: string | null;  // TIMESTAMPTZ nullable
+  adb_connected: boolean;  // DEFAULT FALSE
+  consecutive_failures: number;  // DEFAULT 0
+  health_status: 'healthy' | 'zombie' | 'offline';  // DEFAULT 'offline'
+  // scrcpy 관련 상태
+  scrcpy_running?: boolean;
+  scrcpy_pid?: number | null;
 }
 
 // jobs 테이블
@@ -70,6 +79,21 @@ export interface SalaryLog {
   actual_duration_sec: number;
   rank_in_group?: number;
   created_at: string;
+}
+
+// scrcpy_commands 테이블 (001_scrcpy_heartbeat.sql 참조)
+export interface ScrcpyCommand {
+  id: string;  // UUID PRIMARY KEY
+  device_id: string;  // UUID FK to devices.id
+  pc_id: string;  // VARCHAR(50)
+  command_type: 'scrcpy_start' | 'scrcpy_stop';
+  options: Record<string, unknown>;  // JSONB DEFAULT '{}'
+  status: 'pending' | 'received' | 'executing' | 'completed' | 'failed' | 'timeout';
+  process_pid?: number | null;
+  error_message?: string | null;
+  created_at: string;
+  received_at?: string | null;
+  completed_at?: string | null;
 }
 
 // monitored_channels 테이블

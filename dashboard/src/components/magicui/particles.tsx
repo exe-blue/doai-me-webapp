@@ -84,8 +84,14 @@ const Particles: React.FC<ParticlesProps> = ({
   };
 
   const rgb = hexToRgb(color);
+  
+  // 애니메이션 프레임 취소를 위한 ref
+  const animationFrameRef = useRef<number>(0);
+  const isMountedRef = useRef<boolean>(true);
 
   useEffect(() => {
+    isMountedRef.current = true;
+    
     if (canvasRef.current) {
       context.current = canvasRef.current.getContext("2d");
     }
@@ -94,7 +100,12 @@ const Particles: React.FC<ParticlesProps> = ({
     window.addEventListener("resize", initCanvas);
 
     return () => {
+      isMountedRef.current = false;
       window.removeEventListener("resize", initCanvas);
+      // 메모리 누수 방지: 애니메이션 프레임 취소
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [color]);
@@ -215,8 +226,15 @@ const Particles: React.FC<ParticlesProps> = ({
   };
 
   const animate = () => {
+    // 컴포넌트 언마운트 시 애니메이션 중단
+    if (!isMountedRef.current) return;
+    
     clearContext();
-    circles.current.forEach((circle: Circle, i: number) => {
+    
+    // 역순 반복으로 splice 시 인덱스 문제 방지
+    for (let i = circles.current.length - 1; i >= 0; i--) {
+      const circle = circles.current[i];
+      
       // Handle the alpha value
       const edge = [
         circle.x + circle.translateX - circle.size,
@@ -258,8 +276,9 @@ const Particles: React.FC<ParticlesProps> = ({
         const newCircle = circleParams();
         drawCircle(newCircle);
       }
-    });
-    window.requestAnimationFrame(animate);
+    }
+    
+    animationFrameRef.current = window.requestAnimationFrame(animate);
   };
 
   return (
