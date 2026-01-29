@@ -65,13 +65,22 @@ export async function GET(request: NextRequest) {
     }
 
     // device_id 없이 조회만 하는 경우
-    const { data: comments, error, count } = await supabase
+    const showAll = searchParams.get('all') === 'true';
+    
+    let query = supabase
       .from('comments')
       .select('*', { count: 'exact' })
       .eq('job_id', jobId)
-      .eq('is_used', false)
-      .order('created_at', { ascending: true })
-      .limit(10);
+      .order('created_at', { ascending: true });
+    
+    // all=true가 아니면 미사용 댓글만 조회
+    if (!showAll) {
+      query = query.eq('is_used', false).limit(10);
+    } else {
+      query = query.limit(50);
+    }
+    
+    const { data: comments, error, count } = await query;
 
     if (error) {
       console.error('[API] Comments query error:', error);

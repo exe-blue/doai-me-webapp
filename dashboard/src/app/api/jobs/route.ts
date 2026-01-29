@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import OpenAI from 'openai';
 
 // Server-side Supabase client with service role
 function getSupabase() {
@@ -11,6 +12,102 @@ function getSupabase() {
   }
 
   return createClient(url, key);
+}
+
+// Server-side OpenAI client for auto comment generation
+function getOpenAI(): OpenAI | null {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) return null;
+  return new OpenAI({ apiKey });
+}
+
+/**
+ * Auto-generate AI comments using the 2x Rule
+ * Formula: Math.ceil(target_count * (prob_comment / 100) * 2), minimum 5
+ */
+async function autoGenerateComments(
+  videoTitle: string,
+  targetCount: number,
+  probComment: number
+): Promise<string[]> {
+  const openai = getOpenAI();
+  if (!openai) {
+    console.warn('[API] OPENAI_API_KEY not set - skipping auto comment generation');
+    return [];
+  }
+
+  // 2x Rule: quantity = ceil(target * prob% * 2), min 5
+  const rawQuantity = Math.ceil(targetCount * (probComment / 100) * 2);
+  const quantity = Math.max(5, Math.min(rawQuantity, 200)); // min 5, max 200
+
+  console.log(`[API] Auto-generating ${quantity} comments (target=${targetCount}, prob=${probComment}%, raw=${rawQuantity})`);
+
+  const toneGuide = '다양한 반응 (긍정, 감탄, 질문, 공감 등) 골고루 섞기.';
+
+  const batchSize = 50;
+  const allComments: string[] = [];
+
+  for (let i = 0; i < quantity; i += batchSize) {
+    const batchCount = Math.min(batchSize, quantity - i);
+    let retries = 0;
+    const maxRetries = 2;
+
+    while (retries <= maxRetries) {
+      try {
+        const completion = await openai.chat.completions.create({
+          model: 'gpt-4o-mini',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a witty Korean YouTube viewer. Output ONLY a JSON object with a "comments" key containing an array of strings. No other text.',
+            },
+            {
+              role: 'user',
+              content: `Generate ${batchCount} natural, unique YouTube comments for a video titled "${videoTitle}".
+
+Rules:
+- ${toneGuide}
+- 한국어로 작성. 반말/존댓말 자연스럽게 섞기.
+- 각 댓글은 10~80자 사이
+- 중복되거나 비슷한 댓글 없이 다양하게
+- 봇처럼 보이지 않도록 자연스러운 구어체 포함
+- 댓글 앞에 번호 붙이지 말 것
+
+Output format: {"comments": ["댓글1", "댓글2", ...]}`,
+            },
+          ],
+          response_format: { type: 'json_object' },
+          temperature: 0.9,
+          max_tokens: 4000,
+        });
+
+        const content = completion.choices[0].message.content;
+        if (!content) break;
+
+        const parsed = JSON.parse(content);
+        const batch: string[] = (parsed.comments || parsed.data || (Array.isArray(parsed) ? parsed : []))
+          .filter((c: unknown): c is string => typeof c === 'string' && c.trim().length > 0)
+          .map((c: string) => c.trim());
+
+        allComments.push(...batch);
+        break; // success, exit retry loop
+      } catch (error: unknown) {
+        const isRateLimit = error instanceof Error && ('status' in error && (error as { status: number }).status === 429);
+        if (isRateLimit && retries < maxRetries) {
+          const delay = Math.pow(2, retries) * 1000; // 1s, 2s backoff
+          console.warn(`[API] OpenAI rate limited, retrying in ${delay}ms (attempt ${retries + 1}/${maxRetries})`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          retries++;
+        } else {
+          console.error(`[API] Batch ${Math.floor(i / batchSize) + 1} failed:`, error instanceof Error ? error.message : error);
+          break; // skip this batch, keep partial results
+        }
+      }
+    }
+  }
+
+  console.log(`[API] Auto-generated ${allComments.length}/${quantity} comments for "${videoTitle?.slice(0, 30)}..."`);
+  return allComments;
 }
 
 // GET /api/jobs - 작업 목록 조회
@@ -45,9 +142,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // 각 작업별 실시간 assignment 통계 조회
+    // 각 작업별 실시간 assignment 통계 및 댓글 수 조회
     const jobsWithStats = await Promise.all(
       (jobs || []).map(async (job) => {
+        // Assignment 통계
         const { data: stats } = await supabase
           .from('job_assignments')
           .select('status')
@@ -68,10 +166,17 @@ export async function GET(request: NextRequest) {
           }
         });
 
+        // 댓글 수 조회
+        const { count: commentCount } = await supabase
+          .from('comments')
+          .select('*', { count: 'exact', head: true })
+          .eq('job_id', job.id);
+
         return {
           ...job,
           stats: statusCounts,
           total_assigned: (stats || []).length,
+          comment_count: commentCount || 0,
         };
       })
     );
@@ -350,8 +455,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 5. 댓글 풀 생성 (comments가 제공된 경우)
-    // Handle both array and string input
+    // 5. 댓글 풀 생성
+    // Handle both array and string input from user
     let commentLines: string[] = [];
     if (Array.isArray(comments)) {
       commentLines = comments
@@ -364,6 +469,26 @@ export async function POST(request: NextRequest) {
         .filter((line: string) => line.length > 0);
     }
 
+    // 5-1. Auto AI Comment Generation (2x Rule)
+    // If no manual comments provided AND prob_comment > 0, auto-generate
+    let generatedCommentCount = 0;
+    const isAutoGenerated = commentLines.length === 0 && prob_comment > 0;
+
+    if (isAutoGenerated) {
+      const videoTitle = title || 'YouTube Video';
+      const aiComments = await autoGenerateComments(
+        videoTitle,
+        effectiveTargetValue,
+        prob_comment
+      );
+      if (aiComments.length > 0) {
+        commentLines = aiComments;
+        generatedCommentCount = aiComments.length;
+        console.log(`[API] AI auto-generated ${generatedCommentCount} comments for job ${job.id}`);
+      }
+    }
+
+    // 5-2. Insert comments into DB (manual or AI-generated)
     let insertedCommentCount = 0;
     if (commentLines.length > 0) {
       const commentRecords = commentLines.map((content: string) => ({
@@ -372,7 +497,7 @@ export async function POST(request: NextRequest) {
         is_used: false,
       }));
 
-      const { error: commentError, count } = await supabase
+      const { error: commentError } = await supabase
         .from('comments')
         .insert(commentRecords);
 
@@ -412,6 +537,8 @@ export async function POST(request: NextRequest) {
       success: true,
       job,
       commentCount: insertedCommentCount,
+      generatedCommentCount,
+      isAutoGenerated,
       assignments: createdAssignments || [],
       stats: {
         total_devices: idleDevices.length,

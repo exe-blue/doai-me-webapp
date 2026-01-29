@@ -18,6 +18,9 @@ const { Server } = require('socket.io');
 const supabaseService = require('./services/supabaseService');
 const { supabase } = supabaseService;
 
+// Channel Checker Service (auto-monitoring)
+const { startChannelChecker } = require('./services/channelChecker');
+
 // =============================================
 // Configuration
 // =============================================
@@ -94,6 +97,15 @@ workerNs.on('connection', (socket) => {
 
   if (!pcId) {
     console.log('[Worker] Connection rejected: missing pcId');
+    socket.disconnect();
+    return;
+  }
+
+  // STRICT: Reject workers with invalid pcId format (must be P{num}-WORKER or P{num})
+  // This blocks ghost workers like "PC-01", "device", "List" etc.
+  const validWorkerPattern = /^P\d{1,2}(-WORKER)?$/;
+  if (!validWorkerPattern.test(pcId)) {
+    console.log(`[Worker] Connection rejected: invalid pcId format "${pcId}" (expected P01, P01-WORKER, etc.)`);
     socket.disconnect();
     return;
   }
@@ -257,8 +269,36 @@ workerNs.on('connection', (socket) => {
     dashboardNs.emit('job:started', data);
   });
 
+  // Optimized job:progress - lightweight payload for real-time progress bar
   socket.on('job:progress', (data) => {
-    dashboardNs.emit('job:progress', data);
+    // data: { assignmentId, jobId, deviceId, progressPct, currentStep, totalSteps, status, deviceSerial }
+    const progressPayload = {
+      jobId: data.jobId,
+      assignmentId: data.assignmentId,
+      deviceId: data.deviceId,
+      deviceSerial: data.deviceSerial || data.deviceId,
+      progressPercent: data.progressPct || Math.round((data.currentStep / (data.totalSteps || 12)) * 100),
+      currentStep: data.currentStep || 0,
+      totalSteps: data.totalSteps || 12,
+      status: data.status || 'running',
+      timestamp: Date.now(),
+    };
+    dashboardNs.emit('job:progress', progressPayload);
+  });
+
+  // Device log from worker - room-based broadcasting
+  socket.on('device:log', (data) => {
+    // data: { deviceId, level, message, timestamp }
+    const { deviceId, level, message, timestamp } = data;
+    const roomName = `logs:${deviceId}`;
+    
+    // Only broadcast to clients who joined this specific log room
+    dashboardNs.to(roomName).emit('device:log', {
+      deviceId,
+      level: level || 'info',
+      message,
+      timestamp: timestamp || Date.now(),
+    });
   });
 
   socket.on('job:completed', async (data) => {
@@ -500,6 +540,29 @@ dashboardNs.on('connection', (socket) => {
     });
   }
   socket.emit('devices:initial', initialDevices);
+
+  // =============================================
+  // Log Room Management (On-demand log streaming)
+  // =============================================
+  
+  // Join log room for a specific device/job - enables log streaming
+  socket.on('join:log_room', (data) => {
+    const { deviceId, jobId } = data;
+    const roomName = deviceId ? `logs:${deviceId}` : `logs:job:${jobId}`;
+    socket.join(roomName);
+    console.log(`[Dashboard] ${socket.id} joined log room: ${roomName}`);
+    
+    // Acknowledge join
+    socket.emit('log_room:joined', { roomName, deviceId, jobId });
+  });
+
+  // Leave log room - stops receiving logs
+  socket.on('leave:log_room', (data) => {
+    const { deviceId, jobId } = data;
+    const roomName = deviceId ? `logs:${deviceId}` : `logs:job:${jobId}`;
+    socket.leave(roomName);
+    console.log(`[Dashboard] ${socket.id} left log room: ${roomName}`);
+  });
 
   // Command from dashboard to device
   socket.on('command:send', (data) => {
@@ -887,6 +950,9 @@ httpServer.listen(PORT, () => {
   console.log('╚═══════════════════════════════════════════════════════════╝');
   console.log('');
   console.log('[Server] Waiting for connections...');
+
+  // Start Channel Checker (auto-monitoring for CHANNEL_AUTO jobs)
+  startChannelChecker();
 });
 
 module.exports = { io, workerNs, dashboardNs };

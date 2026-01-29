@@ -24,6 +24,9 @@ interface CommandResult {
 // Socket.io server URL from environment or default to localhost:3001
 const SOCKET_SERVER_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
 
+// Strict naming convention: P01-001, P02-015 etc.
+const VALID_PC_ID_PATTERN = /^P\d{1,2}-\d{3}$/;
+
 export function useSocket(options: SocketHookOptions = {}) {
   const { autoConnect = true } = options;
   const socketRef = useRef<Socket | null>(null);
@@ -42,15 +45,19 @@ export function useSocket(options: SocketHookOptions = {}) {
         if (response.ok) {
           const data = await response.json();
           if (data.devices && data.devices.length > 0) {
-            console.log('[Socket] Loaded persisted devices from DB:', data.devices.length);
+            // Pre-filter: only valid P##-### naming convention devices
+            const validDevices = data.devices.filter(
+              (d: Device) => d.pc_id && VALID_PC_ID_PATTERN.test(d.pc_id)
+            );
+            console.log('[Socket] Loaded persisted devices from DB:', validDevices.length, '/', data.devices.length);
             // Only set if we don't have socket data yet
             setDevices(prev => {
               if (prev.length === 0) {
-                return data.devices;
+                return validDevices;
               }
               // Merge: keep socket data but add any DB-only devices
               const socketIds = new Set(prev.map((d: Device) => d.id));
-              const dbOnlyDevices = data.devices.filter((d: Device) => !socketIds.has(d.id));
+              const dbOnlyDevices = validDevices.filter((d: Device) => !socketIds.has(d.id));
               return [...prev, ...dbOnlyDevices];
             });
           }

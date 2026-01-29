@@ -63,7 +63,6 @@ async function upsertDevice(device) {
     status: status,
     ip_address: ip || null,
     last_seen_at: new Date().toISOString(),
-    // Note: last_heartbeat_at removed - column doesn't exist in schema
     connection_info: {
       pcCode: pcId,
       slotNum: slotNum,

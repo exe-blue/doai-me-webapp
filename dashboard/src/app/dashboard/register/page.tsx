@@ -89,16 +89,11 @@ export default function RegisterPage() {
     }
 
     // Parse comments (newline separated)
+    // 비어있으면 AI가 자동 생성
     const commentList = comments
       .split('\n')
       .map((c) => c.trim())
       .filter((c) => c.length > 0);
-
-    // If commentProb > 0 but no comments provided, warn
-    if (commentProb[0] > 0 && commentList.length === 0) {
-      toast.error('댓글 확률이 설정되어 있지만 댓글 목록이 비어있습니다');
-      return;
-    }
 
     setIsSubmitting(true);
 
@@ -126,9 +121,21 @@ export default function RegisterPage() {
         throw new Error(result.error || '작업 등록에 실패했습니다');
       }
 
-      toast.success('작업이 등록되었습니다', {
-        description: `작업명: ${result.job?.display_name || result.job?.id} | 댓글: ${result.commentCount || 0}개`,
-      });
+      // Toast 메시지: AI 자동 생성 댓글 수 표시
+      const aiGenerated = result.generatedCommentCount || 0;
+      const manualCount = result.commentCount || 0;
+      
+      if (aiGenerated > 0) {
+        toast.success('작업 등록 완료!', {
+          description: `AI 댓글 ${aiGenerated}개 자동 생성됨`,
+        });
+      } else {
+        toast.success('작업 등록 완료!', {
+          description: manualCount > 0 
+            ? `댓글 ${manualCount}개 등록됨`
+            : '댓글 없이 등록됨',
+        });
+      }
 
       // Reset form
       setVideoUrl('');
@@ -405,29 +412,40 @@ export default function RegisterPage() {
               <CardTitle className="font-mono text-sm flex items-center gap-2">
                 <MessageSquare className="h-4 w-4 text-green-500" />
                 댓글 관리
+                <span className="text-[10px] text-zinc-500 font-normal">(선택사항)</span>
               </CardTitle>
               <CardDescription className="font-mono text-xs">
-                댓글 대량 등록 (한 줄에 하나씩)
+                직접 입력하거나 비워두면 AI가 자동 생성합니다
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               <Textarea
-                placeholder={`좋은 영상이네요!\n유익한 정보 감사합니다~\n구독하고 갑니다 :)`}
+                placeholder="댓글 내용을 비워두면, 설정된 확률(%)에 맞춰 자동으로 AI가 댓글을 생성합니다."
                 value={comments}
                 onChange={(e) => setComments(e.target.value)}
-                rows={6}
+                rows={4}
                 className="font-mono text-sm bg-zinc-900 border-zinc-800 resize-none"
               />
-              <div className="flex items-center gap-2">
-                <AlertCircle className="h-3 w-3 text-amber-500" />
-                <p className="font-mono text-[10px] text-zinc-500">
-                  입력된 줄 수만큼 댓글 풀에 저장됩니다 - 현재{' '}
-                  <span className="text-amber-400 font-bold">
-                    {comments.split('\n').filter((c) => c.trim()).length}개
-                  </span>{' '}
-                  등록됨
-                </p>
-              </div>
+              {comments.trim() && (
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-3 w-3 text-amber-500" />
+                  <p className="font-mono text-[10px] text-zinc-500">
+                    수동 입력:{' '}
+                    <span className="text-amber-400 font-bold">
+                      {comments.split('\n').filter((c) => c.trim()).length}개
+                    </span>{' '}
+                    (한 줄에 하나씩)
+                  </p>
+                </div>
+              )}
+              {!comments.trim() && commentProb[0] > 0 && (
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-3 w-3 text-purple-500" />
+                  <p className="font-mono text-[10px] text-purple-400">
+                    댓글 확률 {commentProb[0]}% 설정됨 → AI가 자동 생성합니다
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
 

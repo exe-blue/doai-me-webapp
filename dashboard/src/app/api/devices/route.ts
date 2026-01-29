@@ -26,6 +26,7 @@ export async function GET(request: NextRequest) {
     let query = supabase
       .from('devices')
       .select('*')
+      .like('pc_id', 'P__-___') // Strict filter: only P01-001 format devices
       .order('pc_id', { ascending: true })
       .limit(limit);
 
@@ -36,7 +37,7 @@ export async function GET(request: NextRequest) {
 
     // PC ID filter (prefix match)
     if (pcId) {
-      query = query.like('pc_id', `${pcId}%`);
+      query = query.like('pc_id', `${pcId}-%`);
     }
 
     const { data: devices, error } = await query;
@@ -60,6 +61,44 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('[API] Devices GET error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE /api/devices?status=offline - Delete devices by status
+export async function DELETE(request: NextRequest) {
+  try {
+    const supabase = getSupabase();
+    const { searchParams } = new URL(request.url);
+    const status = searchParams.get('status');
+
+    if (!status) {
+      return NextResponse.json(
+        { error: 'status query parameter required (e.g., ?status=offline)' },
+        { status: 400 }
+      );
+    }
+
+    const { data, error, count } = await supabase
+      .from('devices')
+      .delete()
+      .eq('status', status)
+      .select('id');
+
+    if (error) {
+      console.error('[API] Device delete error:', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      deleted: data?.length || 0,
+      message: `Deleted ${data?.length || 0} devices with status '${status}'`,
+    });
+  } catch (error) {
+    console.error('[API] Devices DELETE error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

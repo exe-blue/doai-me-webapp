@@ -83,8 +83,9 @@ export function DeviceCard({ device, onClick, isSelected, isMaster }: DeviceCard
   const deviceName = device.pc_id || 'UNKNOWN';
   // Serial: show first 4 chars
   const serialShort = device.serial_number?.slice(0, 4)?.toLowerCase() || '----';
-  // IP validation
-  const hasValidIp = device.ip && device.ip !== '-' && device.ip !== '';
+  // IP validation - check both ip (socket) and ip_address (DB) fields
+  const ipValue = device.ip || device.ip_address;
+  const hasValidIp = ipValue && ipValue !== '-' && ipValue !== '';
 
   const handleClick = () => {
     if (health === 'offline') {
@@ -151,7 +152,7 @@ export function DeviceCard({ device, onClick, isSelected, isMaster }: DeviceCard
               'font-mono',
               hasValidIp ? 'text-green-400' : 'text-red-400'
             )}>
-              {hasValidIp ? device.ip : '---'}
+              {hasValidIp ? ipValue : 'No IP'}
             </span>
           </div>
 

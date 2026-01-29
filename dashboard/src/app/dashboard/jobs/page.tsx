@@ -1,67 +1,106 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
-import { Progress } from '@/components/ui/progress';
 import {
   PlayCircle,
   Plus,
   RefreshCw,
-  PauseCircle,
   CheckCircle2,
+  XCircle,
   Clock,
   Loader2,
-  ChevronDown,
+  ChevronLeft,
   ChevronRight,
-  Trash2,
-  AlertCircle,
-  Zap,
   Timer,
-  Users,
+  History,
+  Terminal,
+  ArrowDown,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSocketContext } from '@/contexts/socket-context';
 import { JobCreateModal, type CreateJobResponse } from '@/components/jobs/job-create-modal';
+import { JobCard, type Job } from '@/components/jobs/job-card';
+import { LogDrawer } from '@/components/jobs/log-drawer';
 import { cn } from '@/lib/utils';
 
-interface JobStats {
-  pending: number;
-  paused: number;
-  running: number;
-  completed: number;
-  failed: number;
-  cancelled: number;
+// =============================================
+// Types
+// =============================================
+
+interface JobProgress {
+  jobId: string;
+  progressPercent: number;
+  currentStep: number;
+  totalSteps: number;
+  deviceSerial?: string;
+  status?: string;
+  startedAt?: number;
 }
 
-interface Job {
-  id: string;
-  title: string;
-  display_name?: string;
-  target_url: string;
-  status: 'active' | 'paused' | 'completed' | 'cancelled';
-  duration_sec: number;
-  prob_like: number;
-  prob_comment: number;
-  created_at: string;
-  priority?: boolean;
-  stats?: JobStats;
-  total_assigned?: number;
+// 페이지네이션 상수
+const HISTORY_PAGE_SIZE = 10;
+
+// =============================================
+// 유틸리티 함수
+// =============================================
+
+/**
+ * YouTube 영상 ID 추출
+ */
+function extractVideoId(url: string): string | null {
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/)([^&?/]+)/,
+    /youtube\.com\/shorts\/([^&?/]+)/,
+  ];
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match) return match[1];
+  }
+  return null;
 }
+
+/**
+ * 시간 포맷팅 (초 -> MM:SS)
+ */
+function formatDuration(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+}
+
+// =============================================
+// Main Component
+// =============================================
 
 export default function JobsPage() {
   const { isConnected, devices, socket } = useSocketContext();
+  
+  // 모달 상태
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [logDrawerOpen, setLogDrawerOpen] = useState(false);
+  const [selectedJobForLogs, setSelectedJobForLogs] = useState<Job | null>(null);
+  
+  // 작업 데이터
   const [jobs, setJobs] = useState<Job[]>([]);
   const [completedJobs, setCompletedJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [expandedHistory, setExpandedHistory] = useState<Set<string>>(new Set());
+  
+  // 실시간 프로그레스 상태
+  const [jobProgressMap, setJobProgressMap] = useState<Record<string, JobProgress>>({});
+  const [elapsedTimes, setElapsedTimes] = useState<Record<string, number>>({});
+  
+  // 히스토리 페이지네이션
+  const [historyPage, setHistoryPage] = useState(1);
 
   const idleDevices = devices.filter(d => d.status === 'idle');
 
-  // Fetch active/paused jobs
+  // =============================================
+  // Data Fetching
+  // =============================================
+
   const fetchJobs = useCallback(async () => {
     try {
       const response = await fetch('/api/jobs');
@@ -72,10 +111,9 @@ export default function JobsPage() {
     }
   }, []);
 
-  // Fetch completed jobs for history
   const fetchCompletedJobs = useCallback(async () => {
     try {
-      const response = await fetch('/api/jobs?status=completed');
+      const response = await fetch('/api/jobs?status=completed&limit=100');
       const data = await response.json();
       setCompletedJobs(data.jobs || []);
     } catch (err) {
@@ -95,26 +133,101 @@ export default function JobsPage() {
     return () => clearInterval(interval);
   }, [fetchJobs, fetchCompletedJobs]);
 
-  // Socket.io real-time updates
+  // =============================================
+  // Socket.io Real-time Updates
+  // =============================================
+
   useEffect(() => {
     if (!socket || !isConnected) return;
 
-    const handleJobProgress = () => fetchJobs();
+    const handleJobProgress = (data: JobProgress) => {
+      setJobProgressMap(prev => ({
+        ...prev,
+        [data.jobId]: { ...data, startedAt: data.startedAt || prev[data.jobId]?.startedAt },
+      }));
+    };
+
     const handleJobCompleted = () => {
       fetchJobs();
       fetchCompletedJobs();
     };
 
+    const handleJobStarted = (data: { jobId: string }) => {
+      setJobProgressMap(prev => ({
+        ...prev,
+        [data.jobId]: {
+          jobId: data.jobId,
+          progressPercent: 0,
+          currentStep: 0,
+          totalSteps: 12,
+          status: 'running',
+          startedAt: Date.now(),
+        },
+      }));
+      setElapsedTimes(prev => ({ ...prev, [data.jobId]: 0 }));
+    };
+
     socket.on('job:progress', handleJobProgress);
     socket.on('job:completed', handleJobCompleted);
     socket.on('job:failed', handleJobCompleted);
+    socket.on('job:started', handleJobStarted);
 
     return () => {
       socket.off('job:progress', handleJobProgress);
       socket.off('job:completed', handleJobCompleted);
       socket.off('job:failed', handleJobCompleted);
+      socket.off('job:started', handleJobStarted);
     };
   }, [socket, isConnected, fetchJobs, fetchCompletedJobs]);
+
+  // Elapsed time ticker
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setElapsedTimes(prev => {
+        const updated = { ...prev };
+        Object.keys(jobProgressMap).forEach(jobId => {
+          if (jobProgressMap[jobId]?.startedAt) {
+            updated[jobId] = Math.floor((Date.now() - jobProgressMap[jobId].startedAt!) / 1000);
+          }
+        });
+        return updated;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [jobProgressMap]);
+
+  // =============================================
+  // Queue Processing
+  // =============================================
+
+  // 현재 실행 중인 작업 (Running) - 맨 아래에 표시됨
+  const runningJob = useMemo(() => 
+    jobs.find(j => j.status === 'active' && j.stats && j.stats.running > 0),
+    [jobs]
+  );
+
+  // 대기 중인 작업 (Pending) - 위에서 아래로 쌓임
+  const pendingJobs = useMemo(() => 
+    jobs
+      .filter(j => j !== runningJob)
+      .sort((a, b) => {
+        // Priority DESC, then created_at ASC
+        if (a.priority !== b.priority) return a.priority ? -1 : 1;
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      }),
+    [jobs, runningJob]
+  );
+
+  // 히스토리 페이지네이션
+  const historyTotalPages = Math.ceil(completedJobs.length / HISTORY_PAGE_SIZE);
+  const paginatedHistory = useMemo(() => {
+    const start = (historyPage - 1) * HISTORY_PAGE_SIZE;
+    return completedJobs.slice(start, start + HISTORY_PAGE_SIZE);
+  }, [completedJobs, historyPage]);
+
+  // =============================================
+  // Event Handlers
+  // =============================================
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -125,7 +238,6 @@ export default function JobsPage() {
   const handleJobCreated = (response: CreateJobResponse) => {
     toast.success(`작업 생성: ${response.job.title}`);
     fetchJobs();
-
     if (isConnected && socket && response.assignments.length > 0) {
       socket.emit('job:distribute', {
         assignments: response.assignments,
@@ -134,7 +246,6 @@ export default function JobsPage() {
     }
   };
 
-  // Toggle priority
   const handleTogglePriority = async (job: Job) => {
     setActionLoading(job.id);
     try {
@@ -143,9 +254,7 @@ export default function JobsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ priority: !job.priority }),
       });
-
       if (!response.ok) throw new Error('Failed to update priority');
-
       toast.success(job.priority ? '우선순위 해제' : '우선순위 설정');
       await fetchJobs();
     } catch (err) {
@@ -156,7 +265,6 @@ export default function JobsPage() {
     }
   };
 
-  // Pause/Resume job
   const handlePauseResume = async (job: Job) => {
     setActionLoading(job.id);
     try {
@@ -166,17 +274,10 @@ export default function JobsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus }),
       });
-
       if (!response.ok) throw new Error('Failed to update job');
-
       if (socket && isConnected) {
-        if (newStatus === 'paused') {
-          socket.emit('job:pause', { jobId: job.id });
-        } else {
-          socket.emit('job:resume', { jobId: job.id });
-        }
+        socket.emit(newStatus === 'paused' ? 'job:pause' : 'job:resume', { jobId: job.id });
       }
-
       await fetchJobs();
     } catch (err) {
       console.error('Failed to pause/resume job:', err);
@@ -185,19 +286,15 @@ export default function JobsPage() {
     }
   };
 
-  // Delete job
   const handleDelete = async (job: Job) => {
     if (!confirm(`"${job.display_name || job.title}" 작업을 삭제하시겠습니까?`)) return;
-
     setActionLoading(job.id);
     try {
       if (socket && isConnected) {
         socket.emit('job:cancel', { jobId: job.id });
       }
-
       const response = await fetch(`/api/jobs/${job.id}`, { method: 'DELETE' });
       if (!response.ok) throw new Error('Failed to delete job');
-
       await fetchJobs();
     } catch (err) {
       console.error('Failed to delete job:', err);
@@ -206,27 +303,19 @@ export default function JobsPage() {
     }
   };
 
-  const getProgressPercent = (stats: JobStats | undefined, total: number | undefined) => {
-    if (!stats || !total || total === 0) return 0;
-    return Math.round(((stats.completed + stats.failed) / total) * 100);
-  };
+  const handleOpenLogs = useCallback((job: Job) => {
+    setSelectedJobForLogs(job);
+    setLogDrawerOpen(true);
+  }, []);
 
-  // Separate active running job from queue
-  const activeJob = jobs.find(j => j.status === 'active' && j.stats && j.stats.running > 0);
-  const queueJobs = jobs.filter(j => j !== activeJob);
+  const handleCloseLogs = useCallback(() => {
+    setLogDrawerOpen(false);
+    setSelectedJobForLogs(null);
+  }, []);
 
-  // Estimate completion time
-  const getEstimatedTime = (job: Job) => {
-    if (!job.stats || !job.total_assigned) return '계산 중...';
-    const remaining = job.total_assigned - (job.stats.completed + job.stats.failed);
-    const avgTimePerDevice = job.duration_sec + 10; // buffer
-    const runningDevices = Math.max(1, job.stats.running);
-    const estimatedSeconds = (remaining * avgTimePerDevice) / runningDevices;
-
-    if (estimatedSeconds < 60) return `약 ${Math.ceil(estimatedSeconds)}초`;
-    if (estimatedSeconds < 3600) return `약 ${Math.ceil(estimatedSeconds / 60)}분`;
-    return `약 ${Math.ceil(estimatedSeconds / 3600)}시간`;
-  };
+  // =============================================
+  // Render
+  // =============================================
 
   if (loading) {
     return (
@@ -237,11 +326,13 @@ export default function JobsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-12">
+      {/* ================================================== */}
       {/* Header */}
+      {/* ================================================== */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-mono font-bold text-foreground">작업관리</h1>
+          <h1 className="text-xl font-mono font-bold text-foreground">작업 타임라인</h1>
           <div className="flex items-center gap-2 mt-2">
             <div
               className={cn(
@@ -252,7 +343,7 @@ export default function JobsPage() {
               )}
             />
             <span className="font-mono text-xs text-zinc-400">
-              {idleDevices.length}대 대기중 | {devices.filter(d => d.status !== 'offline').length}대 온라인
+              대기: {idleDevices.length}대 | 온라인: {devices.filter(d => d.status !== 'offline').length}대
             </span>
           </div>
         </div>
@@ -280,297 +371,219 @@ export default function JobsPage() {
       </div>
 
       {/* ================================================== */}
-      {/* Section A: Active Running (Hero Section) */}
+      {/* Section: Queue (Vertical Stack Timeline) */}
+      {/* Running at bottom, Pending stacked above */}
       {/* ================================================== */}
-      {activeJob && (
-        <div className="rounded-lg border-2 border-green-500/50 bg-gradient-to-br from-green-500/10 via-black to-black overflow-hidden">
-          <div className="px-6 py-5">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="relative">
-                <Loader2 className="h-6 w-6 text-green-500 animate-spin" />
-                <div className="absolute inset-0 h-6 w-6 bg-green-500/20 rounded-full animate-ping" />
-              </div>
-              <span className="font-mono text-xs text-green-400 uppercase tracking-wider">
-                현재 진행 중
-              </span>
-            </div>
-
-            {/* Job Name with Blink Effect */}
-            <h2 className="font-mono text-2xl font-bold text-white mb-4 animate-pulse">
-              {activeJob.display_name || activeJob.title}
-            </h2>
-
-            {/* Progress Bar */}
-            <div className="mb-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-mono text-sm text-zinc-400">진행률</span>
-                <span className="font-mono text-lg text-green-400 font-bold">
-                  {getProgressPercent(activeJob.stats, activeJob.total_assigned)}%
-                  <span className="text-sm text-zinc-500 ml-2">
-                    ({activeJob.stats?.completed || 0}/{activeJob.total_assigned || 0}회)
-                  </span>
-                </span>
-              </div>
-              <Progress
-                value={getProgressPercent(activeJob.stats, activeJob.total_assigned)}
-                className="h-3 bg-zinc-800"
-              />
-            </div>
-
-            {/* Stats Row */}
-            <div className="grid grid-cols-3 gap-4">
-              <div className="flex items-center gap-2">
-                <Users className="h-4 w-4 text-blue-400" />
-                <div>
-                  <p className="font-mono text-xs text-zinc-500">투입 리소스</p>
-                  <p className="font-mono text-sm text-white">
-                    P01: <span className="text-blue-400">{activeJob.stats?.running || 0}</span>/{activeJob.total_assigned}대
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Timer className="h-4 w-4 text-yellow-400" />
-                <div>
-                  <p className="font-mono text-xs text-zinc-500">예상 종료</p>
-                  <p className="font-mono text-sm text-yellow-400">
-                    {getEstimatedTime(activeJob)}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-zinc-400" />
-                <div>
-                  <p className="font-mono text-xs text-zinc-500">시청 시간</p>
-                  <p className="font-mono text-sm text-white">{activeJob.duration_sec}초</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className="flex items-center gap-2 mt-4 pt-4 border-t border-zinc-800">
-              <Button
-                size="sm"
-                variant="outline"
-                className="font-mono text-xs"
-                onClick={() => handlePauseResume(activeJob)}
-                disabled={actionLoading === activeJob.id}
-              >
-                {actionLoading === activeJob.id ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                ) : (
-                  <PauseCircle className="h-4 w-4 text-yellow-500 mr-1" />
-                )}
-                일시정지
-              </Button>
-            </div>
+      <div className="rounded-lg border border-zinc-800 bg-black/50 overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 bg-zinc-900/50">
+          <div className="flex items-center gap-3">
+            <Clock className="h-4 w-4 text-blue-500" />
+            <span className="font-mono text-sm font-bold text-white">작업 큐</span>
+            <span className="font-mono text-xs text-zinc-500">
+              ({jobs.length}개 {runningJob ? '• 1개 실행중' : ''})
+            </span>
+          </div>
+          <div className="flex items-center gap-1 text-zinc-500">
+            <ArrowDown className="h-3 w-3" />
+            <span className="font-mono text-[10px]">실행 방향</span>
           </div>
         </div>
-      )}
 
-      {/* No Active Job */}
-      {!activeJob && jobs.length === 0 && (
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-12 text-center">
-          <PlayCircle className="h-16 w-16 text-zinc-700 mx-auto mb-4" />
-          <p className="font-mono text-lg text-zinc-400 mb-2">진행 중인 작업 없음</p>
-          <p className="font-mono text-xs text-zinc-600">새 작업을 등록하여 시작하세요</p>
+        {/* Queue Content - flex-col-reverse로 Running이 아래에 오도록 */}
+        <div className="p-3 min-h-[200px]">
+          {jobs.length === 0 ? (
+            // Empty State
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <PlayCircle className="h-12 w-12 text-zinc-700 mb-4" />
+              <p className="font-mono text-sm text-zinc-400 mb-1">대기 중인 작업 없음</p>
+              <p className="font-mono text-xs text-zinc-600">새 작업을 등록하세요</p>
+            </div>
+          ) : (
+            <div className="flex flex-col-reverse gap-2">
+              {/* Running Job (맨 아래에 표시) */}
+              {runningJob && (
+                <JobCard
+                  key={runningJob.id}
+                  job={runningJob}
+                  isRunning={true}
+                  progress={jobProgressMap[runningJob.id]}
+                  elapsedSeconds={elapsedTimes[runningJob.id] || 0}
+                  isLoading={actionLoading === runningJob.id}
+                  onPauseResume={handlePauseResume}
+                  onDelete={handleDelete}
+                  onOpenLogs={handleOpenLogs}
+                />
+              )}
+
+              {/* Pending Jobs (Running 위에 역순으로 쌓임 - 가장 먼저 실행될 것이 아래) */}
+              {[...pendingJobs].reverse().map((job, index) => (
+                <JobCard
+                  key={job.id}
+                  job={job}
+                  queuePosition={pendingJobs.length - index}
+                  totalInQueue={pendingJobs.length}
+                  isRunning={false}
+                  progress={jobProgressMap[job.id]}
+                  isLoading={actionLoading === job.id}
+                  onPauseResume={handlePauseResume}
+                  onDelete={handleDelete}
+                  onTogglePriority={handleTogglePriority}
+                  onOpenLogs={handleOpenLogs}
+                />
+              ))}
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       {/* ================================================== */}
-      {/* Section B: Job Queue (Timeline) */}
+      {/* Section: Execution History (Compact Table) */}
       {/* ================================================== */}
-      {queueJobs.length > 0 && (
-        <div className="rounded-lg border border-zinc-800 bg-black dark:bg-zinc-950 overflow-hidden">
+      {completedJobs.length > 0 && (
+        <div className="rounded-lg border border-zinc-800 bg-black/50 overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 bg-zinc-900/50">
             <div className="flex items-center gap-3">
-              <Clock className="h-4 w-4 text-blue-500" />
-              <span className="font-mono text-sm font-bold text-white">대기열</span>
-              <span className="font-mono text-xs text-zinc-500">({queueJobs.length}개)</span>
+              <History className="h-4 w-4 text-blue-500" />
+              <span className="font-mono text-sm font-bold text-white">실행 기록</span>
+              <span className="font-mono text-xs text-zinc-500">({completedJobs.length}개)</span>
             </div>
+            
+            {/* Pagination Controls */}
+            {historyTotalPages > 1 && (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 p-0"
+                  disabled={historyPage === 1}
+                  onClick={() => setHistoryPage(p => Math.max(1, p - 1))}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="font-mono text-xs text-zinc-400">
+                  {historyPage} / {historyTotalPages}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 p-0"
+                  disabled={historyPage === historyTotalPages}
+                  onClick={() => setHistoryPage(p => Math.min(historyTotalPages, p + 1))}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
           </div>
 
-          <div className="divide-y divide-zinc-800">
-            {queueJobs.map((job, index) => {
-              const progress = getProgressPercent(job.stats, job.total_assigned);
-              const isLoading = actionLoading === job.id;
+          {/* Compact History Table */}
+          <div className="divide-y divide-zinc-800/50">
+            {/* Header */}
+            <div className="hidden sm:grid grid-cols-12 gap-2 px-4 py-2 bg-zinc-900/30 text-[10px] font-mono text-zinc-500 uppercase">
+              <div className="col-span-1">상태</div>
+              <div className="col-span-5">작업</div>
+              <div className="col-span-3">시간</div>
+              <div className="col-span-2">결과</div>
+              <div className="col-span-1"></div>
+            </div>
+
+            {/* Rows */}
+            {paginatedHistory.map((job) => {
+              const videoId = extractVideoId(job.target_url);
+              const thumbnailUrl = videoId
+                ? `https://img.youtube.com/vi/${videoId}/default.jpg`
+                : null;
+              const successRate = job.stats && job.total_assigned
+                ? Math.round((job.stats.completed / job.total_assigned) * 100)
+                : 0;
+              const isSuccess = successRate >= 80;
 
               return (
                 <div
                   key={job.id}
-                  className={cn(
-                    'px-4 py-3 transition-colors',
-                    job.priority && 'bg-yellow-500/5 border-l-2 border-l-yellow-500'
-                  )}
+                  className="grid grid-cols-12 gap-2 px-4 py-2.5 items-center hover:bg-zinc-900/30 transition-colors"
                 >
-                  <div className="flex items-center gap-4">
-                    {/* Queue Position */}
-                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center">
-                      <span className="font-mono text-xs text-zinc-400">
-                        {job.priority ? <Zap className="h-4 w-4 text-yellow-500" /> : index + 1}
-                      </span>
-                    </div>
-
-                    {/* Job Info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-sm font-medium text-white truncate">
-                          {job.display_name || job.title}
-                        </span>
-                        {job.status === 'paused' && (
-                          <span className="font-mono text-[10px] text-yellow-400 bg-yellow-500/20 px-1.5 py-0.5 rounded">
-                            PAUSED
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-3 mt-1">
-                        <span className="font-mono text-[10px] text-zinc-500">
-                          {job.total_assigned || 0}대 할당
-                        </span>
-                        <span className="font-mono text-[10px] text-zinc-500">
-                          {progress}% 완료
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Progress */}
-                    <div className="w-24 hidden sm:block">
-                      <Progress value={progress} className="h-1.5" />
-                    </div>
-
-                    {/* Priority Toggle */}
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-[10px] text-zinc-500">우선</span>
-                      <Switch
-                        checked={job.priority || false}
-                        onCheckedChange={() => handleTogglePriority(job)}
-                        disabled={isLoading}
-                        className="data-[state=checked]:bg-yellow-500"
-                      />
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex items-center gap-1">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-8 w-8 p-0"
-                        disabled={isLoading}
-                        onClick={() => handlePauseResume(job)}
-                      >
-                        {isLoading ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : job.status === 'active' ? (
-                          <PauseCircle className="h-4 w-4 text-yellow-500" />
-                        ) : (
-                          <PlayCircle className="h-4 w-4 text-green-500" />
-                        )}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-8 w-8 p-0"
-                        disabled={isLoading}
-                        onClick={() => handleDelete(job)}
-                      >
-                        <Trash2 className="h-4 w-4 text-red-500" />
-                      </Button>
-                    </div>
+                  {/* Status Icon */}
+                  <div className="col-span-1">
+                    {isSuccess ? (
+                      <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    ) : (
+                      <XCircle className="h-4 w-4 text-red-500" />
+                    )}
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
-      {/* ================================================== */}
-      {/* Section C: History (Accordion) */}
-      {/* ================================================== */}
-      {completedJobs.length > 0 && (
-        <div className="rounded-lg border border-zinc-800 bg-black dark:bg-zinc-950 overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 bg-zinc-900/50">
-            <div className="flex items-center gap-3">
-              <CheckCircle2 className="h-4 w-4 text-blue-500" />
-              <span className="font-mono text-sm font-bold text-white">완료 기록</span>
-              <span className="font-mono text-xs text-zinc-500">({completedJobs.length}개)</span>
-            </div>
-          </div>
-
-          <div className="divide-y divide-zinc-800">
-            {completedJobs.slice(0, 10).map((job) => {
-              const isExpanded = expandedHistory.has(job.id);
-              const successRate = job.stats && job.total_assigned
-                ? Math.round((job.stats.completed / job.total_assigned) * 100)
-                : 0;
-
-              return (
-                <div key={job.id}>
-                  {/* Accordion Header */}
-                  <div
-                    className="px-4 py-3 cursor-pointer hover:bg-zinc-900/50 transition-colors"
-                    onClick={() => {
-                      setExpandedHistory(prev => {
-                        const newSet = new Set(prev);
-                        if (newSet.has(job.id)) {
-                          newSet.delete(job.id);
-                        } else {
-                          newSet.add(job.id);
-                        }
-                        return newSet;
-                      });
-                    }}
-                  >
-                    <div className="flex items-center gap-3">
-                      {isExpanded ? (
-                        <ChevronDown className="h-4 w-4 text-zinc-500" />
+                  {/* Job Info: Thumbnail + ID + Title */}
+                  <div className="col-span-5 flex items-center gap-2 min-w-0">
+                    {/* Small Thumbnail */}
+                    <div className="shrink-0 w-10 h-7 rounded overflow-hidden bg-zinc-800">
+                      {thumbnailUrl ? (
+                        <img
+                          src={thumbnailUrl}
+                          alt=""
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                        />
                       ) : (
-                        <ChevronRight className="h-4 w-4 text-zinc-500" />
+                        <div className="w-full h-full flex items-center justify-center">
+                          <PlayCircle className="h-3 w-3 text-zinc-600" />
+                        </div>
                       )}
-
-                      <CheckCircle2 className="h-4 w-4 text-blue-500" />
-
-                      <div className="flex-1 min-w-0">
-                        <span className="font-mono text-sm text-zinc-300 truncate">
-                          {job.display_name || job.title}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-4 text-xs font-mono">
-                        <span className="text-green-400">{job.stats?.completed || 0} 성공</span>
-                        <span className="text-red-400">{job.stats?.failed || 0} 실패</span>
-                        <span className="text-zinc-500">
-                          {new Date(job.created_at).toLocaleDateString('ko-KR')}
-                        </span>
-                      </div>
+                    </div>
+                    
+                    <div className="min-w-0">
+                      <p className="font-mono text-xs text-white truncate">
+                        {job.display_name || job.title}
+                      </p>
+                      {job.title !== job.display_name && (
+                        <p className="font-mono text-[9px] text-zinc-500 truncate">
+                          {job.title}
+                        </p>
+                      )}
                     </div>
                   </div>
 
-                  {/* Accordion Content */}
-                  {isExpanded && (
-                    <div className="px-4 pb-4 pt-2 bg-zinc-900/30">
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        <div className="p-2 rounded bg-zinc-800/50">
-                          <span className="font-mono text-[10px] text-zinc-500 block">총 할당</span>
-                          <span className="font-mono text-sm text-white">{job.total_assigned || 0}대</span>
-                        </div>
-                        <div className="p-2 rounded bg-zinc-800/50">
-                          <span className="font-mono text-[10px] text-zinc-500 block">성공</span>
-                          <span className="font-mono text-sm text-green-400">{job.stats?.completed || 0}</span>
-                        </div>
-                        <div className="p-2 rounded bg-zinc-800/50">
-                          <span className="font-mono text-[10px] text-zinc-500 block">실패</span>
-                          <span className="font-mono text-sm text-red-400">{job.stats?.failed || 0}</span>
-                        </div>
-                        <div className="p-2 rounded bg-zinc-800/50">
-                          <span className="font-mono text-[10px] text-zinc-500 block">성공률</span>
-                          <span className="font-mono text-sm text-blue-400">{successRate}%</span>
-                        </div>
-                      </div>
-                      <div className="mt-3 text-xs font-mono text-zinc-500">
-                        URL: <span className="text-zinc-400 truncate">{job.target_url}</span>
-                      </div>
-                    </div>
-                  )}
+                  {/* Timing: Started / Duration */}
+                  <div className="col-span-3">
+                    <p className="font-mono text-[10px] text-zinc-400">
+                      {new Date(job.created_at).toLocaleString('ko-KR', {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </p>
+                    <p className="font-mono text-[10px] text-zinc-500 flex items-center gap-1">
+                      <Timer className="h-3 w-3" />
+                      {job.duration_sec}초
+                    </p>
+                  </div>
+
+                  {/* Result: Views / Likes */}
+                  <div className="col-span-2">
+                    <p className="font-mono text-[10px]">
+                      <span className="text-green-400">{job.stats?.completed || 0}</span>
+                      <span className="text-zinc-600">/</span>
+                      <span className="text-zinc-400">{job.total_assigned || 0}</span>
+                    </p>
+                    {(job.stats?.failed || 0) > 0 && (
+                      <p className="font-mono text-[9px] text-red-400">
+                        {job.stats?.failed} fail
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Action: View Logs */}
+                  <div className="col-span-1 flex justify-end">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0 hover:bg-zinc-800"
+                      onClick={() => handleOpenLogs(job)}
+                      title="로그 보기"
+                    >
+                      <Terminal className="h-3 w-3 text-green-500" />
+                    </Button>
+                  </div>
                 </div>
               );
             })}
@@ -578,12 +591,21 @@ export default function JobsPage() {
         </div>
       )}
 
-      {/* Create Job Modal */}
+      {/* ================================================== */}
+      {/* Modals & Drawers */}
+      {/* ================================================== */}
       <JobCreateModal
         open={createModalOpen}
         onOpenChange={setCreateModalOpen}
         onJobCreated={handleJobCreated}
         idleDeviceCount={idleDevices.length}
+      />
+
+      <LogDrawer
+        open={logDrawerOpen}
+        onClose={handleCloseLogs}
+        jobId={selectedJobForLogs?.id}
+        jobTitle={selectedJobForLogs?.display_name || selectedJobForLogs?.title}
       />
     </div>
   );

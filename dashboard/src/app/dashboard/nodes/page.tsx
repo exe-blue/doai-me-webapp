@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { RefreshCw, Monitor, WifiOff, Loader2, Zap, Sun, Volume2, Filter, AlertCircle, ChevronDown, Home, Youtube, Power, RotateCcw, AppWindow } from 'lucide-react';
+import { RefreshCw, Monitor, WifiOff, Loader2, Zap, Sun, Volume2, Filter, AlertCircle, ChevronDown, Home, Youtube, Power, RotateCcw, AppWindow, Trash2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -372,6 +372,22 @@ export default function NodesPage() {
     toast.success(`${onlineDevices.length}대 기기 밝기 최소화 명령 전송됨`);
   }, [validDevices, isConnected, broadcastCommand, deviceSettings]);
 
+  // Clear offline devices from DB
+  const clearOfflineDevices = useCallback(async () => {
+    try {
+      const response = await fetch('/api/devices?status=offline', { method: 'DELETE' });
+      const data = await response.json();
+      if (response.ok) {
+        toast.success(`오프라인 기기 ${data.deleted}개 삭제됨`);
+        window.location.reload();
+      } else {
+        toast.error(`삭제 실패: ${data.error}`);
+      }
+    } catch {
+      toast.error('오프라인 기기 삭제 중 오류 발생');
+    }
+  }, []);
+
   // Set volume to 0 on all devices
   const setVolumeAll = useCallback(() => {
     const onlineDevices = validDevices.filter(d => d.status !== 'offline');
@@ -552,6 +568,11 @@ export default function NodesPage() {
               <DropdownMenuItem onClick={initializeAllDevices} className="cursor-pointer">
                 <Zap className="h-3.5 w-3.5 mr-2 text-purple-400" />
                 전체 초기화
+              </DropdownMenuItem>
+              <DropdownMenuSeparator className="bg-zinc-700" />
+              <DropdownMenuItem onClick={clearOfflineDevices} className="cursor-pointer text-red-400">
+                <Trash2 className="h-3.5 w-3.5 mr-2 text-red-400" />
+                Clear Offline ({stats.offline})
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
