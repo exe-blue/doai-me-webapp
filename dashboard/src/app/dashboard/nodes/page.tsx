@@ -350,11 +350,11 @@ export default function NodesPage() {
     });
 
     toast.success(`${onlineDevices.length}대 기기 초기화 명령 전송됨 (해상도 + 밝기 + 볼륨)`);
-  }, [devices, isConnected, broadcastCommand, deviceSettings]);
+  }, [validDevices, isConnected, broadcastCommand, deviceSettings]);
 
   // Set brightness on all devices
   const setBrightnessAll = useCallback(() => {
-    const onlineDevices = devices.filter(d => d.status !== 'offline');
+    const onlineDevices = validDevices.filter(d => d.status !== 'offline');
     if (onlineDevices.length === 0) {
       toast.error('온라인 기기가 없습니다');
       return;
@@ -370,11 +370,11 @@ export default function NodesPage() {
       shellCommand: `settings put system screen_brightness ${deviceSettings.brightness}`
     });
     toast.success(`${onlineDevices.length}대 기기 밝기 최소화 명령 전송됨`);
-  }, [devices, isConnected, broadcastCommand, deviceSettings]);
+  }, [validDevices, isConnected, broadcastCommand, deviceSettings]);
 
   // Set volume to 0 on all devices
   const setVolumeAll = useCallback(() => {
-    const onlineDevices = devices.filter(d => d.status !== 'offline');
+    const onlineDevices = validDevices.filter(d => d.status !== 'offline');
     if (onlineDevices.length === 0) {
       toast.error('온라인 기기가 없습니다');
       return;
@@ -390,7 +390,7 @@ export default function NodesPage() {
       shellCommand: `media volume --stream 3 --set ${deviceSettings.volume}`
     });
     toast.success(`${onlineDevices.length}대 기기 볼륨 음소거 명령 전송됨`);
-  }, [devices, isConnected, broadcastCommand, deviceSettings]);
+  }, [validDevices, isConnected, broadcastCommand, deviceSettings]);
 
   // Get target devices for batch actions (filtered devices that are not offline)
   const getTargetDevices = useCallback(() => {
@@ -730,7 +730,7 @@ export default function NodesPage() {
 
         {/* Filter count */}
         <span className="font-mono text-xs text-zinc-600 ml-auto">
-          {filteredDevices.length} / {devices.length}
+          {filteredDevices.length} / {validDevices.length}
         </span>
 
         {/* Reset filter */}
