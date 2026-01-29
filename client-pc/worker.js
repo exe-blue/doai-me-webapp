@@ -1,6 +1,7 @@
 /**
- * [Agent-Node] Worker Client v2.0
+ * [Agent-Node] Worker Client v3.0
  * 역할: ADB 장치 감시, Supabase 등록, 작업 폴링 및 자동 실행
+ * 추가: Socket.io 실시간 통신 (Heartbeat, Remote Control, Streaming)
  */
 
 require('dotenv').config({ path: '../.env' });
@@ -8,10 +9,17 @@ const { createClient } = require('@supabase/supabase-js');
 const { exec, execFile } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const { io } = require('socket.io-client');
 const config = require('./config.json');
 
 // v5.1: 결과 수집 모듈 (파일 존재 확인 후 Pull)
-const resultCollector = require('../backend/result-collector.js');
+let resultCollector;
+try {
+    resultCollector = require('../backend/result-collector.js');
+} catch (e) {
+    console.warn('[System] result-collector.js not found, evidence collection disabled');
+    resultCollector = null;
+}
 
 // =============================================
 // 1. 초기 설정
@@ -24,7 +32,9 @@ const supabase = createClient(
 
 const ADB_PATH = process.env.ADB_PATH || 'adb';
 const PC_ID = config.pc_id;
-const DEFAULT_GROUP = config.groups.default;
+const DEFAULT_GROUP = config.groups?.default || 'P1-G1';
+const SERVER_URL = process.env.API_BASE_URL || 'https://doai.me';
+const WORKER_API_KEY = process.env.WORKER_API_KEY || '';
 
 // 로컬 캐시: serial_number -> device UUID 매핑
 const deviceIdCache = new Map();
@@ -33,31 +43,365 @@ const deviceIdCache = new Map();
 const jobQueue = [];
 let isProcessing = false;
 
-console.log(`[System] PC-Client (${PC_ID}) Starting...`);
+// Streaming state
+const activeStreams = new Map(); // deviceId -> interval
+
+console.log(`[System] PC-Client v3.0 (${PC_ID}) Starting...`);
 console.log(`[System] ADB Path: ${ADB_PATH}`);
 console.log(`[System] Default Group: ${DEFAULT_GROUP}`);
+console.log(`[System] Server URL: ${SERVER_URL}`);
 
 // =============================================
-// 2. ADB 유틸리티 함수
+// 2. Socket.io 연결
 // =============================================
 
-/**
- * 연결된 ADB 기기 목록 조회
- * @returns {Promise<{devices: string[], error: Error|null}>} - 기기 목록 및 에러
- */
+let socket = null;
+let socketConnected = false;
+
+function initSocketConnection() {
+    console.log(`[Socket] Connecting to ${SERVER_URL}/worker...`);
+
+    socket = io(`${SERVER_URL}/worker`, {
+        auth: {
+            token: WORKER_API_KEY,
+            pcId: PC_ID
+        },
+        transports: ['websocket'],
+        reconnection: true,
+        reconnectionAttempts: 10,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 30000
+    });
+
+    socket.on('connect', () => {
+        console.log(`[Socket] ✅ Connected! (ID: ${socket.id})`);
+        socketConnected = true;
+    });
+
+    socket.on('disconnect', (reason) => {
+        console.log(`[Socket] ❌ Disconnected: ${reason}`);
+        socketConnected = false;
+
+        // Stop all active streams on disconnect
+        activeStreams.forEach((interval, deviceId) => {
+            clearInterval(interval);
+            console.log(`[Stream] Stopped streaming for ${deviceId} (disconnected)`);
+        });
+        activeStreams.clear();
+    });
+
+    socket.on('connect_error', (error) => {
+        console.error(`[Socket] Connection error: ${error.message}`);
+        socketConnected = false;
+    });
+
+    // Command execution from dashboard
+    socket.on('device:command', async (payload) => {
+        const { deviceId, command, params, commandId } = payload;
+        console.log(`[Socket] 🎮 Command received: ${command} for device ${deviceId}`);
+
+        try {
+            const serial = getSerialFromDeviceId(deviceId);
+            if (!serial) {
+                throw new Error(`Device not found: ${deviceId}`);
+            }
+
+            const adbCommand = buildAdbCommand(command, params);
+            await executeAdbCommand(serial, `shell ${adbCommand}`);
+
+            socket.emit('command:ack', {
+                commandId,
+                deviceId,
+                status: 'completed'
+            });
+            console.log(`[Socket] ✅ Command completed: ${command}`);
+        } catch (error) {
+            socket.emit('command:ack', {
+                commandId,
+                deviceId,
+                status: 'failed',
+                error: error.message
+            });
+            console.error(`[Socket] ❌ Command failed: ${error.message}`);
+        }
+    });
+
+    // Start screen streaming
+    socket.on('stream:start', (payload) => {
+        const { deviceId, fps = 2 } = payload;
+        console.log(`[Socket] 🎥 Stream start requested for ${deviceId} at ${fps} FPS`);
+
+        const serial = getSerialFromDeviceId(deviceId);
+        if (!serial) {
+            console.error(`[Stream] Device not found: ${deviceId}`);
+            return;
+        }
+
+        // Stop existing stream if any
+        if (activeStreams.has(deviceId)) {
+            clearInterval(activeStreams.get(deviceId));
+        }
+
+        const interval = setInterval(async () => {
+            try {
+                const base64Img = await captureScreen(serial);
+                if (base64Img && socketConnected) {
+                    socket.emit('stream:frame', {
+                        deviceId,
+                        timestamp: Date.now(),
+                        frame: base64Img
+                    });
+                }
+            } catch (error) {
+                console.error(`[Stream] Capture error: ${error.message}`);
+            }
+        }, Math.round(1000 / fps));
+
+        activeStreams.set(deviceId, interval);
+        console.log(`[Stream] ✅ Streaming started for ${deviceId}`);
+    });
+
+    // Stop screen streaming
+    socket.on('stream:stop', (payload) => {
+        const { deviceId } = payload;
+        console.log(`[Socket] 🛑 Stream stop requested for ${deviceId}`);
+
+        if (activeStreams.has(deviceId)) {
+            clearInterval(activeStreams.get(deviceId));
+            activeStreams.delete(deviceId);
+            console.log(`[Stream] ✅ Streaming stopped for ${deviceId}`);
+        }
+    });
+}
+
+// Helper: Get serial from device ID
+function getSerialFromDeviceId(deviceId) {
+    for (const [serial, id] of deviceIdCache.entries()) {
+        if (id === deviceId) return serial;
+    }
+    return null;
+}
+
+// Helper: Build ADB command from params
+function buildAdbCommand(command, params = {}) {
+    switch (command) {
+        case 'tap':
+            return `input tap ${params.x || 0} ${params.y || 0}`;
+        case 'swipe':
+            const duration = params.duration || 300;
+            return `input swipe ${params.x || 0} ${params.y || 0} ${params.x2 || 0} ${params.y2 || 0} ${duration}`;
+        case 'keyevent':
+            return `input keyevent ${params.keycode || 0}`;
+        case 'text':
+            const escapedText = (params.text || '').replace(/['"\\]/g, '\\$&');
+            return `input text "${escapedText}"`;
+        default:
+            return command; // Pass through for shell commands
+    }
+}
+
+// =============================================
+// 3. Heartbeat System
+// =============================================
+
+async function sendHeartbeat() {
+    const { devices: serials } = await getConnectedDevices();
+
+    const deviceStatuses = [];
+    for (const serial of serials) {
+        const deviceId = deviceIdCache.get(serial);
+        deviceStatuses.push({
+            serial,
+            deviceId,
+            status: 'idle', // Could be enhanced with actual status tracking
+            adbConnected: true
+        });
+    }
+
+    // Send via Socket.io if connected
+    if (socketConnected && socket) {
+        socket.emit('worker:heartbeat', {
+            pcId: PC_ID,
+            timestamp: new Date().toISOString(),
+            devices: deviceStatuses
+        });
+    }
+
+    // Also update Supabase for fallback
+    for (const serial of serials) {
+        const deviceId = deviceIdCache.get(serial);
+        if (deviceId) {
+            await supabase
+                .from('devices')
+                .update({
+                    last_heartbeat_at: new Date().toISOString(),
+                    adb_connected: true
+                })
+                .eq('id', deviceId);
+        }
+    }
+}
+
+// =============================================
+// 4. Screen Capture
+// =============================================
+
+async function captureScreen(serial) {
+    return new Promise((resolve, reject) => {
+        const tempPath = path.join(__dirname, `temp_screen_${serial}.png`);
+
+        // Use screencap with file output for Windows compatibility
+        execFile(ADB_PATH, ['-s', serial, 'exec-out', 'screencap', '-p'],
+            { encoding: 'buffer', maxBuffer: 10 * 1024 * 1024 },
+            (error, stdout) => {
+                if (error) {
+                    return reject(error);
+                }
+
+                try {
+                    // Convert buffer to base64
+                    const base64 = stdout.toString('base64');
+                    resolve(base64);
+                } catch (e) {
+                    reject(e);
+                }
+            }
+        );
+    });
+}
+
+// =============================================
+// 5. Scrcpy Command Polling (Fallback)
+// =============================================
+
+async function pollScrcpyCommands() {
+    try {
+        const { devices: serials } = await getConnectedDevices();
+        if (serials.length === 0) return;
+
+        const deviceIds = serials
+            .map(s => deviceIdCache.get(s))
+            .filter(Boolean);
+
+        if (deviceIds.length === 0) return;
+
+        // Poll for pending commands
+        const { data: commands, error } = await supabase
+            .from('scrcpy_commands')
+            .select('*')
+            .in('device_id', deviceIds)
+            .eq('status', 'pending')
+            .order('created_at', { ascending: true })
+            .limit(10);
+
+        if (error || !commands || commands.length === 0) return;
+
+        for (const cmd of commands) {
+            const serial = getSerialFromDeviceId(cmd.device_id);
+            if (!serial) continue;
+
+            console.log(`[Command] Processing: ${cmd.command_type} for ${serial}`);
+
+            // Update status to executing
+            await supabase
+                .from('scrcpy_commands')
+                .update({
+                    status: 'executing',
+                    received_at: new Date().toISOString()
+                })
+                .eq('id', cmd.id);
+
+            try {
+                let result = null;
+
+                switch (cmd.command_type) {
+                    case 'input':
+                        // Execute ADB input command
+                        const adbCmd = cmd.command_data?.adbCommand;
+                        if (adbCmd) {
+                            await executeAdbCommand(serial, `shell ${adbCmd}`);
+                        }
+                        break;
+
+                    case 'screenshot':
+                        // Capture and upload screenshot
+                        const base64 = await captureScreen(serial);
+                        // For MVP, store as data URL
+                        result = { imageUrl: `data:image/png;base64,${base64.substring(0, 100)}...` };
+                        // In production, upload to storage and return URL
+                        break;
+
+                    case 'stream_start':
+                        // Start streaming (handled via Socket.io primarily)
+                        console.log(`[Command] Stream start via polling not supported, use Socket.io`);
+                        break;
+
+                    case 'stream_stop':
+                        // Stop streaming
+                        if (activeStreams.has(cmd.device_id)) {
+                            clearInterval(activeStreams.get(cmd.device_id));
+                            activeStreams.delete(cmd.device_id);
+                        }
+                        break;
+
+                    case 'shell':
+                        // Execute shell command (with whitelist check)
+                        const shellCmd = cmd.command_data?.shellCommand;
+                        if (shellCmd) {
+                            await executeAdbCommand(serial, `shell ${shellCmd}`);
+                        }
+                        break;
+
+                    default:
+                        console.warn(`[Command] Unknown command type: ${cmd.command_type}`);
+                }
+
+                // Update status to completed
+                await supabase
+                    .from('scrcpy_commands')
+                    .update({
+                        status: 'completed',
+                        result_data: result,
+                        completed_at: new Date().toISOString()
+                    })
+                    .eq('id', cmd.id);
+
+                console.log(`[Command] ✅ Completed: ${cmd.command_type}`);
+
+            } catch (cmdError) {
+                console.error(`[Command] ❌ Failed: ${cmdError.message}`);
+
+                await supabase
+                    .from('scrcpy_commands')
+                    .update({
+                        status: 'failed',
+                        error_message: cmdError.message,
+                        completed_at: new Date().toISOString()
+                    })
+                    .eq('id', cmd.id);
+            }
+        }
+    } catch (err) {
+        console.error('[Command Poll] Error:', err.message);
+    }
+}
+
+// =============================================
+// 6. ADB 유틸리티 함수
+// =============================================
+
 function getConnectedDevices() {
     return new Promise((resolve) => {
         exec(`"${ADB_PATH}" devices`, (error, stdout) => {
             if (error) {
                 console.error(`[ADB Error] ${error.message}`);
-                // 에러와 빈 배열 함께 반환 - 호출자가 구분 가능
                 resolve({ devices: [], error });
                 return;
             }
-            
+
             const devices = [];
             const lines = stdout.split('\n');
-            
+
             for (let line of lines) {
                 const parts = line.split('\t');
                 if (parts.length >= 2 && parts[1].trim() === 'device') {
@@ -69,35 +413,24 @@ function getConnectedDevices() {
     });
 }
 
-// serial 유효성 검증을 위한 정규식 (영숫자, 콜론, 하이픈, 언더스코어만 허용)
 const SERIAL_REGEX = /^[a-zA-Z0-9:_-]+$/;
 
-/**
- * serial 유효성 검증 함수
- * @param {string} serial - 검증할 시리얼 번호
- * @returns {boolean} - 유효하면 true
- */
 function isValidSerial(serial) {
-    return typeof serial === 'string' && 
-           serial.length > 0 && 
-           serial.length <= 64 && 
+    return typeof serial === 'string' &&
+           serial.length > 0 &&
+           serial.length <= 64 &&
            SERIAL_REGEX.test(serial);
 }
 
-/**
- * 명령어 문자열을 안전한 인자 배열로 파싱
- * @param {string} command - 파싱할 명령어 문자열
- * @returns {string[]} - 인자 배열
- */
 function parseCommandToArgs(command) {
     const args = [];
     let current = '';
     let inQuote = false;
     let quoteChar = '';
-    
+
     for (let i = 0; i < command.length; i++) {
         const char = command[i];
-        
+
         if (inQuote) {
             if (char === quoteChar) {
                 inQuote = false;
@@ -116,35 +449,32 @@ function parseCommandToArgs(command) {
             current += char;
         }
     }
-    
-    // 닫히지 않은 따옴표 검출
+
     if (inQuote) {
         throw new Error(`Unclosed quote in command: missing closing ${quoteChar}`);
     }
-    
+
     if (current) {
         args.push(current);
     }
-    
+
     return args;
 }
 
 function executeAdbCommand(serial, command) {
     return new Promise((resolve, reject) => {
-        // serial 유효성 검증 (command injection 방지)
         if (!isValidSerial(serial)) {
             const error = new Error(`유효하지 않은 시리얼 번호: ${serial.substring(0, 20)}`);
             console.error(`[ADB Error] 시리얼 검증 실패`);
             reject(error);
             return;
         }
-        
-        // 명령어를 안전한 인자 배열로 변환
+
         const commandArgs = parseCommandToArgs(command);
         const args = ['-s', serial, ...commandArgs];
-        
+
         console.log(`[ADB] Executing: ${ADB_PATH} ${args.join(' ')}`);
-        
+
         execFile(ADB_PATH, args, (error, stdout, stderr) => {
             if (error) {
                 console.error(`[ADB Error] serial=${serial}: ${error.message}`);
@@ -157,7 +487,7 @@ function executeAdbCommand(serial, command) {
 }
 
 // =============================================
-// 3. 장치 동기화 (Watchdog)
+// 7. 장치 동기화 (Watchdog)
 // =============================================
 
 async function syncDevices() {
@@ -169,14 +499,13 @@ async function syncDevices() {
     }
 
     if (serials.length === 0) {
-        console.log(`[Watchdog] 연결된 기기 없음. 대기중...`);
+        // Mark all cached devices as offline
         return [];
     }
 
     for (const serial of serials) {
-        const groupId = config.groups.mappings[serial] || DEFAULT_GROUP;
+        const groupId = config.groups?.mappings?.[serial] || DEFAULT_GROUP;
 
-        // Upsert 기기 정보 (serial_number 기준으로 upsert, id는 자동 생성)
         const { data, error } = await supabase
             .from('devices')
             .upsert({
@@ -184,7 +513,8 @@ async function syncDevices() {
                 pc_id: PC_ID,
                 group_id: groupId,
                 status: 'idle',
-                last_seen_at: new Date().toISOString()
+                last_seen_at: new Date().toISOString(),
+                adb_connected: true
             }, {
                 onConflict: 'serial_number',
                 ignoreDuplicates: false
@@ -195,9 +525,7 @@ async function syncDevices() {
         if (error) {
             console.error('[DB Error]', error.message);
         } else if (data) {
-            // 캐시 업데이트: serial_number -> UUID id 매핑
             deviceIdCache.set(serial, data.id);
-            console.log(`[Sync] ${serial} -> ${data.id}`);
         }
     }
 
@@ -206,26 +534,24 @@ async function syncDevices() {
 }
 
 // =============================================
-// 4. 작업 폴링 (Polling Logic)
+// 8. 작업 폴링 (Polling Logic)
 // =============================================
 
 async function pollForJobs() {
     try {
-        // 연결된 기기의 UUID device_id 목록 가져오기
         const { devices: connectedSerials, error: adbError } = await getConnectedDevices();
-        
+
         if (adbError) {
             console.error(`[Poll] ADB 조회 실패: ${adbError.message}`);
-            return; // ADB 에러 시 이번 폴링 건너뛰기
+            return;
         }
-        
+
         const connectedDeviceIds = [];
 
         for (const serial of connectedSerials) {
             let deviceId = deviceIdCache.get(serial);
 
             if (!deviceId) {
-                // 캐시에 없으면 DB에서 조회 (serial_number로 검색 -> id 획득)
                 const { data } = await supabase
                     .from('devices')
                     .select('id, serial_number')
@@ -247,7 +573,6 @@ async function pollForJobs() {
             return;
         }
 
-        // pending 상태의 assignments 조회 (device_id는 이제 UUID FK)
         const { data: assignments, error } = await supabase
             .from('job_assignments')
             .select(`
@@ -284,7 +609,6 @@ async function pollForJobs() {
 
         console.log(`[Poll] ${assignments.length}개 새 작업 발견!`);
 
-        // serial_number 정보 추가하여 큐에 추가
         for (const assignment of assignments) {
             const deviceInfo = connectedDeviceIds.find(d => d.id === assignment.device_id);
             if (deviceInfo && !jobQueue.find(j => j.id === assignment.id)) {
@@ -292,11 +616,10 @@ async function pollForJobs() {
                     ...assignment,
                     device_serial: deviceInfo.serial
                 });
-                console.log(`[Queue] 작업 추가: ${assignment.id} (device_id: ${assignment.device_id}, serial: ${deviceInfo.serial})`);
+                console.log(`[Queue] 작업 추가: ${assignment.id}`);
             }
         }
 
-        // 큐 처리 시작
         processQueue();
 
     } catch (err) {
@@ -305,7 +628,7 @@ async function pollForJobs() {
 }
 
 // =============================================
-// 5. 큐 처리 (Queue Management)
+// 9. 큐 처리 (Queue Management)
 // =============================================
 
 async function processQueue() {
@@ -317,22 +640,21 @@ async function processQueue() {
 
     while (jobQueue.length > 0) {
         const assignment = jobQueue.shift();
-        
+
         try {
             await executeJob(assignment);
         } catch (err) {
             console.error(`[Execute Error] ${assignment.id}:`, err.message);
-            
+
             await supabase
                 .from('job_assignments')
-                .update({ 
+                .update({
                     status: 'failed',
                     error_log: err.message
                 })
                 .eq('id', assignment.id);
         }
 
-        // 작업 간 딜레이 (1초)
         await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
@@ -340,48 +662,34 @@ async function processQueue() {
 }
 
 // =============================================
-// 6. 작업 실행 (Command Execution)
+// 10. 작업 실행 (Command Execution)
 // =============================================
 
-// URL 허용 패턴 (YouTube 도메인만 허용)
 const YOUTUBE_URL_REGEX = /^https?:\/\/(www\.)?(youtube\.com|youtu\.be|m\.youtube\.com)\/.*/i;
 
-/**
- * YouTube URL 검증 및 sanitize
- * @param {string} url - 검증할 URL
- * @returns {{ valid: boolean, sanitized: string, error?: string }}
- */
 function validateAndSanitizeUrl(url) {
     try {
-        // URL 파싱 (유효하지 않으면 예외 발생)
         const parsedUrl = new URL(url);
-        
-        // 프로토콜 검증 (http/https만 허용)
+
         if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
             return { valid: false, sanitized: '', error: '허용되지 않은 프로토콜' };
         }
-        
-        // YouTube 도메인 허용 목록
+
         const allowedHosts = ['youtube.com', 'www.youtube.com', 'm.youtube.com', 'youtu.be'];
         if (!allowedHosts.includes(parsedUrl.hostname.toLowerCase())) {
             return { valid: false, sanitized: '', error: '허용되지 않은 도메인' };
         }
-        
-        // URL 전체 패턴 검증
+
         if (!YOUTUBE_URL_REGEX.test(url)) {
             return { valid: false, sanitized: '', error: 'YouTube URL 형식이 아닙니다' };
         }
-        
-        // encodeURI로 안전하게 인코딩하고 위험 문자 제거/인코딩
+
         let sanitized = parsedUrl.href;
-        // 쉘 명령 주입에 사용될 수 있는 문자 인코딩
-        // 참고: '&'는 YouTube 쿼리 문자열에서 파라미터 구분에 사용되므로 인코딩하지 않음
-        // (YouTube URL 패턴 검증을 이미 통과했으므로 안전)
         sanitized = sanitized
             .replace(/[`$;|]/g, (char) => encodeURIComponent(char))
             .replace(/"/g, '%22')
             .replace(/'/g, '%27');
-        
+
         return { valid: true, sanitized };
     } catch (e) {
         return { valid: false, sanitized: '', error: `유효하지 않은 URL: ${e.message}` };
@@ -393,7 +701,6 @@ async function executeJob(assignment) {
 
     if (!job) {
         console.error(`[Execute] Job 정보 없음: ${id}`);
-        // Job 정보 없음 에러를 DB에 기록
         await supabase
             .from('job_assignments')
             .update({
@@ -404,17 +711,21 @@ async function executeJob(assignment) {
         return;
     }
 
-    // 검색어 결정: keyword가 있으면 사용, 없으면 title로 fallback
     const searchKeyword = job.keyword || job.title;
     const scriptType = job.script_type || 'youtube_watch';
 
     console.log(`[Execute] 작업 시작: ${id}`);
     console.log(`[Execute] 기기: ${device_serial} (device_id: ${device_id})`);
-    console.log(`[Execute] 스크립트: ${scriptType}, 검색어: "${searchKeyword}", 제목: "${job.title}"`);
 
-    // 1. 상태를 running으로 업데이트 (에러 처리 포함)
-    let assignmentUpdated = false;
-    let deviceUpdated = false;
+    // Emit job start event via Socket.io
+    if (socketConnected && socket) {
+        socket.emit('job:started', {
+            assignmentId: id,
+            jobId: job.id,
+            deviceId: device_id,
+            title: job.title
+        });
+    }
 
     try {
         const { error: assignmentError } = await supabase
@@ -426,111 +737,69 @@ async function executeJob(assignment) {
             .eq('id', id);
 
         if (assignmentError) {
-            console.error(`[DB Error] job_assignments 업데이트 실패: ${assignmentError.message}`);
             throw new Error(`job_assignments 업데이트 실패: ${assignmentError.message}`);
         }
-        assignmentUpdated = true;
 
-        // 2. 기기 상태를 busy로 업데이트 (device_id는 UUID FK)
         const { error: deviceError } = await supabase
             .from('devices')
             .update({ status: 'busy' })
             .eq('id', device_id);
 
         if (deviceError) {
-            console.error(`[DB Error] devices 업데이트 실패: ${deviceError.message}`);
-            // assignment 상태 롤백 (롤백 실패도 별도 처리)
-            let rollbackError = null;
-            try {
-                const { error: rbError } = await supabase
-                    .from('job_assignments')
-                    .update({ status: 'pending', started_at: null })
-                    .eq('id', id);
-                if (rbError) {
-                    rollbackError = rbError;
-                    console.error(`[DB Error] job_assignments 롤백 실패: ${rbError.message}`);
-                }
-            } catch (rbException) {
-                rollbackError = rbException;
-                console.error(`[DB Error] job_assignments 롤백 예외: ${rbException.message}`);
-            }
-
-            // 원본 에러와 롤백 에러를 모두 포함한 에러 throw
-            if (rollbackError) {
-                throw new Error(`devices 업데이트 실패: ${deviceError.message} (롤백도 실패: ${rollbackError.message})`);
-            }
+            await supabase
+                .from('job_assignments')
+                .update({ status: 'pending', started_at: null })
+                .eq('id', id);
             throw new Error(`devices 업데이트 실패: ${deviceError.message}`);
         }
-        deviceUpdated = true;
     } catch (dbError) {
         console.error(`[Execute] DB 초기화 실패: ${dbError.message}`);
         throw dbError;
     }
 
     try {
-        // 3. 화면 깨우기
         await executeAdbCommand(device_serial, 'shell input keyevent 26');
         await new Promise(resolve => setTimeout(resolve, 500));
 
-        // 4. 시청 시간: DB에서 가져온 duration_sec 사용 (기본값 60초)
         const watchDuration = job.duration_sec || 60;
 
-        // 5. 스크립트 타입에 따른 실행 분기
         if (scriptType === 'youtube_search') {
-            // ===== 검색 유입 모드 =====
             console.log(`[Execute] 검색 유입 모드 - 키워드: "${searchKeyword}"`);
 
-            // Mobile Agent용 job.json 생성 (데이터 매핑 규칙 준수)
-            // DB -> Worker -> Mobile Agent 매핑:
-            // jobs.keyword -> keyword -> keyword
-            // jobs.title -> video_title -> video_title
-            // jobs.duration_sec -> duration_sec -> duration_sec
-            // job_assignments.id -> assignment_id -> assignment_id
             const jobConfig = {
                 assignment_id: id,
-                keyword: searchKeyword,         // jobs.keyword (fallback: jobs.title)
-                video_title: job.title,         // jobs.title
-                duration_sec: watchDuration,    // jobs.duration_sec
+                keyword: searchKeyword,
+                video_title: job.title,
+                duration_sec: watchDuration,
                 prob_like: job.prob_like || 0,
                 prob_comment: job.prob_comment || 0,
                 prob_playlist: job.prob_playlist || 0
             };
 
-            // job.json을 기기에 푸시 (job-loader.js와 동일한 경로 사용)
             const jobJsonPath = `/sdcard/Scripts/doai-bot/job.json`;
             const tempJobFile = path.join(__dirname, `temp_job_${device_serial}.json`);
 
-            // 로컬에 임시 파일 생성
             fs.writeFileSync(tempJobFile, JSON.stringify(jobConfig, null, 2));
 
-            // ADB로 기기에 푸시 (디렉토리 생성 포함)
             await executeAdbCommand(device_serial, `shell mkdir -p /sdcard/Scripts/doai-bot`);
             await executeAdbCommand(device_serial, `push "${tempJobFile}" ${jobJsonPath}`);
 
-            // 임시 파일 삭제
             fs.unlinkSync(tempJobFile);
 
-            console.log(`[Execute] job.json 푸시 완료: ${jobJsonPath}`);
-            console.log(`[Execute] job.json 내용:`, JSON.stringify(jobConfig));
-
-            // AutoX.js WebView Bot 실행 (am start via RunIntentActivity)
             await executeAdbCommand(
                 device_serial,
                 `shell am start -n org.autojs.autoxjs.v6/org.autojs.autojs.external.open.RunIntentActivity -d "file:///sdcard/Scripts/doai-bot/webview_bot.js" -t "text/javascript"`
             );
 
         } else {
-            // ===== 직접 URL 모드 (기존 방식) =====
             console.log(`[Execute] 직접 URL 모드 - ${job.target_url}`);
 
-            // URL 검증 및 sanitize
             const urlValidation = validateAndSanitizeUrl(job.target_url);
             if (!urlValidation.valid) {
                 throw new Error(`유효하지 않은 URL: ${urlValidation.error}`);
             }
             const videoUrl = urlValidation.sanitized;
 
-            // execFile을 통해 실행되므로 shell 해석 없이 안전하게 전달
             await executeAdbCommand(
                 device_serial,
                 `shell am start -a android.intent.action.VIEW -d "${videoUrl}" -n com.google.android.youtube/.UrlActivity`
@@ -539,28 +808,32 @@ async function executeJob(assignment) {
 
         console.log(`[Execute] 시청 시간: ${watchDuration}초`);
 
-        // 6. 시청 시뮬레이션 (10초마다 진행률 업데이트)
         let elapsed = 0;
         while (elapsed < watchDuration) {
             await new Promise(resolve => setTimeout(resolve, 10000));
             elapsed += 10;
 
             const progressPct = Math.min(100, Math.round((elapsed / watchDuration) * 100));
-            
-            // 진행률 업데이트 에러 핸들링 추가
-            const { error: progressError } = await supabase
+
+            await supabase
                 .from('job_assignments')
                 .update({ progress_pct: progressPct })
                 .eq('id', id);
-            
-            if (progressError) {
-                console.error(`[Execute] ${device_serial}: 진행률 업데이트 실패 (${progressPct}%) - ${progressError.message}`);
+
+            // Emit progress via Socket.io
+            if (socketConnected && socket) {
+                socket.emit('job:progress', {
+                    assignmentId: id,
+                    jobId: job.id,
+                    deviceId: device_id,
+                    progressPct,
+                    elapsedSec: elapsed
+                });
             }
 
             console.log(`[Execute] ${device_serial}: ${elapsed}s / ${watchDuration}s (${progressPct}%)`);
         }
 
-        // 7. 좋아요 처리 (확률 기반)
         if (job.prob_like > 0) {
             const shouldLike = Math.random() * 100 < job.prob_like;
             if (shouldLike) {
@@ -569,47 +842,34 @@ async function executeJob(assignment) {
             }
         }
 
-        // 8. 증거 파일 수집 (v5.1: 파일 준비 확인 후 Pull)
-        console.log(`[Execute] ${device_serial}: 증거 파일 수집 중...`);
+        // Evidence collection
+        if (resultCollector) {
+            try {
+                const jobResult = await resultCollector.collectJobResult(
+                    ADB_PATH,
+                    device_serial,
+                    id
+                );
 
-        try {
-            // 결과 JSON 및 스크린샷 수집
-            const jobResult = await resultCollector.collectJobResult(
-                ADB_PATH,
-                device_serial,
-                id  // job_id로 assignment_id 사용
-            );
+                if (jobResult.success !== false) {
+                    const evidenceCount = jobResult.evidencePullResults ?
+                        jobResult.evidencePullResults.filter(r => r.success).length : 0;
 
-            if (jobResult.success !== false) {
-                console.log(`[Execute] 증거 파일 수집 완료: ${jobResult.evidence_count || 0}개`);
-
-                // 수집된 파일 정보 업데이트
-                const evidenceCount = jobResult.evidencePullResults ?
-                    jobResult.evidencePullResults.filter(r => r.success).length : 0;
-
-                // 증거 수집 DB 업데이트 에러 핸들링 추가
-                const { error: evidenceUpdateError } = await supabase
-                    .from('job_assignments')
-                    .update({
-                        evidence_collected: true,
-                        evidence_count: evidenceCount,
-                        evidence_local_path: jobResult.localResultPath
-                    })
-                    .eq('id', id);
-                
-                if (evidenceUpdateError) {
-                    console.error(`[Execute] ${device_serial}: 증거 정보 DB 업데이트 실패 - ${evidenceUpdateError.message}`);
+                    await supabase
+                        .from('job_assignments')
+                        .update({
+                            evidence_collected: true,
+                            evidence_count: evidenceCount,
+                            evidence_local_path: jobResult.localResultPath
+                        })
+                        .eq('id', id);
                 }
-            } else {
-                console.warn(`[Execute] 증거 파일 수집 실패: ${jobResult.error}`);
+            } catch (collectErr) {
+                console.error(`[Execute] 증거 수집 오류: ${collectErr.message}`);
             }
-        } catch (collectErr) {
-            console.error(`[Execute] 증거 수집 오류: ${collectErr.message}`);
-            // 증거 수집 실패해도 작업은 완료로 처리
         }
 
-        // 9. 완료 처리 (에러 핸들링 추가)
-        const { error: completionError } = await supabase
+        await supabase
             .from('job_assignments')
             .update({
                 status: 'completed',
@@ -619,32 +879,43 @@ async function executeJob(assignment) {
             })
             .eq('id', id);
 
-        if (completionError) {
-            console.error(`[Execute] ${device_serial}: 작업 완료 DB 업데이트 실패 - ${completionError.message}`);
-            // 작업 완료 기록 실패는 심각하므로 재시도 로직 추가 가능
-        } else {
-            console.log(`[Execute] 작업 완료: ${id}`);
+        // Emit completion via Socket.io
+        if (socketConnected && socket) {
+            socket.emit('job:completed', {
+                assignmentId: id,
+                jobId: job.id,
+                deviceId: device_id,
+                finalDurationSec: watchDuration
+            });
         }
 
+        console.log(`[Execute] 작업 완료: ${id}`);
+
     } catch (err) {
+        // Emit failure via Socket.io
+        if (socketConnected && socket) {
+            socket.emit('job:failed', {
+                assignmentId: id,
+                jobId: job.id,
+                deviceId: device_id,
+                error: err.message
+            });
+        }
         throw err;
     } finally {
-        // 10. 기기 상태를 idle로 복구 (에러 핸들링 추가)
-        const { error: deviceResetError } = await supabase
+        await supabase
             .from('devices')
             .update({ status: 'idle' })
             .eq('id', device_id);
-        
-        if (deviceResetError) {
-            console.error(`[Execute] 기기 상태 리셋 실패 (device_id: ${device_id}) - ${deviceResetError.message}`);
-            // 심각: 기기가 busy 상태로 고정될 수 있음. 재시도 필요.
-        }
     }
 }
 
 // =============================================
-// 7. 메인 실행 루프
+// 11. 메인 실행 루프
 // =============================================
+
+// Initialize Socket.io connection
+initSocketConnection();
 
 // 장치 동기화 (5초마다)
 setInterval(syncDevices, config.scan_interval_ms || 5000);
@@ -654,4 +925,11 @@ syncDevices();
 setInterval(pollForJobs, 3000);
 pollForJobs();
 
-console.log('[System] Worker started. Polling for jobs...');
+// Heartbeat (5초마다)
+setInterval(sendHeartbeat, 5000);
+
+// Scrcpy command polling (2초마다) - Fallback for non-Socket.io commands
+setInterval(pollScrcpyCommands, 2000);
+
+console.log('[System] Worker v3.0 started with Socket.io support');
+console.log('[System] Polling for jobs and commands...');

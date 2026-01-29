@@ -23,7 +23,7 @@ interface BroadcastControlProps {
   slaveDeviceIds: string[];
   onMasterChange: (deviceId: string | null) => void;
   onSlaveToggle: (deviceId: string) => void;
-  onBroadcastCommand: (command: string, params?: Record<string, number>) => Promise<void>;
+  onBroadcastCommand: (command: string, params?: Record<string, number>) => void | Promise<void>;
   isActive: boolean;
   onToggleActive: () => void;
 }

@@ -27,12 +27,13 @@ import {
 import { cn } from '@/lib/utils';
 import type { Device } from '@/lib/supabase';
 import { toast } from 'sonner';
+import { useSocketContext } from '@/contexts/socket-context';
 
 interface RemoteViewModalProps {
   device: Device | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCommand: (deviceId: string, command: string, params?: Record<string, number | string>) => Promise<void>;
+  onCommand: (deviceId: string, command: string, params?: Record<string, number | string>) => void | Promise<void>;
   // Broadcast mode props
   broadcastEnabled?: boolean;
   onBroadcastToggle?: (enabled: boolean) => void;
@@ -57,112 +58,67 @@ export function RemoteViewModal({
   const [isLoading, setIsLoading] = useState(false);
   const [clickPos, setClickPos] = useState<{ x: number; y: number } | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
-  const [streamFps, setStreamFps] = useState(2);
   const imageRef = useRef<HTMLDivElement>(null);
-  const streamIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Cleanup stream on unmount or close
-  useEffect(() => {
-    return () => {
-      if (streamIntervalRef.current) {
-        clearInterval(streamIntervalRef.current);
-      }
-    };
-  }, []);
+  // Socket.io integration
+  const { isConnected, startStream, stopStream, sendCommand, broadcastCommand } = useSocketContext();
 
   // Stop streaming when modal closes
   useEffect(() => {
-    if (!open && isStreaming) {
-      stopStreaming();
+    if (!open && isStreaming && device) {
+      stopStream(device.id);
+      setIsStreaming(false);
     }
-  }, [open]);
+  }, [open, isStreaming, device, stopStream]);
+
+  // Cleanup stream on unmount
+  useEffect(() => {
+    return () => {
+      if (device && isStreaming) {
+        stopStream(device.id);
+      }
+    };
+  }, [device, isStreaming, stopStream]);
 
   const fetchScreenshot = useCallback(async () => {
     if (!device) return;
 
     setIsLoading(true);
     try {
-      const response = await fetch('/api/device/screenshot', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ deviceId: device.id }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setScreenshot(data.imageUrl);
-      }
+      // Request single screenshot via Socket.io command
+      sendCommand(device.id, 'screenshot', {});
+      toast.info('스크린샷 요청됨');
     } catch (error) {
-      console.error('Screenshot fetch failed:', error);
+      console.error('Screenshot request failed:', error);
+      toast.error('스크린샷 요청 실패');
     } finally {
       setIsLoading(false);
     }
-  }, [device]);
+  }, [device, sendCommand]);
 
-  const startStreaming = useCallback(async () => {
-    if (!device) return;
-
-    try {
-      // Start stream on backend
-      await fetch('/api/device/stream', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          deviceId: device.id,
-          action: 'start',
-          fps: streamFps
-        }),
-      });
-
-      setIsStreaming(true);
-
-      // Poll for frames
-      streamIntervalRef.current = setInterval(async () => {
-        try {
-          const response = await fetch(`/api/device/stream?deviceId=${device.id}`);
-          if (response.ok) {
-            const data = await response.json();
-            if (data.hasFrame && data.imageUrl) {
-              setScreenshot(data.imageUrl);
-            }
-          }
-        } catch (error) {
-          console.error('Frame fetch error:', error);
-        }
-      }, 1000 / streamFps);
-
-      toast.success('스트리밍 시작됨');
-    } catch (error) {
-      console.error('Start streaming failed:', error);
-      toast.error('스트리밍 시작 실패');
-    }
-  }, [device, streamFps]);
-
-  const stopStreaming = useCallback(async () => {
-    if (streamIntervalRef.current) {
-      clearInterval(streamIntervalRef.current);
-      streamIntervalRef.current = null;
+  const startStreaming = useCallback(() => {
+    if (!device || !isConnected) {
+      toast.error('Socket.io 연결 필요');
+      return;
     }
 
+    startStream(device.id, (frameData) => {
+      setScreenshot(`data:image/jpeg;base64,${frameData.frame}`);
+    });
+
+    setIsStreaming(true);
+    toast.success('스트리밍 시작됨');
+  }, [device, isConnected, startStream]);
+
+  const stopStreaming = useCallback(() => {
     if (device) {
-      try {
-        await fetch('/api/device/stream', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            deviceId: device.id,
-            action: 'stop'
-          }),
-        });
-      } catch (error) {
-        console.error('Stop streaming failed:', error);
-      }
+      stopStream(device.id);
     }
-
     setIsStreaming(false);
-  }, [device]);
+    toast.info('스트리밍 중지됨');
+  }, [device, stopStream]);
 
-  const handleImageClick = useCallback(async (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleImageClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (!device || !imageRef.current) return;
 
     const rect = imageRef.current.getBoundingClientRect();
@@ -172,38 +128,18 @@ export function RemoteViewModal({
     setClickPos({ x, y });
 
     if (broadcastEnabled && broadcastDeviceIds.length > 0) {
-      // Broadcast to all devices in the group
-      try {
-        const response = await fetch('/api/device/command', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            deviceIds: [device.id, ...broadcastDeviceIds.filter(id => id !== device.id)],
-            command: 'tap',
-            params: { x, y }
-          }),
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          toast.success(`${data.commandCount}대 기기에 탭 전송됨`);
-        }
-      } catch (error) {
-        console.error('Broadcast tap failed:', error);
-        toast.error('브로드캐스트 탭 실패');
-      }
+      // Broadcast to all devices in the group via Socket.io
+      const allDeviceIds = [device.id, ...broadcastDeviceIds.filter(id => id !== device.id)];
+      broadcastCommand(allDeviceIds, 'tap', { x, y });
+      toast.success(`${allDeviceIds.length}대 기기에 탭 전송됨`);
     } else {
-      // Single device tap
-      await onCommand(device.id, 'tap', { x, y });
+      // Single device tap via Socket.io
+      sendCommand(device.id, 'tap', { x, y });
+      toast.success('탭 전송됨');
     }
+  }, [device, sendCommand, broadcastCommand, broadcastEnabled, broadcastDeviceIds, deviceResolution]);
 
-    // Auto refresh after tap (if not streaming)
-    if (!isStreaming) {
-      setTimeout(fetchScreenshot, 500);
-    }
-  }, [device, onCommand, fetchScreenshot, broadcastEnabled, broadcastDeviceIds, deviceResolution, isStreaming]);
-
-  const handleSwipe = useCallback(async (direction: 'up' | 'down' | 'left' | 'right') => {
+  const handleSwipe = useCallback((direction: 'up' | 'down' | 'left' | 'right') => {
     if (!device) return;
 
     const centerX = Math.round(deviceResolution.width / 2);
@@ -228,65 +164,27 @@ export function RemoteViewModal({
     }
 
     if (broadcastEnabled && broadcastDeviceIds.length > 0) {
-      try {
-        const response = await fetch('/api/device/command', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            deviceIds: [device.id, ...broadcastDeviceIds.filter(id => id !== device.id)],
-            command: 'swipe',
-            params
-          }),
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          toast.success(`${data.commandCount}대 기기에 스와이프 전송됨`);
-        }
-      } catch (error) {
-        console.error('Broadcast swipe failed:', error);
-        toast.error('브로드캐스트 스와이프 실패');
-      }
+      const allDeviceIds = [device.id, ...broadcastDeviceIds.filter(id => id !== device.id)];
+      broadcastCommand(allDeviceIds, 'swipe', params);
+      toast.success(`${allDeviceIds.length}대 기기에 스와이프 전송됨`);
     } else {
-      await onCommand(device.id, 'swipe', params);
+      sendCommand(device.id, 'swipe', params);
+      toast.success('스와이프 전송됨');
     }
+  }, [device, sendCommand, broadcastCommand, broadcastEnabled, broadcastDeviceIds, deviceResolution]);
 
-    if (!isStreaming) {
-      setTimeout(fetchScreenshot, 500);
-    }
-  }, [device, onCommand, fetchScreenshot, broadcastEnabled, broadcastDeviceIds, deviceResolution, isStreaming]);
-
-  const handleKeyCommand = useCallback(async (keycode: number) => {
+  const handleKeyCommand = useCallback((keycode: number) => {
     if (!device) return;
 
     if (broadcastEnabled && broadcastDeviceIds.length > 0) {
-      try {
-        const response = await fetch('/api/device/command', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            deviceIds: [device.id, ...broadcastDeviceIds.filter(id => id !== device.id)],
-            command: 'keyevent',
-            params: { keycode }
-          }),
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          toast.success(`${data.commandCount}대 기기에 키 전송됨`);
-        }
-      } catch (error) {
-        console.error('Broadcast keyevent failed:', error);
-        toast.error('브로드캐스트 키 전송 실패');
-      }
+      const allDeviceIds = [device.id, ...broadcastDeviceIds.filter(id => id !== device.id)];
+      broadcastCommand(allDeviceIds, 'keyevent', { keycode });
+      toast.success(`${allDeviceIds.length}대 기기에 키 전송됨`);
     } else {
-      await onCommand(device.id, 'keyevent', { keycode });
+      sendCommand(device.id, 'keyevent', { keycode });
+      toast.success('키 전송됨');
     }
-
-    if (!isStreaming) {
-      setTimeout(fetchScreenshot, 300);
-    }
-  }, [device, onCommand, fetchScreenshot, broadcastEnabled, broadcastDeviceIds, isStreaming]);
+  }, [device, sendCommand, broadcastCommand, broadcastEnabled, broadcastDeviceIds]);
 
   if (!device) return null;
 
@@ -303,6 +201,15 @@ export function RemoteViewModal({
               <Badge variant="default" className="bg-red-500 animate-pulse">
                 <Radio className="h-3 w-3 mr-1" />
                 LIVE
+              </Badge>
+            )}
+            {isConnected ? (
+              <Badge variant="outline" className="text-green-600 border-green-600">
+                Socket.io 연결됨
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="text-red-600 border-red-600">
+                Socket.io 연결 안됨
               </Badge>
             )}
           </DialogTitle>
@@ -412,7 +319,8 @@ export function RemoteViewModal({
               variant="default"
               size="sm"
               onClick={startStreaming}
-              className="bg-red-500 hover:bg-red-600"
+              disabled={!isConnected}
+              className="bg-red-500 hover:bg-red-600 disabled:bg-gray-400"
             >
               <Play className="h-4 w-4 mr-1" />
               실시간 스트리밍
@@ -431,7 +339,7 @@ export function RemoteViewModal({
             variant="outline"
             size="sm"
             onClick={fetchScreenshot}
-            disabled={isLoading || isStreaming}
+            disabled={isLoading || isStreaming || !isConnected}
           >
             <RefreshCw className={cn('h-4 w-4 mr-1', isLoading && 'animate-spin')} />
             새로고침
