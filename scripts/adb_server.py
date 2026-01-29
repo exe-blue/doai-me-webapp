@@ -20,8 +20,10 @@ def run_adb_command(args, retries=MAX_RETRIES, timeout=COMMAND_TIMEOUT_SEC):
     - 재시도 로직 추가 (지수 백오프)
     - 타임아웃 설정
     - 상세한 오류 메시지
+    - 실패 시 명시적 에러 반환 (returncode != 0이면 stdout 반환하지 않음)
     """
     last_error = None
+    retryable_patterns = ["device offline", "no devices"]
     
     for attempt in range(retries):
         try:
@@ -35,17 +37,26 @@ def run_adb_command(args, retries=MAX_RETRIES, timeout=COMMAND_TIMEOUT_SEC):
                 timeout=timeout   # 타임아웃 추가
             )
             
-            # 오류 출력 확인
-            if result.returncode != 0 and result.stderr:
-                # ADB 오류가 있지만 재시도 가능한 경우
-                if "device offline" in result.stderr.lower() or "no devices" in result.stderr.lower():
-                    last_error = f"ADB Error: {result.stderr.strip()}"
-                    if attempt < retries - 1:
-                        delay = (RETRY_DELAY_MS / 1000) * (2 ** attempt)  # 지수 백오프
-                        time.sleep(delay)
-                        continue
-                        
-            return result.stdout.strip()
+            # 성공: returncode가 0이면 stdout 반환
+            if result.returncode == 0:
+                return result.stdout.strip()
+            
+            # 실패: returncode != 0
+            error_msg = result.stderr.strip() if result.stderr else f"ADB command failed with exit code {result.returncode}"
+            
+            # 재시도 가능한 오류인지 확인
+            is_retryable = any(pattern in error_msg.lower() for pattern in retryable_patterns)
+            
+            if is_retryable:
+                last_error = f"ADB Error: {error_msg}"
+                if attempt < retries - 1:
+                    delay = (RETRY_DELAY_MS / 1000) * (2 ** attempt)  # 지수 백오프
+                    time.sleep(delay)
+                    continue
+                # 마지막 시도였으면 아래로 진행하여 에러 반환
+            else:
+                # 재시도 불가능한 오류는 즉시 에러 반환
+                return f"ADB Error: {error_msg}"
             
         except subprocess.TimeoutExpired:
             last_error = f"ADB 명령 타임아웃 ({timeout}초)"
@@ -58,16 +69,22 @@ def run_adb_command(args, retries=MAX_RETRIES, timeout=COMMAND_TIMEOUT_SEC):
                 time.sleep(RETRY_DELAY_MS / 1000)
                 continue
     
-    return last_error or "Unknown error"
+    # 모든 재시도 소진 후 마지막 에러 반환
+    return last_error or "ADB Error: Unknown error after exhausting retries"
 
 @mcp.tool()
 def get_connected_devices():
     """현재 연결된 안드로이드 기기 목록과 상태를 조회합니다."""
     output = run_adb_command(["devices", "-l"])
+    
+    # 오류 응답 확인
+    if output.startswith("ADB Error:") or output.startswith("Error"):
+        return {"device_count": 0, "devices": [], "error": output}
+    
     devices = []
     
     # 출력 파싱 (model, device id 등 추출)
-    lines = output.split('\n')[1:] # 첫 줄(List of devices...) 제외
+    lines = output.split('\n')[1:]  # 첫 줄(List of devices...) 제외
     for line in lines:
         if line.strip():
             parts = line.split()

@@ -20,8 +20,13 @@ const ZOMBIE_THRESHOLD_MS = 180_000;   // 180초 초과 무활동 → zombie
  * - 180초 초과 무활동 → 'zombie' (Red)
  */
 export function computeHealthStatus(device: Device): HealthStatus {
-  // ADB 연결이 끊긴 경우 오프라인
-  if (!device.adb_connected) {
+  // 기기 상태가 offline이면 바로 반환
+  if (device.status === 'offline') {
+    return 'offline';
+  }
+
+  // ADB 연결이 명시적으로 false인 경우 오프라인 (undefined는 무시)
+  if (device.adb_connected === false) {
     return 'offline';
   }
 

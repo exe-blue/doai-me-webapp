@@ -4,6 +4,8 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowLeft, ArrowRight, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Header } from "@/components/sections/header";
+import { Footer } from "@/components/sections/footer";
 
 const ease: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
@@ -69,29 +71,12 @@ const philosophyConcepts = [
 
 export default function WhyNotBotPage() {
   return (
-    <main className="min-h-screen">
-      {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 border-b bg-background/80 backdrop-blur-sm">
-        <div className="container mx-auto flex h-16 items-center justify-between px-4">
-          <Link href="/" className="text-xl font-bold">
-            DoAi.Me
-          </Link>
-          <div className="flex items-center gap-4">
-            <Link
-              href="/tech"
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Tech
-            </Link>
-            <Button asChild variant="outline" size="sm">
-              <Link href="/dashboard">Dashboard</Link>
-            </Button>
-          </div>
-        </div>
-      </nav>
+    <main id="main-content" className="min-h-screen">
+      {/* Header */}
+      <Header />
 
       {/* Hero */}
-      <section className="pt-32 pb-16">
+      <section className="pt-8 pb-16">
         <div className="container mx-auto px-4">
           <Button asChild variant="ghost" size="sm" className="mb-8">
             <Link href="/">
@@ -304,11 +289,7 @@ export default function WhyNotBotPage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t py-8">
-        <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
-          <p>&copy; {new Date().getFullYear()} DoAi.Me. All rights reserved.</p>
-        </div>
-      </footer>
+      <Footer />
     </main>
   );
 }

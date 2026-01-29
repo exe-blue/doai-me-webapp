@@ -144,10 +144,11 @@ workerNs.on('connection', (socket) => {
         });
 
         // Broadcast to dashboards
+        // Note: pc_id should be the full device slotId (P01-001), not just pcId (P01)
         dashboardNs.emit('device:status:update', {
           device_id: deviceId,
           serial_number: serial,
-          pc_id: pcId,
+          pc_id: deviceId, // Full device identifier (P01-001 format)
           status: device.status || 'idle',
           health_status: 'healthy',
           last_seen_at: new Date().toISOString(),

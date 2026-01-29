@@ -141,20 +141,32 @@ export async function POST(request: NextRequest) {
     const {
       title,
       channel_name,  // Optional: 채널명 (없으면 자동 추출)
+      display_name: customDisplayName,  // Custom display name from frontend
       source_type = 'N',  // 'A' (Auto) or 'N' (Normal/Manual)
       job_type = 'VIDEO_URL',  // 'VIDEO_URL' or 'CHANNEL_AUTO'
       target_url,
+      video_url,  // Frontend sends video_url for VIDEO_URL mode
       channel_url,  // For CHANNEL_AUTO mode
       duration_sec = 60,
+      watch_duration_min,  // New: min watch duration in seconds
+      watch_duration_max,  // New: max watch duration in seconds
       target_type = 'all_devices',
       target_value = 100,
+      target_views,  // New: frontend sends target_views instead of target_value
       prob_like = 0,
       prob_comment = 0,
+      prob_subscribe = 0,  // New: subscribe probability
       prob_playlist = 0,
       script_type = 'youtube_watch',
       priority = false,  // Priority flag for queue ordering
-      comments = '',  // 댓글 목록 (줄바꿈으로 구분)
+      comments = [],  // 댓글 목록 (배열 또는 줄바꿈 문자열)
     } = body;
+
+    // Normalize video URL: frontend uses video_url, backend expects target_url
+    const effectiveTargetUrl = target_url || video_url;
+
+    // Normalize target value: frontend uses target_views, backend expects target_value
+    const effectiveTargetValue = target_views || target_value;
 
     // YouTube URL 검증 패턴
     const youtubeVideoRegex = /^https?:\/\/(www\.)?(youtube\.com|youtu\.be|m\.youtube\.com)\/(watch\?v=|shorts\/|embed\/|v\/)/i;
@@ -176,14 +188,14 @@ export async function POST(request: NextRequest) {
         );
       }
     } else {
-      // VIDEO_URL 모드: target_url 필수
-      if (!target_url) {
+      // VIDEO_URL 모드: target_url or video_url 필수
+      if (!effectiveTargetUrl) {
         return NextResponse.json(
-          { error: 'target_url is required' },
+          { error: 'target_url or video_url is required' },
           { status: 400 }
         );
       }
-      if (!youtubeVideoRegex.test(target_url)) {
+      if (!youtubeVideoRegex.test(effectiveTargetUrl)) {
         return NextResponse.json(
           { error: 'Invalid YouTube Video URL' },
           { status: 400 }
@@ -218,10 +230,10 @@ export async function POST(request: NextRequest) {
     let targetDevices = [...idleDevices];
 
     if (target_type === 'percentage') {
-      const count = Math.ceil((idleDevices.length * target_value) / 100);
+      const count = Math.ceil((idleDevices.length * effectiveTargetValue) / 100);
       targetDevices = idleDevices.slice(0, count);
     } else if (target_type === 'device_count') {
-      targetDevices = idleDevices.slice(0, Math.min(target_value, idleDevices.length));
+      targetDevices = idleDevices.slice(0, Math.min(effectiveTargetValue, idleDevices.length));
     }
     // target_type === 'all_devices' 는 전체 사용
 
@@ -241,10 +253,14 @@ export async function POST(request: NextRequest) {
 
       if (existingChannel) {
         channelRecord = existingChannel;
-        // 기존 채널 활성화
+        // 기존 채널 활성화 및 이름 업데이트
         await supabase
           .from('channels')
-          .update({ is_active: true, updated_at: new Date().toISOString() })
+          .update({
+            is_active: true,
+            updated_at: new Date().toISOString(),
+            channel_name: customDisplayName || channel_name || existingChannel.channel_name,
+          })
           .eq('id', existingChannel.id);
       } else {
         // 새 채널 등록
@@ -252,12 +268,13 @@ export async function POST(request: NextRequest) {
           .from('channels')
           .insert({
             channel_id: channelId,
-            channel_name: channel_name || channelId,
+            channel_name: customDisplayName || channel_name || channelId,
             channel_url: channel_url,
             is_active: true,
-            default_duration_sec: duration_sec,
+            default_duration_sec: watch_duration_max || duration_sec,
             default_prob_like: prob_like,
             default_prob_comment: prob_comment,
+            default_prob_subscribe: prob_subscribe || 0,
             default_prob_playlist: prob_playlist,
           })
           .select()
@@ -283,26 +300,35 @@ export async function POST(request: NextRequest) {
     }
 
     // 4. VIDEO_URL 모드: 작업 생성
-    // Generate display name: YYMMDD-{Channel}-{Source}
-    const channelHint = channel_name || extractChannelHint(target_url, title);
-    const displayName = generateJobDisplayName(channelHint, source_type as 'A' | 'N');
+    // Generate display name: YYMMDD-{Channel}-{Source} or use custom name
+    const channelHint = channel_name || extractChannelHint(effectiveTargetUrl, title);
+    const displayName = customDisplayName || generateJobDisplayName(channelHint, source_type as 'A' | 'N');
+
+    // Calculate effective duration settings
+    const effectiveDurationSec = watch_duration_max || duration_sec;
+    const effectiveDurationMinPct = watch_duration_min && watch_duration_max
+      ? Math.round((watch_duration_min / watch_duration_max) * 100)
+      : 80;
 
     const jobData = {
       title: title || `YouTube Job ${new Date().toLocaleString('ko-KR')}`,
-      display_name: displayName,  // NEW: 260130-짐승남-N format
+      display_name: displayName,  // Custom or YYMMDD-짐승남-N format
       type: 'VIDEO_URL',
-      target_url,
-      duration_sec,
-      duration_min_pct: 80,
+      target_url: effectiveTargetUrl,
+      duration_sec: effectiveDurationSec,
+      duration_min_pct: effectiveDurationMinPct,
       duration_max_pct: 100,
+      watch_duration_min: watch_duration_min || null,  // Store raw values too
+      watch_duration_max: watch_duration_max || null,
       prob_like,
       prob_comment,
+      prob_subscribe: prob_subscribe || 0,  // New: subscribe probability
       prob_playlist,
       script_type,
       is_active: true,
       status: 'active',
       target_type,
-      target_value,
+      target_value: effectiveTargetValue,
       assigned_count: targetDevices.length,
       completed_count: 0,
       failed_count: 0,
@@ -325,29 +351,37 @@ export async function POST(request: NextRequest) {
     }
 
     // 5. 댓글 풀 생성 (comments가 제공된 경우)
-    if (comments && comments.trim()) {
-      const commentLines = comments
+    // Handle both array and string input
+    let commentLines: string[] = [];
+    if (Array.isArray(comments)) {
+      commentLines = comments
+        .map((c: string) => (typeof c === 'string' ? c.trim() : ''))
+        .filter((c: string) => c.length > 0);
+    } else if (typeof comments === 'string' && comments.trim()) {
+      commentLines = comments
         .split('\n')
         .map((line: string) => line.trim())
         .filter((line: string) => line.length > 0);
+    }
 
-      if (commentLines.length > 0) {
-        const commentRecords = commentLines.map((content: string) => ({
-          job_id: job.id,
-          content,
-          is_used: false,
-        }));
+    let insertedCommentCount = 0;
+    if (commentLines.length > 0) {
+      const commentRecords = commentLines.map((content: string) => ({
+        job_id: job.id,
+        content,
+        is_used: false,
+      }));
 
-        const { error: commentError } = await supabase
-          .from('comments')
-          .insert(commentRecords);
+      const { error: commentError, count } = await supabase
+        .from('comments')
+        .insert(commentRecords);
 
-        if (commentError) {
-          console.error('[API] Comments insertion error:', commentError);
-          // 댓글 삽입 실패해도 작업은 계속 진행
-        } else {
-          console.log(`[API] ${commentLines.length} comments inserted for job ${job.id}`);
-        }
+      if (commentError) {
+        console.error('[API] Comments insertion error:', commentError);
+        // 댓글 삽입 실패해도 작업은 계속 진행
+      } else {
+        insertedCommentCount = commentLines.length;
+        console.log(`[API] ${insertedCommentCount} comments inserted for job ${job.id}`);
       }
     }
 
@@ -371,23 +405,18 @@ export async function POST(request: NextRequest) {
       // 작업은 생성됐지만 할당 실패 - 부분 성공으로 처리
     }
 
-    // 7. 댓글 풀 개수 조회
-    const { count: commentCount } = await supabase
-      .from('comments')
-      .select('*', { count: 'exact', head: true })
-      .eq('job_id', job.id);
-
-    // 8. Socket.io로 Worker에게 전송 (서버 사이드에서는 직접 불가 - 클라이언트가 처리)
+    // 7. Socket.io로 Worker에게 전송 (서버 사이드에서는 직접 불가 - 클라이언트가 처리)
     // 대신 응답에 assignments 포함하여 클라이언트가 Socket으로 전송할 수 있게 함
 
     return NextResponse.json({
       success: true,
       job,
+      commentCount: insertedCommentCount,
       assignments: createdAssignments || [],
       stats: {
         total_devices: idleDevices.length,
         assigned_devices: targetDevices.length,
-        comments_count: commentCount || 0,
+        comments_count: insertedCommentCount,
       },
     });
   } catch (error) {

@@ -65,7 +65,7 @@ async function checkMonitoredChannels() {
 
             console.log(`[YouTube API] 응답 받음: ${res.data.items?.length || 0}개 영상`);
 
-            const latestVideo = res.data.items[0];
+            const latestVideo = res.data.items?.[0];
             if (!latestVideo) {
                 console.log(`[Manager] ${ch.channel_name}: 영상 없음`);
                 continue;
@@ -105,10 +105,14 @@ async function checkMonitoredChannels() {
 
             if (!jobError) {
                 // 채널의 마지막 비디오 ID 업데이트
-                await supabase.from('monitored_channels')
+                const { error: updateError } = await supabase.from('monitored_channels')
                     .update({ last_video_id: videoId, last_checked_at: new Date() })
                     .eq('id', ch.id);
-                console.log(` -> Job Created Successfully!`);
+                if (updateError) {
+                    console.error('[Channel Update Error]', updateError.message);
+                } else {
+                    console.log(` -> Job Created Successfully!`);
+                }
             } else {
                 console.error('[Job Create Error]', jobError.message);
             }

@@ -86,11 +86,15 @@ export default function NodesPage() {
   // Loading state based on connection
   const isLoading = !isConnected;
 
+  // STRICT NAMING VALIDATION REGEX for top-level use
+  const VALID_PC_ID_PATTERN = /^P\d{1,2}-\d{3}$/;
+
   // Get unique PC list for filter (extract PC code like P01 from P01-001)
   const pcList = useMemo(() => {
     const pcs = new Set<string>();
     devices.forEach(d => {
-      if (d.pc_id && d.pc_id.startsWith('P')) {
+      // Only process devices matching strict pattern (P01-001, P02-015, etc.)
+      if (d.pc_id && VALID_PC_ID_PATTERN.test(d.pc_id)) {
         // Extract PC code (P01) from pc_id (P01-001)
         const pcCode = d.pc_id.split('-')[0];
         if (pcCode) pcs.add(pcCode);
@@ -124,12 +128,28 @@ export default function NodesPage() {
     return 'sleep'; // Normal/Sleep state
   }, []);
 
-  // Filter devices - includes strict naming convention filter
+  // Valid devices - only strict naming filter (no user filters)
+  // Used for BroadcastControl and other components that need all valid devices
+  const validDevices = useMemo(() => {
+    return devices.filter(device => {
+      if (!device.pc_id || !VALID_PC_ID_PATTERN.test(device.pc_id)) return false;
+      if (device.id === device.pc_id) return false;
+      if (device.pc_id.toUpperCase().startsWith('PC-')) return false;
+      return true;
+    });
+  }, [devices]);
+
+  // Filter devices - includes strict naming convention filter + user filters
   const filteredDevices = useMemo(() => {
     return devices.filter(device => {
-      // STRICT FILTER: Only show devices with valid naming convention (P{PC}-{001~999})
-      // This filters out garbage data like "device", "List", "TEST-PC"
-      if (!device.pc_id || !device.pc_id.startsWith('P')) return false;
+      // STRICT FILTER 1: pc_id must exist and match exact pattern P{number}-{3digits}
+      if (!device.pc_id || !VALID_PC_ID_PATTERN.test(device.pc_id)) return false;
+
+      // STRICT FILTER 2: Ignore devices where id equals pc_id (prevents PC itself from appearing)
+      if (device.id === device.pc_id) return false;
+
+      // STRICT FILTER 3: Explicitly reject "PC" prefix (e.g., "PC-01")
+      if (device.pc_id.toUpperCase().startsWith('PC-')) return false;
 
       // PC filter (e.g., P01, P02)
       if (filterPC !== 'all') {
@@ -182,10 +202,10 @@ export default function NodesPage() {
     return grouped;
   }, [filteredDevices]);
 
-  // Stats (from valid devices only - those with pc_id starting with 'P')
+  // Stats (from valid devices only - those matching strict P{num}-{3digits} pattern)
   const stats = useMemo(() => {
-    // Filter to valid devices only
-    const validDevices = devices.filter(d => d.pc_id && d.pc_id.startsWith('P'));
+    // Filter to valid devices only (strict pattern match)
+    const validDevices = devices.filter(d => d.pc_id && VALID_PC_ID_PATTERN.test(d.pc_id));
     const total = validDevices.length;
     const online = validDevices.filter(d => d.status !== 'offline').length;
     const working = validDevices.filter(d => d.status === 'busy').length;
@@ -209,23 +229,23 @@ export default function NodesPage() {
   const sameGroupDeviceIds = useMemo(() => {
     if (!selectedDevice) return [];
     const selectedPcCode = selectedDevice.pc_id?.split('-')[0];
-    return devices
+    return validDevices
       .filter(d => d.pc_id?.split('-')[0] === selectedPcCode && d.id !== selectedDevice.id)
       .map(d => d.id);
-  }, [selectedDevice, devices]);
+  }, [selectedDevice, validDevices]);
 
   // Get broadcast devices info for modal
-  const broadcastDevices = useMemo(() => {
+  const broadcastDevicesForModal = useMemo(() => {
     if (!selectedDevice) return [];
     const selectedPcCode = selectedDevice.pc_id?.split('-')[0];
-    return devices
+    return validDevices
       .filter(d => d.pc_id?.split('-')[0] === selectedPcCode && d.id !== selectedDevice.id)
       .map(d => ({
         id: d.id,
         name: d.pc_id || 'UNKNOWN', // Display full pc_id (P01-001 format)
         status: d.status
       }));
-  }, [selectedDevice, devices]);
+  }, [selectedDevice, validDevices]);
 
   // Handle device click
   const handleDeviceClick = useCallback((device: Device) => {
@@ -281,7 +301,7 @@ export default function NodesPage() {
 
   // Unify device resolution (execute wm size command on all devices) via Socket.io
   const unifyResolution = useCallback(() => {
-    const onlineDevices = devices.filter(d => d.status !== 'offline');
+    const onlineDevices = validDevices.filter(d => d.status !== 'offline');
     if (onlineDevices.length === 0) {
       toast.error('온라인 기기가 없습니다');
       return;
@@ -297,11 +317,11 @@ export default function NodesPage() {
       shellCommand: `wm size ${deviceSettings.resolution.width}x${deviceSettings.resolution.height}`
     });
     toast.success(`${onlineDevices.length}대 기기 해상도 통일 명령 전송됨 (${deviceSettings.resolution.width}x${deviceSettings.resolution.height})`);
-  }, [devices, isConnected, broadcastCommand, deviceSettings]);
+  }, [validDevices, isConnected, broadcastCommand, deviceSettings]);
 
   // Initialize all devices (resolution + brightness + volume)
   const initializeAllDevices = useCallback(() => {
-    const onlineDevices = devices.filter(d => d.status !== 'offline');
+    const onlineDevices = validDevices.filter(d => d.status !== 'offline');
     if (onlineDevices.length === 0) {
       toast.error('온라인 기기가 없습니다');
       return;
@@ -734,7 +754,7 @@ export default function NodesPage() {
 
       {/* Broadcast Control */}
       <BroadcastControl
-        devices={devices}
+        devices={validDevices}
         masterDeviceId={masterDeviceId}
         slaveDeviceIds={slaveDeviceIds}
         onMasterChange={setMasterDeviceId}
@@ -780,7 +800,7 @@ export default function NodesPage() {
         broadcastEnabled={modalBroadcastEnabled}
         onBroadcastToggle={setModalBroadcastEnabled}
         broadcastDeviceIds={sameGroupDeviceIds}
-        broadcastDevices={broadcastDevices}
+        broadcastDevices={broadcastDevicesForModal}
         deviceResolution={deviceSettings.resolution}
       />
     </div>

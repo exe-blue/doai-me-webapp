@@ -146,10 +146,9 @@ namespace DoaiDeviceFarm.Client
         /// </summary>
         public bool IsWithinMonitorBounds(int x, int y)
         {
-            return x >= _pcScreenBounds.Left && x <= _pcScreenBounds.Right &&
-                   y >= _pcScreenBounds.Top && y <= _pcScreenBounds.Bottom;
-        }
-        
+            return x >= _pcScreenBounds.Left && x < _pcScreenBounds.Right &&
+                   y >= _pcScreenBounds.Top && y < _pcScreenBounds.Bottom;
+        }        
         /// <summary>
         /// 좌표를 모니터 영역 내로 클램핑
         /// </summary>

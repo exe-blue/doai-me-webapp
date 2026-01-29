@@ -42,6 +42,13 @@ namespace DoaiDeviceFarm.Client
         private bool _isDisposed;
         private int _reconnectAttempts;
         
+        // 프로세스 동기화 (세마포어 기반)
+        private readonly SemaphoreSlim _processSemaphore = new(1, 1);
+        private const int PROCESS_SEMAPHORE_TIMEOUT_MS = 5000;
+        
+        // 강제 정리용 원자적 플래그
+        private int _cleanupInProgress = 0; // 0 = idle, 1 = cleanup in progress
+        
         // 하트비트 모니터링
         private CancellationTokenSource? _heartbeatCts;
         private Task? _heartbeatTask;
@@ -285,7 +292,7 @@ namespace DoaiDeviceFarm.Client
         }
         
         /// <summary>
-        /// 셸 프로세스 정리
+        /// 셸 프로세스 정리 (반드시 _processLock 또는 _processSemaphore 보유 상태에서 호출)
         /// </summary>
         private void CleanupShellProcess()
         {
@@ -311,6 +318,126 @@ namespace DoaiDeviceFarm.Client
                 _shellInput = null;
                 _shellOutput = null;
                 _adbShellProcess = null;
+            }
+        }
+        
+        /// <summary>
+        /// 스레드 안전 강제 정리 (세마포어 미보유 상태에서 호출 가능)
+        /// 타임아웃으로 _processSemaphore를 획득하지 못했을 때 안전하게 정리하는 메서드
+        /// Interlocked로 중복 정리 방지, 짧은 타임아웃으로 세마포어 획득 재시도
+        /// </summary>
+        /// <param name="reason">정리 사유 (로깅용)</param>
+        /// <returns>정리 성공 여부</returns>
+        private async Task<bool> CleanupShellProcessForcedAsync(string reason)
+        {
+            // Interlocked로 중복 정리 방지
+            if (Interlocked.CompareExchange(ref _cleanupInProgress, 1, 0) != 0)
+            {
+                _logger.Debug($"강제 정리 스킵 (이미 진행 중): {reason}");
+                return false;
+            }
+            
+            try
+            {
+                _logger.Warning($"강제 프로세스 정리 시작: {reason}");
+                
+                // 짧은 타임아웃으로 세마포어 획득 시도
+                var acquired = await _processSemaphore.WaitAsync(1000);
+                
+                try
+                {
+                    // _processLock으로 추가 동기화 (세마포어 획득 여부와 관계없이 안전하게 정리)
+                    lock (_processLock)
+                    {
+                        // 연결 상태 먼저 해제
+                        _isConnected = false;
+                        
+                        // 각 리소스를 개별적으로 null 체크 후 정리 (원자적 스왑)
+                        var shellInput = Interlocked.Exchange(ref _shellInput, null);
+                        var shellOutput = Interlocked.Exchange(ref _shellOutput, null);
+                        var adbProcess = Interlocked.Exchange(ref _adbShellProcess, null);
+                        
+                        try
+                        {
+                            shellInput?.Dispose();
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.Debug($"shellInput 정리 예외: {ex.Message}");
+                        }
+                        
+                        try
+                        {
+                            shellOutput?.Dispose();
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.Debug($"shellOutput 정리 예외: {ex.Message}");
+                        }
+                        
+                        try
+                        {
+                            if (adbProcess != null && !adbProcess.HasExited)
+                            {
+                                adbProcess.Kill();
+                            }
+                            adbProcess?.Dispose();
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.Debug($"adbProcess 정리 예외: {ex.Message}");
+                        }
+                    }
+                    
+                    _logger.Info($"강제 프로세스 정리 완료: {reason}");
+                    return true;
+                }
+                finally
+                {
+                    if (acquired)
+                    {
+                        _processSemaphore.Release();
+                    }
+                }
+            }
+            finally
+            {
+                // 정리 완료 플래그 해제
+                Interlocked.Exchange(ref _cleanupInProgress, 0);
+            }
+        }
+        
+        /// <summary>
+        /// 세마포어 획득과 함께 안전하게 셸 프로세스 정리
+        /// </summary>
+        /// <param name="timeoutMs">세마포어 획득 타임아웃 (ms)</param>
+        /// <param name="cancellationToken">취소 토큰</param>
+        /// <returns>true: 정상 정리, false: 타임아웃으로 강제 정리 사용</returns>
+        private async Task<bool> SafeCleanupShellProcessAsync(int timeoutMs, CancellationToken cancellationToken)
+        {
+            var acquired = await _processSemaphore.WaitAsync(timeoutMs, cancellationToken);
+            
+            if (acquired)
+            {
+                try
+                {
+                    lock (_processLock)
+                    {
+                        CleanupShellProcess();
+                    }
+                    return true;
+                }
+                finally
+                {
+                    _processSemaphore.Release();
+                }
+            }
+            else
+            {
+                // 세마포어 획득 실패 시 강제 정리 사용
+                _logger.Warning($"세마포어 획득 타임아웃 ({timeoutMs}ms), 강제 정리 실행");
+                await CleanupShellProcessForcedAsync("Semaphore acquisition timeout");
+                return false;
             }
         }
         
@@ -567,13 +694,44 @@ namespace DoaiDeviceFarm.Client
         {
             StopHeartbeat();
             
-            lock (_processLock)
+            // 세마포어 획득 시도 (동기 버전)
+            var acquired = _processSemaphore.Wait(PROCESS_SEMAPHORE_TIMEOUT_MS);
+            
+            try
             {
-                CleanupShellProcess();
+                lock (_processLock)
+                {
+                    CleanupShellProcess();
+                }
+            }
+            finally
+            {
+                if (acquired)
+                {
+                    _processSemaphore.Release();
+                }
+                else
+                {
+                    // 세마포어 미획득 시 강제 정리 (비동기 fire-and-forget)
+                    _ = CleanupShellProcessForcedAsync("Disconnect timeout - forced cleanup");
+                }
             }
             
             OnConnectionStateChanged(false, "Disconnected by user");
             _logger.Info("연결 해제됨");
+        }
+        
+        /// <summary>
+        /// 비동기 연결 해제 (권장)
+        /// </summary>
+        public async Task DisconnectAsync()
+        {
+            StopHeartbeat();
+            
+            await SafeCleanupShellProcessAsync(PROCESS_SEMAPHORE_TIMEOUT_MS, CancellationToken.None);
+            
+            OnConnectionStateChanged(false, "Disconnected by user");
+            _logger.Info("연결 해제됨 (async)");
         }
         
         public void Dispose()
@@ -583,6 +741,7 @@ namespace DoaiDeviceFarm.Client
             
             Disconnect();
             _commandSemaphore.Dispose();
+            _processSemaphore.Dispose();
             
             _logger.Info("ConnectionManager 해제됨");
             GC.SuppressFinalize(this);

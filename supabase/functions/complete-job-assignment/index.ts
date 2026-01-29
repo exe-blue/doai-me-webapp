@@ -8,9 +8,23 @@
  *   (advisory lock 사용하여 동시 완료 시 race condition 방지)
  * - service_role 키로 salary_logs 삽입
  * 
+ * 보안:
+ * - Authorization Bearer 토큰 필수 (Supabase Auth JWT)
+ * - 토큰에서 추출한 user.id와 assignment.agent_id 일치 검증
+ * - 불일치 시 403 Forbidden 반환
+ * 
  * 사용법:
  * POST /functions/v1/complete-job-assignment
+ * Headers: { Authorization: "Bearer <access_token>" }
  * Body: { assignment_id, watch_percentage, actual_duration_sec }
+ * 
+ * 응답 코드:
+ * - 200: 성공
+ * - 400: 잘못된 요청 (assignment_id 누락, 이미 완료됨)
+ * - 401: 인증 실패 (토큰 없음 또는 유효하지 않음)
+ * - 403: 권한 없음 (agent_id 불일치)
+ * - 404: assignment 없음
+ * - 500: 서버 오류
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -31,6 +45,7 @@ interface JobAssignment {
   id: string
   job_id: string
   device_id: string  // UUID FK to devices.id
+  agent_id: string   // UUID FK to auth.users (assignment 소유자)
   status: string
   watch_percentage: number
   final_duration_sec: number
@@ -50,6 +65,40 @@ Deno.serve(async (req) => {
     if (!supabaseUrl || !supabaseServiceKey) {
       throw new Error('서버 설정 오류: 환경 변수가 설정되지 않았습니다.')
     }
+
+    // =====================================================
+    // 인증 검증: Authorization Bearer 토큰 추출 및 검증
+    // =====================================================
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ error: '인증이 필요합니다. Authorization 헤더가 없거나 유효하지 않습니다.' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const token = authHeader.replace('Bearer ', '')
+
+    // 사용자 토큰으로 임시 클라이언트 생성하여 사용자 정보 확인
+    const supabaseAuth = createClient(supabaseUrl, supabaseServiceKey, {
+      global: {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      }
+    })
+
+    // JWT 토큰 검증 및 사용자 정보 추출
+    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token)
+
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: '인증 실패: 유효하지 않은 토큰입니다.', details: authError?.message }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const authenticatedUserId = user.id
 
     // service_role 키로 클라이언트 생성 (RLS 우회 가능)
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
@@ -72,10 +121,10 @@ Deno.serve(async (req) => {
     // actual_duration_sec 검증 (음수 방지)
     const validatedDuration = Math.max(0, Math.round(actual_duration_sec || 0))
 
-    // 1. assignment 조회 및 상태 확인
+    // 1. assignment 조회 및 상태 확인 (agent_id 포함하여 권한 검증용)
     const { data: assignment, error: fetchError } = await supabase
       .from('job_assignments')
-      .select('id, job_id, device_id, status')
+      .select('id, job_id, device_id, agent_id, status')
       .eq('id', assignment_id)
       .single()
 
@@ -83,6 +132,17 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({ error: 'assignment를 찾을 수 없습니다.', details: fetchError?.message }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // =====================================================
+    // 권한 검증: 인증된 사용자가 이 assignment의 소유자인지 확인
+    // =====================================================
+    if (assignment.agent_id !== authenticatedUserId) {
+      console.error(`권한 거부: user ${authenticatedUserId} attempted to complete assignment owned by ${assignment.agent_id}`)
+      return new Response(
+        JSON.stringify({ error: '권한 없음: 이 assignment를 완료할 권한이 없습니다.' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 

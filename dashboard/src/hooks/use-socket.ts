@@ -21,6 +21,9 @@ interface CommandResult {
   error?: string;
 }
 
+// Socket.io server URL from environment or default to localhost:3001
+const SOCKET_SERVER_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
+
 export function useSocket(options: SocketHookOptions = {}) {
   const { autoConnect = true } = options;
   const socketRef = useRef<Socket | null>(null);
@@ -31,11 +34,40 @@ export function useSocket(options: SocketHookOptions = {}) {
   const frameListenersRef = useRef<Map<string, (frame: StreamFrame) => void>>(new Map());
   const commandResultListenersRef = useRef<((result: CommandResult) => void)[]>([]);
 
+  // Fetch persisted devices from Supabase API on mount (for device persistence)
+  useEffect(() => {
+    async function fetchPersistedDevices() {
+      try {
+        const response = await fetch('/api/devices');
+        if (response.ok) {
+          const data = await response.json();
+          if (data.devices && data.devices.length > 0) {
+            console.log('[Socket] Loaded persisted devices from DB:', data.devices.length);
+            // Only set if we don't have socket data yet
+            setDevices(prev => {
+              if (prev.length === 0) {
+                return data.devices;
+              }
+              // Merge: keep socket data but add any DB-only devices
+              const socketIds = new Set(prev.map((d: Device) => d.id));
+              const dbOnlyDevices = data.devices.filter((d: Device) => !socketIds.has(d.id));
+              return [...prev, ...dbOnlyDevices];
+            });
+          }
+        }
+      } catch (err) {
+        console.error('[Socket] Failed to fetch persisted devices:', err);
+      }
+    }
+
+    fetchPersistedDevices();
+  }, []);
+
   // Initialize socket connection
   useEffect(() => {
     if (!autoConnect) return;
 
-    const socket = io('/dashboard', {
+    const socket = io(`${SOCKET_SERVER_URL}/dashboard`, {
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionAttempts: 5,
@@ -58,20 +90,54 @@ export function useSocket(options: SocketHookOptions = {}) {
       console.error('[Socket] Connection error:', error);
     });
 
-    // Initial device list
+    // Initial device list from Socket - merge with persisted data
     socket.on('devices:initial', (initialDevices: Device[]) => {
-      console.log('[Socket] Received initial devices:', initialDevices.length);
-      setDevices(initialDevices);
+      console.log('[Socket] Received initial devices from socket:', initialDevices.length);
+      setDevices(prev => {
+        // Merge: socket devices override persisted by ID
+        const mergedMap = new Map<string, Device>();
+
+        // First add persisted devices (from DB)
+        prev.forEach(d => {
+          if (d.id) mergedMap.set(d.id, d);
+        });
+
+        // Then override with socket devices (real-time data takes precedence)
+        initialDevices.forEach(d => {
+          if (d.id) {
+            const existing = mergedMap.get(d.id);
+            mergedMap.set(d.id, existing ? { ...existing, ...d } : d);
+          }
+        });
+
+        return Array.from(mergedMap.values());
+      });
     });
 
     // Device status updates
-    socket.on('device:status:update', (device: Device) => {
+    // Socket sends device_id but frontend uses id, so we normalize
+    socket.on('device:status:update', (update: Partial<Device> & { device_id?: string }) => {
+      const deviceId = update.device_id || update.id;
+      if (!deviceId) {
+        console.warn('[Socket] Received device update without id:', update);
+        return;
+      }
+
+      const normalizedDevice: Device = {
+        ...update,
+        id: deviceId,
+      } as Device;
+
       setDevices(prev => {
-        const exists = prev.find(d => d.id === device.id);
-        if (exists) {
-          return prev.map(d => d.id === device.id ? { ...d, ...device } : d);
+        const existingIndex = prev.findIndex(d => d.id === deviceId || d.serial_number === update.serial_number);
+        if (existingIndex >= 0) {
+          // Update existing device
+          const updated = [...prev];
+          updated[existingIndex] = { ...updated[existingIndex], ...normalizedDevice };
+          return updated;
         }
-        return [...prev, device];
+        // Only add if not exists
+        return [...prev, normalizedDevice];
       });
     });
 

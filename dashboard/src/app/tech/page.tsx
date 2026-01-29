@@ -2,34 +2,43 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowLeft, ArrowRight, Server, Smartphone, Database, Wifi, RefreshCw, Shield } from "lucide-react";
+import { ArrowLeft, ArrowRight, Server, Smartphone, Database, Wifi, RefreshCw, Shield, Cpu } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Header } from "@/components/sections/header";
+import { Footer } from "@/components/sections/footer";
+import { FeatureSelector } from "@/components/feature-selector";
 
 const ease: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
-const techStack = [
+const techCategories = [
   {
-    category: "Central Server",
+    id: "central-server",
+    title: "Central Server",
+    icon: <Server className="h-5 w-5" />,
     items: [
-      { name: "Next.js 16", description: "Dashboard Frontend" },
-      { name: "Supabase", description: "PostgreSQL + Realtime" },
-      { name: "Tailscale VPN", description: "Secure Network" },
+      { name: "Next.js 16", description: "최신 React 프레임워크 기반 Dashboard Frontend. App Router와 Server Components 활용." },
+      { name: "Supabase", description: "PostgreSQL 데이터베이스와 Realtime 구독 기능. 모든 디바이스 상태를 실시간 동기화." },
+      { name: "Tailscale VPN", description: "보안 네트워크 메시. 모든 노드 간 암호화된 P2P 통신 보장." },
     ],
   },
   {
-    category: "Mobile Agent",
+    id: "mobile-agent",
+    title: "Mobile Agent",
+    icon: <Smartphone className="h-5 w-5" />,
     items: [
-      { name: "AutoX.js", description: "Android Automation" },
-      { name: "REST API Client", description: "Supabase 통신" },
-      { name: "Error Recovery", description: "자동 복구 모듈" },
+      { name: "AutoX.js", description: "Android 자동화 프레임워크. UI 자동화 및 접근성 서비스 기반 제어." },
+      { name: "REST API Client", description: "Supabase와의 양방향 통신. 작업 수신 및 상태 보고." },
+      { name: "Error Recovery", description: "자동 복구 모듈. Exponential backoff와 상태 기반 복구 전략." },
     ],
   },
   {
-    category: "Hardware",
+    id: "hardware",
+    title: "Hardware",
+    icon: <Cpu className="h-5 w-5" />,
     items: [
-      { name: "Galaxy S9 x 600", description: "Physical Devices" },
-      { name: "LTE SIM x 600", description: "Independent Networks" },
-      { name: "Titan Nodes x 5", description: "Workstations" },
+      { name: "Galaxy S9 x 600", description: "실제 물리적 Android 디바이스. 각각 고유한 하드웨어 지문 보유." },
+      { name: "LTE SIM x 600", description: "완전히 독립된 모바일 네트워크. IP 공유 없는 개별 연결." },
+      { name: "Titan Nodes x 5", description: "각 노드가 120대의 디바이스 관리. 24시간 연속 운영." },
     ],
   },
 ];
@@ -43,29 +52,12 @@ const errorCodes = [
 
 export default function TechPage() {
   return (
-    <main className="min-h-screen">
-      {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 border-b bg-background/80 backdrop-blur-sm">
-        <div className="container mx-auto flex h-16 items-center justify-between px-4">
-          <Link href="/" className="text-xl font-bold">
-            DoAi.Me
-          </Link>
-          <div className="flex items-center gap-4">
-            <Link
-              href="/why-not-bot"
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Why Not Bot
-            </Link>
-            <Button asChild variant="outline" size="sm">
-              <Link href="/dashboard">Dashboard</Link>
-            </Button>
-          </div>
-        </div>
-      </nav>
+    <main id="main-content" className="min-h-screen">
+      {/* Header */}
+      <Header />
 
       {/* Hero */}
-      <section className="pt-32 pb-16">
+      <section className="pt-8 pb-16">
         <div className="container mx-auto px-4">
           <Button asChild variant="ghost" size="sm" className="mb-8">
             <Link href="/">
@@ -136,7 +128,7 @@ export default function TechPage() {
         </div>
       </section>
 
-      {/* Tech Stack */}
+      {/* Tech Stack - Interactive */}
       <section className="py-16">
         <div className="container mx-auto px-4">
           <motion.div
@@ -146,34 +138,8 @@ export default function TechPage() {
             transition={{ duration: 0.6, ease }}
           >
             <h2 className="text-3xl font-bold mb-8 text-center">기술 스택</h2>
-            <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-              {techStack.map((stack, stackIndex) => (
-                <motion.div
-                  key={stack.category}
-                  className="p-6 rounded-lg border bg-card"
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: stackIndex * 0.1, duration: 0.4 }}
-                >
-                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                    {stackIndex === 0 && <Server className="h-5 w-5" />}
-                    {stackIndex === 1 && <Smartphone className="h-5 w-5" />}
-                    {stackIndex === 2 && <Database className="h-5 w-5" />}
-                    {stack.category}
-                  </h3>
-                  <ul className="space-y-3">
-                    {stack.items.map((item) => (
-                      <li key={item.name} className="text-sm">
-                        <span className="font-medium">{item.name}</span>
-                        <span className="text-muted-foreground ml-2">
-                          {item.description}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </motion.div>
-              ))}
+            <div className="max-w-4xl mx-auto">
+              <FeatureSelector categories={techCategories} />
             </div>
           </motion.div>
         </div>
@@ -358,11 +324,7 @@ export default function TechPage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t py-8">
-        <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
-          <p>&copy; {new Date().getFullYear()} DoAi.Me. All rights reserved.</p>
-        </div>
-      </footer>
+      <Footer />
     </main>
   );
 }

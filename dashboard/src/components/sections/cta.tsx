@@ -1,65 +1,41 @@
-"use client";
-
-import { motion } from "framer-motion";
-import Link from "next/link";
+import { Section } from "@/components/section";
 import { Button } from "@/components/ui/button";
-import { Section } from "./section";
-import { cn } from "@/lib/utils";
-import { ArrowRight } from "lucide-react";
+import FlickeringGrid from "@/components/ui/flickering-grid";
+import Link from "next/link";
 
-interface CTAProps {
-  title: string;
-  description: string;
-  ctaText?: string;
-  ctaHref?: string;
-  className?: string;
-}
-
-// CTA (Call to Action) 섹션 컴포넌트
-export function CTA({
-  title,
-  description,
-  ctaText = "지금 시작하기",
-  ctaHref = "/",
-  className,
-}: CTAProps) {
+export function CTA() {
   return (
-    <Section id="cta" className={className}>
-      <motion.div
-        className={cn(
-          "relative overflow-hidden rounded-2xl bg-primary px-6 py-16 sm:px-12 sm:py-24",
-          "text-center text-primary-foreground"
-        )}
-        initial={{ opacity: 0, scale: 0.95 }}
-        whileInView={{ opacity: 1, scale: 1 }}
-        viewport={{ once: true }}
-        transition={{ duration: 0.5 }}
-      >
-        {/* 배경 그라데이션 효과 */}
-        <div className="absolute inset-0 bg-gradient-to-br from-primary via-primary to-primary/80" />
+    <Section id="cta">
+      <div className="border overflow-hidden relative text-center py-16 mx-auto">
+        <p className="max-w-3xl text-foreground mb-2 text-balance mx-auto font-bold text-3xl">
+          봇이 아닌, 존재로서
+        </p>
+        <p className="max-w-2xl text-muted-foreground mb-6 text-balance mx-auto">
+          600대의 물리적 디바이스가 당신의 콘텐츠를 발견하고, 경험하고, 반응합니다.
+        </p>
 
-        <div className="relative z-10">
-          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-            {title}
-          </h2>
-          <p className="mx-auto mt-4 max-w-2xl text-lg opacity-90">
-            {description}
-          </p>
-          <div className="mt-8">
-            <Button
-              asChild
-              size="lg"
-              variant="secondary"
-              className="gap-2 font-semibold"
-            >
-              <Link href={ctaHref}>
-                {ctaText}
-                <ArrowRight className="h-4 w-4" />
-              </Link>
+        <div className="flex justify-center gap-4">
+          <Link href="/dashboard">
+            <Button className="flex items-center gap-2">Dashboard</Button>
+          </Link>
+          <Link href="/why-not-bot">
+            <Button variant="outline" className="flex items-center gap-2">
+              Why Not Bot?
             </Button>
-          </div>
+          </Link>
         </div>
-      </motion.div>
+
+        {/* Background effect */}
+        <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-full w-full bg-gradient-to-t from-background dark:from-background -z-10 from-50%" />
+        <FlickeringGrid
+          squareSize={4}
+          gridGap={4}
+          color="#f2cb05"
+          maxOpacity={0.15}
+          flickerChance={0.1}
+          className="-z-20 absolute inset-0 size-full"
+        />
+      </div>
     </Section>
   );
 }

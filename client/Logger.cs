@@ -83,12 +83,14 @@ namespace DoaiDeviceFarm.Client
             // 콘솔 출력
             if (EnableConsoleOutput)
             {
-                var originalColor = Console.ForegroundColor;
-                Console.ForegroundColor = GetLogColor(level);
-                Console.WriteLine(logEntry);
-                Console.ForegroundColor = originalColor;
-            }
-            
+                lock (_lock)
+                {
+                    var originalColor = Console.ForegroundColor;
+                    Console.ForegroundColor = GetLogColor(level);
+                    Console.WriteLine(logEntry);
+                    Console.ForegroundColor = originalColor;
+                }
+            }            
             // 파일 출력
             if (EnableFileOutput)
             {

@@ -1,145 +1,262 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useMemo } from 'react';
 import Link from 'next/link';
-import { JobPostingForm } from '@/components/JobPostingForm';
-import { StatusBoard } from '@/components/StatusBoard';
-import { supabase } from '@/lib/supabase';
-import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
+import { useSocketContext } from '@/contexts/socket-context';
+import {
+  Monitor,
+  Activity,
+  PlayCircle,
+  Wifi,
+  WifiOff,
+  TrendingUp,
+  Smartphone,
+  Loader2,
+  ArrowRight,
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export default function DashboardPage() {
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const [isWorkerConnected, setIsWorkerConnected] = useState<boolean | null>(null);
-  const [isRealtimeActive, setIsRealtimeActive] = useState<boolean | null>(null);
+  const { isConnected, devices } = useSocketContext();
 
-  const handleJobCreated = () => {
-    setRefreshTrigger(prev => prev + 1);
-  };
+  // Calculate stats
+  const stats = useMemo(() => {
+    const total = devices.length;
+    const online = devices.filter(d => d.status !== 'offline').length;
+    const busy = devices.filter(d => d.status === 'busy').length;
+    const offline = devices.filter(d => d.status === 'offline').length;
+    const operationRate = total > 0 ? Math.round((online / total) * 100) : 0;
 
-  // Worker 연결 상태 확인 (devices 테이블에서 최근 활성 기기 확인)
-  useEffect(() => {
-    const checkWorkerStatus = async () => {
-      try {
-        // 최근 30초 이내에 last_seen_at이 업데이트된 기기가 있는지 확인
-        const thirtySecondsAgo = new Date(Date.now() - 30 * 1000).toISOString();
-        const { data, error } = await supabase
-          .from('devices')
-          .select('id, serial_number')
-          .gte('last_seen_at', thirtySecondsAgo)
-          .limit(1);
+    // Group by PC
+    const pcGroups = new Set(devices.map(d => d.pc_id));
+    const activePCs = new Set(devices.filter(d => d.status !== 'offline').map(d => d.pc_id));
 
-        if (error) {
-          console.error('Worker 상태 확인 실패:', error);
-          setIsWorkerConnected(false);
-        } else {
-          setIsWorkerConnected(data && data.length > 0);
-        }
-      } catch (err) {
-        console.error('Worker 상태 확인 예외:', err);
-        setIsWorkerConnected(false);
-      }
-    };
+    return { total, online, busy, offline, operationRate, pcCount: pcGroups.size, activePCs: activePCs.size };
+  }, [devices]);
 
-    checkWorkerStatus();
-    // 10초마다 상태 확인
-    const interval = setInterval(checkWorkerStatus, 10000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Realtime 연결 상태 확인
-  useEffect(() => {
-    const channel = supabase
-      .channel('realtime-status-check')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'devices' }, () => {
-        // Realtime 이벤트 수신 시 활성 상태로 표시
-        setIsRealtimeActive(true);
-      })
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          setIsRealtimeActive(true);
-        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-          setIsRealtimeActive(false);
-        }
-      });
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
+  // Current active jobs (busy devices)
+  const activeJobs = useMemo(() => {
+    return devices.filter(d => d.status === 'busy');
+  }, [devices]);
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-950 dark:via-blue-950 dark:to-indigo-950">
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
-        {/* 헤더 */}
-        <header className="text-center mb-10">
-          <div className="flex justify-start mb-4">
-            <Button asChild variant="ghost" size="sm">
-              <Link href="/">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                홈으로
-              </Link>
-            </Button>
-          </div>
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-3">
-            AI Device Farm
-          </h1>
-          <p className="text-muted-foreground text-lg">
-            작업 통제실 - 스마트폰 팜 관리 대시보드
-          </p>
-          <div className="mt-4 flex justify-center gap-4 text-sm">
-            {isWorkerConnected === null ? (
-              <span className="px-3 py-1 bg-gray-100 dark:bg-gray-900/30 text-gray-700 dark:text-gray-400 rounded-full">
-                Worker 상태 확인 중...
-              </span>
-            ) : isWorkerConnected ? (
-              <span className="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full">
-                Worker 연결됨
-              </span>
-            ) : (
-              <span className="px-3 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 rounded-full">
-                Worker 미연결
-              </span>
-            )}
-            {isRealtimeActive === null ? (
-              <span className="px-3 py-1 bg-gray-100 dark:bg-gray-900/30 text-gray-700 dark:text-gray-400 rounded-full">
-                Realtime 상태 확인 중...
-              </span>
-            ) : isRealtimeActive ? (
-              <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-full">
-                Realtime 활성화
-              </span>
-            ) : (
-              <span className="px-3 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-full">
-                Realtime 비활성
-              </span>
-            )}
-          </div>
-        </header>
-
-        {/* 메인 컨텐츠 - 반응형 그리드 */}
-        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-          {/* 좌측: 작업 등록 폼 (4/12) */}
-          <div className="xl:col-span-4">
-            <div className="sticky top-8">
-              <JobPostingForm onJobCreated={handleJobCreated} />
-            </div>
-          </div>
-
-          {/* 우측: 상태 보드 (8/12) */}
-          <div className="xl:col-span-8">
-            <StatusBoard refreshTrigger={refreshTrigger} />
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-mono font-bold text-foreground">대시보드</h1>
+          <div className="flex items-center gap-2 mt-2">
+            <div className={cn(
+              'h-2 w-2 rounded-full',
+              isConnected
+                ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]'
+                : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]'
+            )} />
+            <span className="font-mono text-xs text-zinc-400">
+              {isConnected ? '연결됨' : '연결 끊김'}
+            </span>
           </div>
         </div>
-
-        {/* 푸터 */}
-        <footer className="mt-16 text-center text-sm text-muted-foreground border-t pt-8">
-          <p>DoAi.me Device Farm Management System</p>
-          <p className="mt-1 text-xs">
-            Built with Next.js + Supabase + AutoX.js
-          </p>
-        </footer>
       </div>
-    </main>
+
+      {/* Bento Grid Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {/* Operation Rate - Large Card */}
+        <div className="col-span-2 rounded-md border border-zinc-800 bg-black dark:bg-zinc-950 p-6 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-green-500/10 to-transparent" />
+          <div className="flex items-center justify-between mb-4">
+            <span className="font-mono text-[10px] text-zinc-500 uppercase">가동률</span>
+            <TrendingUp className="h-4 w-4 text-green-500" />
+          </div>
+          <div className="flex items-end gap-2">
+            <span className="font-mono text-5xl font-bold text-white">{stats.operationRate}</span>
+            <span className="font-mono text-2xl text-zinc-500 mb-1">%</span>
+          </div>
+          <div className="mt-4 h-2 bg-zinc-800 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-green-500 to-green-400 transition-all duration-500"
+              style={{ width: `${stats.operationRate}%` }}
+            />
+          </div>
+          <p className="font-mono text-xs text-zinc-500 mt-2">
+            {stats.online} / {stats.total} 기기 온라인
+          </p>
+        </div>
+
+        {/* Total Devices */}
+        <div className="rounded-md border border-zinc-800 bg-black dark:bg-zinc-950 p-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="font-mono text-[10px] text-zinc-500 uppercase">총 기기</span>
+            <Monitor className="h-3.5 w-3.5 text-zinc-600" />
+          </div>
+          <span className="font-mono text-3xl font-bold text-white">{stats.total}</span>
+          <p className="font-mono text-[10px] text-zinc-600 mt-1">
+            {stats.pcCount}개 PC 연결됨
+          </p>
+        </div>
+
+        {/* Online Devices */}
+        <div className="rounded-md border border-zinc-800 bg-black dark:bg-zinc-950 p-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="font-mono text-[10px] text-zinc-500 uppercase">작동중</span>
+            <div className="h-2 w-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]" />
+          </div>
+          <span className="font-mono text-3xl font-bold text-green-400">{stats.online}</span>
+          <p className="font-mono text-[10px] text-zinc-600 mt-1">
+            {stats.activePCs}개 PC 활성
+          </p>
+        </div>
+
+        {/* Running Tasks */}
+        <div className="rounded-md border border-zinc-800 bg-black dark:bg-zinc-950 p-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="font-mono text-[10px] text-zinc-500 uppercase">작업중</span>
+            <div className="h-2 w-2 rounded-full bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.5)]" />
+          </div>
+          <span className="font-mono text-3xl font-bold text-yellow-400">{stats.busy}</span>
+          <p className="font-mono text-[10px] text-zinc-600 mt-1">
+            작업 실행중
+          </p>
+        </div>
+
+        {/* Offline Devices */}
+        <div className="rounded-md border border-zinc-800 bg-black dark:bg-zinc-950 p-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="font-mono text-[10px] text-zinc-500 uppercase">오프라인</span>
+            <WifiOff className="h-3.5 w-3.5 text-zinc-600" />
+          </div>
+          <span className="font-mono text-3xl font-bold text-zinc-500">{stats.offline}</span>
+          <p className="font-mono text-[10px] text-zinc-600 mt-1">
+            연결 끊김
+          </p>
+        </div>
+
+        {/* Connection Status - Wide Card */}
+        <div className="col-span-2 rounded-md border border-zinc-800 bg-black dark:bg-zinc-950 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <span className="font-mono text-[10px] text-zinc-500 uppercase">시스템 상태</span>
+            <Activity className="h-4 w-4 text-zinc-500" />
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <div className={cn(
+                'h-3 w-3 rounded-full',
+                isConnected ? 'bg-green-500' : 'bg-red-500'
+              )} />
+              <span className="font-mono text-sm text-zinc-300">
+                Socket.io: {isConnected ? '연결됨' : '연결 끊김'}
+              </span>
+            </div>
+            <div className="h-4 w-px bg-zinc-800" />
+            <div className="flex items-center gap-2">
+              <div className={cn(
+                'h-3 w-3 rounded-full',
+                stats.online > 0 ? 'bg-green-500' : 'bg-yellow-500'
+              )} />
+              <span className="font-mono text-sm text-zinc-300">
+                워커: {stats.online > 0 ? '활성' : '대기중'}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Quick Links */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <Link href="/dashboard/nodes" className="group">
+          <div className="rounded-md border border-zinc-800 bg-black dark:bg-zinc-950 p-4 hover:border-zinc-700 hover:bg-zinc-900 transition-all">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Smartphone className="h-5 w-5 text-blue-500" />
+                <div>
+                  <h3 className="font-mono text-sm font-bold text-white">기기관리</h3>
+                  <p className="font-mono text-[10px] text-zinc-500">기기 제어 및 브로드캐스트</p>
+                </div>
+              </div>
+              <ArrowRight className="h-4 w-4 text-zinc-600 group-hover:text-zinc-400 transition-colors" />
+            </div>
+          </div>
+        </Link>
+
+        <Link href="/dashboard/jobs" className="group">
+          <div className="rounded-md border border-zinc-800 bg-black dark:bg-zinc-950 p-4 hover:border-zinc-700 hover:bg-zinc-900 transition-all">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <PlayCircle className="h-5 w-5 text-green-500" />
+                <div>
+                  <h3 className="font-mono text-sm font-bold text-white">작업관리</h3>
+                  <p className="font-mono text-[10px] text-zinc-500">작업 생성 및 관리</p>
+                </div>
+              </div>
+              <ArrowRight className="h-4 w-4 text-zinc-600 group-hover:text-zinc-400 transition-colors" />
+            </div>
+          </div>
+        </Link>
+
+        <Link href="/dashboard/register" className="group">
+          <div className="rounded-md border border-zinc-800 bg-black dark:bg-zinc-950 p-4 hover:border-zinc-700 hover:bg-zinc-900 transition-all">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Wifi className="h-5 w-5 text-purple-500" />
+                <div>
+                  <h3 className="font-mono text-sm font-bold text-white">작업등록</h3>
+                  <p className="font-mono text-[10px] text-zinc-500">채널/영상 등록</p>
+                </div>
+              </div>
+              <ArrowRight className="h-4 w-4 text-zinc-600 group-hover:text-zinc-400 transition-colors" />
+            </div>
+          </div>
+        </Link>
+      </div>
+
+      {/* Active Jobs Section */}
+      <div className="rounded-md border border-zinc-800 bg-black dark:bg-zinc-950 overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 bg-zinc-900/50">
+          <div className="flex items-center gap-3">
+            <Activity className="h-4 w-4 text-zinc-500" />
+            <span className="font-mono text-sm font-bold text-white">진행중인 작업</span>
+          </div>
+          <span className="font-mono text-xs text-zinc-500">{activeJobs.length}개 실행중</span>
+        </div>
+        <div className="p-4">
+          {!isConnected ? (
+            <div className="flex flex-col items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-primary mb-3" />
+              <span className="font-mono text-xs text-zinc-500">연결중...</span>
+            </div>
+          ) : activeJobs.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8">
+              <PlayCircle className="h-8 w-8 text-zinc-600 mb-3" />
+              <span className="font-mono text-sm text-zinc-500">진행중인 작업 없음</span>
+              <span className="font-mono text-xs text-zinc-600 mt-1">
+                작업을 등록하여 실행을 시작하세요
+              </span>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {activeJobs.slice(0, 10).map((device, index) => (
+                <div
+                  key={device.id || index}
+                  className="flex items-center justify-between px-3 py-2 rounded bg-zinc-900/50"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="h-2 w-2 rounded-full bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.5)]" />
+                    <span className="font-mono text-sm text-white">
+                      {device.pc_id || device.serial_number?.slice(-6)}
+                    </span>
+                  </div>
+                  <span className="font-mono text-xs text-zinc-500">실행중</span>
+                </div>
+              ))}
+              {activeJobs.length > 10 && (
+                <p className="font-mono text-xs text-zinc-600 text-center pt-2">
+                  + {activeJobs.length - 10}개 기기 더보기
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }

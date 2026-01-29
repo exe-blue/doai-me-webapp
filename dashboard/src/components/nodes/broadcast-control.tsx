@@ -107,7 +107,7 @@ export function BroadcastControl({
           <div className="flex flex-wrap gap-1.5">
             {onlineDevices.map((device, index) => (
               <button
-                key={device.serial_number || device.id || index}
+                key={`master-${device.id || device.serial_number || index}`}
                 onClick={() => onMasterChange(masterDeviceId === device.id ? null : device.id)}
                 className={cn(
                   'px-2 py-1 rounded text-xs font-mono transition-all',
@@ -156,7 +156,7 @@ export function BroadcastControl({
               .filter(d => d.id !== masterDeviceId)
               .map((device, index) => (
                 <label
-                  key={device.serial_number || device.id || index}
+                  key={`slave-${device.id || device.serial_number || index}`}
                   className="flex items-center gap-2 cursor-pointer group"
                 >
                   <Checkbox

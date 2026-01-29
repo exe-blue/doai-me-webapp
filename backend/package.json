@@ -8,7 +8,9 @@
     "start": "node dist/socket_service.js",
     "dev": "ts-node socket_service.ts",
     "test:latency": "ts-node latency_test.ts",
-    "test": "npm run test:latency"
+    "test": "npm run test:latency",
+    "socketio": "node socketio-server.js",
+    "socketio:dev": "nodemon socketio-server.js"
   },
   "keywords": [
     "websocket",
@@ -19,11 +21,14 @@
   "license": "ISC",
   "dependencies": {
     "@supabase/supabase-js": "^2.93.2",
+    "dotenv": "^16.3.1",
+    "socket.io": "^4.8.3",
     "ws": "^8.18.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "@types/ws": "^8.5.10",
+    "nodemon": "^3.0.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.5.0"
   }

@@ -49,31 +49,100 @@ CREATE TABLE IF NOT EXISTS scrcpy_commands (
 -- 2.2 RLS 활성화
 ALTER TABLE scrcpy_commands ENABLE ROW LEVEL SECURITY;
 
--- 2.3 RLS 정책
--- ⚠️ 프로덕션 환경에서는 SERVICE_ROLE 키를 사용하여 백엔드에서만 접근
--- 아래 정책은 인증된 사용자만 접근 가능하도록 제한
+-- 2.3 RLS 정책 (역할 기반 접근 제어)
+-- =============================================
+-- 역할 정의:
+--   - dashboard: 대시보드 사용자 (명령 생성)
+--   - pc_worker: PC Worker (명령 수신 및 실행)
+--   - admin: 관리자 (전체 권한)
+--   - service_role: 백엔드 서비스 (전체 권한)
+-- =============================================
+
+-- 기존 정책 모두 삭제
 DROP POLICY IF EXISTS "Allow all for scrcpy_commands" ON scrcpy_commands;
+DROP POLICY IF EXISTS "Allow authenticated read for scrcpy_commands" ON scrcpy_commands;
+DROP POLICY IF EXISTS "Allow authenticated insert for scrcpy_commands" ON scrcpy_commands;
+DROP POLICY IF EXISTS "Allow service role update for scrcpy_commands" ON scrcpy_commands;
+DROP POLICY IF EXISTS "Allow service role delete for scrcpy_commands" ON scrcpy_commands;
 
--- 읽기: 인증된 사용자만 조회 가능
-CREATE POLICY "Allow authenticated read for scrcpy_commands" ON scrcpy_commands
-  FOR SELECT
-  USING (auth.role() = 'authenticated' OR auth.role() = 'service_role');
-
--- 삽입: 인증된 사용자만 생성 가능
-CREATE POLICY "Allow authenticated insert for scrcpy_commands" ON scrcpy_commands
+-- 2.3.1 Dashboard INSERT 정책
+-- Dashboard 사용자는 자신의 요청으로 명령을 생성할 수 있음
+-- 참고: created_by 컬럼이 있으면 NEW.created_by = auth.uid() 검증 추가 권장
+CREATE POLICY "Dashboard insert commands" ON scrcpy_commands
   FOR INSERT
-  WITH CHECK (auth.role() = 'authenticated' OR auth.role() = 'service_role');
+  WITH CHECK (
+    (auth.jwt() ->> 'role') = 'dashboard'
+    OR (auth.jwt() ->> 'role') = 'admin'
+    OR auth.role() = 'service_role'
+  );
 
--- 업데이트: service_role만 가능 (PC Worker용)
-CREATE POLICY "Allow service role update for scrcpy_commands" ON scrcpy_commands
+-- 2.3.2 PC Worker SELECT 정책
+-- PC Worker는 자신에게 할당된 pending/received 상태의 명령만 조회 가능
+CREATE POLICY "PC worker read pending assigned" ON scrcpy_commands
+  FOR SELECT
+  USING (
+    (
+      (auth.jwt() ->> 'role') = 'pc_worker'
+      AND pc_id = (auth.jwt() ->> 'pc_id')  -- 자신의 PC에 할당된 명령만
+      AND status IN ('pending', 'received', 'executing')  -- 처리 가능한 상태만
+    )
+    OR (auth.jwt() ->> 'role') = 'dashboard'  -- Dashboard는 모든 명령 조회 가능
+    OR (auth.jwt() ->> 'role') = 'admin'
+    OR auth.role() = 'service_role'
+  );
+
+-- 2.3.3 PC Worker UPDATE 정책  
+-- PC Worker는 자신에게 할당된 pending/received/executing 상태의 명령만 업데이트 가능
+CREATE POLICY "PC worker update assigned" ON scrcpy_commands
   FOR UPDATE
-  USING (auth.role() = 'service_role')
-  WITH CHECK (auth.role() = 'service_role');
+  USING (
+    (
+      (auth.jwt() ->> 'role') = 'pc_worker'
+      AND pc_id = (auth.jwt() ->> 'pc_id')  -- 자신의 PC에 할당된 명령만
+      AND status IN ('pending', 'received', 'executing')  -- 처리 중인 상태만
+    )
+    OR (auth.jwt() ->> 'role') = 'admin'
+    OR auth.role() = 'service_role'
+  )
+  WITH CHECK (
+    (
+      (auth.jwt() ->> 'role') = 'pc_worker'
+      AND pc_id = (auth.jwt() ->> 'pc_id')
+      -- 허용된 상태 전이만 가능
+      AND status IN ('received', 'executing', 'completed', 'failed', 'timeout')
+    )
+    OR (auth.jwt() ->> 'role') = 'admin'
+    OR auth.role() = 'service_role'
+  );
 
--- 삭제: service_role만 가능
-CREATE POLICY "Allow service role delete for scrcpy_commands" ON scrcpy_commands
+-- 2.3.4 Admin 전체 접근 정책
+-- 관리자는 모든 작업 가능 (SELECT, INSERT, UPDATE, DELETE)
+CREATE POLICY "Admin full access" ON scrcpy_commands
+  FOR ALL
+  USING (
+    (auth.jwt() ->> 'role') = 'admin'
+    OR auth.role() = 'service_role'
+  )
+  WITH CHECK (
+    (auth.jwt() ->> 'role') = 'admin'
+    OR auth.role() = 'service_role'
+  );
+
+-- 2.3.5 Dashboard SELECT 정책 (명령 상태 모니터링용)
+CREATE POLICY "Dashboard read all commands" ON scrcpy_commands
+  FOR SELECT
+  USING (
+    (auth.jwt() ->> 'role') = 'dashboard'
+  );
+
+-- 2.3.6 Dashboard DELETE 정책 (취소된 명령 정리용)
+-- Dashboard는 pending 상태의 명령만 삭제 가능
+CREATE POLICY "Dashboard delete pending commands" ON scrcpy_commands
   FOR DELETE
-  USING (auth.role() = 'service_role');
+  USING (
+    (auth.jwt() ->> 'role') = 'dashboard'
+    AND status = 'pending'
+  );
 
 -- =============================================
 -- PART 3: Realtime + 인덱스 설정 (DB-03)

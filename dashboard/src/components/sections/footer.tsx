@@ -1,74 +1,46 @@
-import Link from "next/link";
-import { Section } from "./section";
-import { cn } from "@/lib/utils";
+import { Logo } from "@/components/icons";
+import { BorderText } from "@/components/ui/border-number";
+import { siteConfig } from "@/lib/config";
 
-interface FooterLink {
-  label: string;
-  href: string;
-}
-
-interface FooterSection {
-  title: string;
-  links: FooterLink[];
-}
-
-interface FooterProps {
-  logo?: React.ReactNode;
-  description?: string;
-  sections?: FooterSection[];
-  copyright?: string;
-  className?: string;
-}
-
-// 푸터 섹션 컴포넌트
-export function Footer({
-  logo,
-  description,
-  sections = [],
-  copyright = `© ${new Date().getFullYear()} DOAI.me. All rights reserved.`,
-  className,
-}: FooterProps) {
+export function Footer() {
   return (
-    <footer className={cn("border-t bg-muted/30", className)}>
-      <Section className="py-12">
-        <div className="grid gap-8 lg:grid-cols-4">
-          {/* 로고 및 설명 */}
-          <div className="lg:col-span-1">
-            {logo && <div className="mb-4">{logo}</div>}
-            {description && (
-              <p className="text-sm text-muted-foreground">{description}</p>
-            )}
-          </div>
+    <footer className="flex flex-col gap-y-5 rounded-lg p-5 container max-w-[var(--container-max-width)] mx-auto">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-x-2">
+          <Logo className="h-5 w-auto text-primary" />
+        </div>
 
-          {/* 링크 섹션들 */}
-          {sections.map((section) => (
-            <div key={section.title}>
-              <h3 className="text-sm font-semibold text-foreground">
-                {section.title}
-              </h3>
-              <ul className="mt-4 space-y-2">
-                {section.links.map((link) => (
-                  <li key={link.href}>
-                    <Link
-                      href={link.href}
-                      className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                      {link.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
+        <div className="flex gap-x-2">
+          {siteConfig.footer.socialLinks.map((link, index) => (
+            <a
+              key={index}
+              href={link.url}
+              className="flex h-5 w-5 items-center justify-center text-muted-foreground transition-all duration-100 ease-linear hover:text-foreground hover:underline hover:underline-offset-4"
+            >
+              {link.icon}
+            </a>
           ))}
         </div>
-
-        {/* 저작권 */}
-        <div className="mt-12 border-t pt-8">
-          <p className="text-center text-sm text-muted-foreground">
-            {copyright}
-          </p>
+      </div>
+      <div className="flex flex-col justify-between gap-y-5 md:flex-row md:items-center">
+        <ul className="flex flex-col gap-x-5 gap-y-2 text-muted-foreground md:flex-row md:items-center">
+          {siteConfig.footer.links.map((link, index) => (
+            <li
+              key={index}
+              className="text-[15px]/normal font-medium text-muted-foreground transition-all duration-100 ease-linear hover:text-foreground hover:underline hover:underline-offset-4"
+            >
+              <a href={link.url}>{link.text}</a>
+            </li>
+          ))}
+        </ul>
+        <div className="flex items-center justify-between text-sm font-medium tracking-tight text-muted-foreground">
+          <p>{siteConfig.footer.bottomText}</p>
         </div>
-      </Section>
+      </div>
+      <BorderText
+        text={siteConfig.footer.brandText}
+        className="text-[clamp(3rem,15vw,10rem)] overflow-hidden font-mono tracking-tighter font-medium"
+      />
     </footer>
   );
 }
