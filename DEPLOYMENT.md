@@ -11,6 +11,30 @@
 
 ---
 
+## ⚡ Quick Start (5분 배포)
+
+서버에 Docker가 설치되어 있다면, 이 명령어로 바로 시작:
+
+```bash
+# 1. 코드 클론
+git clone https://github.com/exe-blue/doai-me-webapp.git
+cd doai-me-webapp
+
+# 2. 환경 변수 설정 (YOUR_SERVER_IP와 API 키 수정)
+cp .env.example .env
+nano .env
+
+# 3. HTTP 모드로 즉시 실행 (SSL 없이)
+docker compose -f docker-compose.http.yml up -d --build
+
+# 4. 접속 확인
+curl http://YOUR_SERVER_IP/health
+```
+
+> 💡 도메인/SSL이 필요하면 아래 상세 가이드의 **옵션 B**를 참고하세요.
+
+---
+
 ## 1️⃣ Vultr 서버 준비
 
 ### 1.1 인스턴스 생성
@@ -100,7 +124,42 @@ CORS_ORIGIN=https://doai.me
 EOF
 ```
 
-### 3.3 SSL 인증서 발급 (Let's Encrypt)
+### 3.3 배포 옵션 선택
+
+#### 옵션 A: HTTP Only (IP 접속, 테스트용) 🚀 빠른 시작
+
+도메인/SSL 없이 **IP 주소로 바로 접속**하려면 이 옵션을 사용하세요.
+
+```bash
+# .env 파일에서 IP 주소 설정
+cat > .env << 'EOF'
+# Supabase
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_KEY=your-service-role-key
+SUPABASE_ANON_KEY=your-anon-key
+
+# OpenAI
+OPENAI_API_KEY=sk-your-openai-key
+
+# URLs (IP 주소로 변경)
+NEXT_PUBLIC_API_URL=http://YOUR_SERVER_IP/api
+NEXT_PUBLIC_SOCKET_URL=http://YOUR_SERVER_IP
+CORS_ORIGIN=*
+EOF
+
+# HTTP-only 버전으로 실행
+docker compose -f docker-compose.http.yml up -d --build
+```
+
+접속: `http://YOUR_SERVER_IP`
+
+---
+
+#### 옵션 B: HTTPS (도메인 + SSL, 프로덕션용) 🔒
+
+도메인이 있고 SSL 인증서를 사용하려면 이 옵션을 사용하세요.
+
+**Step 1. SSL 인증서 발급 (Let's Encrypt)**
 
 ```bash
 # Certbot 설치
@@ -115,17 +174,49 @@ cp /etc/letsencrypt/live/doai.me/fullchain.pem nginx/ssl/
 cp /etc/letsencrypt/live/doai.me/privkey.pem nginx/ssl/
 ```
 
-### 3.4 Docker 빌드 및 실행
+**Step 2. 환경 변수 설정**
 
 ```bash
-# 빌드 및 실행
-docker compose up -d --build
+cat > .env << 'EOF'
+# Supabase
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_KEY=your-service-role-key
+SUPABASE_ANON_KEY=your-anon-key
 
+# OpenAI
+OPENAI_API_KEY=sk-your-openai-key
+
+# URLs (도메인으로 설정)
+NEXT_PUBLIC_API_URL=https://doai.me/api
+NEXT_PUBLIC_SOCKET_URL=https://doai.me
+CORS_ORIGIN=https://doai.me
+EOF
+```
+
+**Step 3. Docker 빌드 및 실행**
+
+```bash
+# HTTPS 버전으로 실행
+docker compose up -d --build
+```
+
+접속: `https://doai.me`
+
+---
+
+### 3.4 실행 확인
+
+```bash
 # 로그 확인
 docker compose logs -f
 
 # 상태 확인
 docker compose ps
+
+# 개별 서비스 로그
+docker compose logs -f backend
+docker compose logs -f frontend
+docker compose logs -f nginx
 ```
 
 ---

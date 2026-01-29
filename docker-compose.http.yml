@@ -1,0 +1,79 @@
+# ===========================================
+# DoAi.Me Docker Compose (HTTP Only)
+# SSL 없이 IP 주소로 접속할 때 사용
+# 사용법: docker compose -f docker-compose.http.yml up -d --build
+# ===========================================
+
+version: '3.8'
+
+services:
+  # ===========================================
+  # Frontend (Next.js Dashboard)
+  # ===========================================
+  frontend:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://YOUR_SERVER_IP/api}
+        - NEXT_PUBLIC_SOCKET_URL=${NEXT_PUBLIC_SOCKET_URL:-http://YOUR_SERVER_IP}
+        - NEXT_PUBLIC_SUPABASE_URL=${SUPABASE_URL}
+        - NEXT_PUBLIC_SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+    container_name: doai-frontend
+    environment:
+      - NODE_ENV=production
+    restart: always
+    networks:
+      - doai-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ===========================================
+  # Backend (Node.js Socket.io Server)
+  # ===========================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: doai-backend
+    environment:
+      - NODE_ENV=production
+      - PORT=4000
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - CORS_ORIGIN=${CORS_ORIGIN:-*}
+    restart: always
+    networks:
+      - doai-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ===========================================
+  # Nginx (Reverse Proxy - HTTP Only)
+  # ===========================================
+  nginx:
+    image: nginx:alpine
+    container_name: doai-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx-http-only.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/logs:/var/log/nginx
+    depends_on:
+      - frontend
+      - backend
+    restart: always
+    networks:
+      - doai-network
+
+networks:
+  doai-network:
+    driver: bridge
