@@ -1,23 +1,36 @@
-"use client";
+'use client';
 
-import { Button } from "@/components/ui/button";
-import { Moon, Sun } from "lucide-react";
-import { useTheme } from "next-themes";
+import * as React from 'react';
+import { Moon, Sun } from 'lucide-react';
+import { useTheme } from 'next-themes';
+import { Button } from '@/components/ui/button';
 
-// 다크모드/라이트모드 전환 토글 버튼
 export function ThemeToggle() {
-  const { setTheme, theme } = useTheme();
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = React.useState(false);
+
+  // Avoid hydration mismatch
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return null;
+  }
 
   return (
     <Button
-      variant="ghost"
+      variant="outline"
       size="icon"
-      className="fixed bottom-4 right-4 z-50"
-      onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+      className="fixed bottom-4 right-4 rounded-full shadow-lg z-50"
+      onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+      aria-label="테마 변경"
     >
-      <Sun className="h-[1.5rem] w-[1.3rem] dark:hidden" />
-      <Moon className="hidden h-5 w-5 dark:block" />
-      <span className="sr-only">테마 전환</span>
+      {theme === 'dark' ? (
+        <Sun className="h-5 w-5" />
+      ) : (
+        <Moon className="h-5 w-5" />
+      )}
     </Button>
   );
 }

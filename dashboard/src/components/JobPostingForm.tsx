@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -81,7 +82,7 @@ export function JobPostingForm({ onJobCreated }: JobPostingFormProps) {
     e.preventDefault();
     
     if (!videoUrl.trim()) {
-      alert('동영상 URL을 입력하세요.');
+      toast.warning('동영상 URL을 입력하세요.');
       return;
     }
 
@@ -142,12 +143,12 @@ export function JobPostingForm({ onJobCreated }: JobPostingFormProps) {
       setProbComment([30]);
       setProbPlaylist([10]);
       
-      alert(`작업이 생성되었습니다! (${deviceCount}대 기기에 할당)`);
+      toast.success(`작업이 생성되었습니다! (${deviceCount}대 기기에 할당)`);
       onJobCreated?.();
 
     } catch (error) {
       console.error('작업 생성 실패:', error);
-      alert('작업 생성에 실패했습니다.');
+      toast.error('작업 생성에 실패했습니다.');
     } finally {
       setIsSubmitting(false);
     }
