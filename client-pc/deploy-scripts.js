@@ -79,13 +79,37 @@ async function getConnectedDevices() {
     return devices;
 }
 
-async function pushFile(serial, localPath, remotePath) {
+/**
+ * 원격 파일 존재 여부 확인
+ * @param {string} serial - 디바이스 시리얼
+ * @param {string} remotePath - 원격 파일 경로
+ * @returns {Promise<boolean>} 파일 존재 여부
+ */
+async function checkRemoteFileExists(serial, remotePath) {
+    try {
+        // ls 명령으로 파일 존재 확인 (존재하면 exit code 0)
+        await runAdb(['-s', serial, 'shell', `[ -f "${remotePath}" ] && echo "exists"`]);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+async function pushFile(serial, localPath, remotePath, force = false) {
     const fullLocal = path.join(LOCAL_SCRIPT_PATH, localPath);
     const fullRemote = `${DEVICE_SCRIPT_PATH}/${remotePath}`;
     
     // 로컬 파일 존재 확인
     if (!fs.existsSync(fullLocal)) {
         throw new Error(`Local file not found: ${fullLocal}`);
+    }
+    
+    // force가 false일 때 원격 파일 존재 확인
+    if (!force) {
+        const remoteExists = await checkRemoteFileExists(serial, fullRemote);
+        if (remoteExists) {
+            return { local: fullLocal, remote: fullRemote, skipped: true };
+        }
     }
     
     // 원격 디렉토리 생성
@@ -95,7 +119,7 @@ async function pushFile(serial, localPath, remotePath) {
     // 파일 푸시
     await runAdb(['-s', serial, 'push', fullLocal, fullRemote], 30000);
     
-    return { local: fullLocal, remote: fullRemote };
+    return { local: fullLocal, remote: fullRemote, skipped: false };
 }
 
 // =============================================
@@ -104,9 +128,11 @@ async function pushFile(serial, localPath, remotePath) {
 
 async function deployToDevice(serial, model, force = false) {
     console.log(`\n📱 배포 시작: ${serial} (${model})`);
+    console.log(`   모드: ${force ? '강제 덮어쓰기 (--force)' : '점진적 배포 (신규/변경 파일만)'}`);
     console.log('─'.repeat(50));
     
     let successCount = 0;
+    let skipCount = 0;
     let failCount = 0;
     
     for (const file of DEPLOY_FILES) {
@@ -119,9 +145,14 @@ async function deployToDevice(serial, model, force = false) {
         }
         
         try {
-            const result = await pushFile(serial, file.local, file.remote);
-            console.log(`   ✅ ${file.local}`);
-            successCount++;
+            const result = await pushFile(serial, file.local, file.remote, force);
+            if (result.skipped) {
+                console.log(`   ⏭️  ${file.local} - 이미 존재 (스킵, --force로 덮어쓰기)`);
+                skipCount++;
+            } else {
+                console.log(`   ✅ ${file.local}`);
+                successCount++;
+            }
         } catch (e) {
             console.log(`   ❌ ${file.local} - ${e.message}`);
             failCount++;
@@ -137,9 +168,9 @@ async function deployToDevice(serial, model, force = false) {
     }
     
     console.log('─'.repeat(50));
-    console.log(`   📊 결과: ${successCount} 성공, ${failCount} 실패`);
+    console.log(`   📊 결과: ${successCount} 배포, ${skipCount} 스킵, ${failCount} 실패`);
     
-    return { success: successCount, fail: failCount };
+    return { success: successCount, skip: skipCount, fail: failCount };
 }
 
 async function main() {
@@ -180,17 +211,23 @@ async function main() {
     
     // 배포 실행
     let totalSuccess = 0;
+    let totalSkip = 0;
     let totalFail = 0;
     
     for (const device of targets) {
         const result = await deployToDevice(device.serial, device.model, force);
         totalSuccess += result.success;
+        totalSkip += result.skip;
         totalFail += result.fail;
     }
     
     // 최종 결과
     console.log('\n╔════════════════════════════════════════════════════════╗');
-    console.log(`║  배포 완료: ${targets.length}개 디바이스, ${totalSuccess} 성공, ${totalFail} 실패`);
+    console.log(`║  배포 완료: ${targets.length}개 디바이스`);
+    console.log(`║  📊 ${totalSuccess} 배포, ${totalSkip} 스킵, ${totalFail} 실패`);
+    if (totalSkip > 0 && !force) {
+        console.log(`║  💡 모든 파일 덮어쓰려면 --force 옵션 사용`);
+    }
     console.log('╚════════════════════════════════════════════════════════╝');
 }
 

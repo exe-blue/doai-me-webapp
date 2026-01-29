@@ -301,8 +301,7 @@ if (params.enable_forward_action) {
 
 // 9. 메인 시청 루프 및 상호작용
 threads.start(function() {
-    var elapsed = 10 + (jobResult.forwardActions * 8); // 평균 대기시간 기준    var actionsPerformed = false;
-
+    var elapsed = 10 + (jobResult.forwardActions * 8); // 평균 대기시간 기준
     // 시청 루프
     while (elapsed < targetDurationSec) {
         // +3000ms 랜덤 범위로 노드별 다른 대기시간

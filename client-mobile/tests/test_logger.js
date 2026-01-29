@@ -40,8 +40,8 @@ if (typeof files === 'undefined') {
     
     global.java = {
         io: {
-            File: function(path) {
-                var localPath = path.replace('/sdcard/doai_logs', testLogDir);
+            File: function(filePath) {
+                var localPath = filePath.replace('/sdcard/doai_logs', testLogDir);
                 return {
                     length: function() {
                         try {
@@ -163,9 +163,9 @@ console.log('========================================');
 
 if (typeof require !== 'undefined' && typeof module !== 'undefined') {
     // Node.js: 로그 파일 내용 출력
-    var fs = require('fs');
-    var path = require('path');
-    var logFile = path.join(__dirname, 'test_logs', 'bot_log.txt');
+    const fs = require('fs');
+    const path = require('path');
+    const logFile = path.join(__dirname, 'test_logs', 'bot_log.txt');
     
     if (fs.existsSync(logFile)) {
         console.log('\n[로그 파일 내용]\n');

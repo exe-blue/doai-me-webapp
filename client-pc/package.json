@@ -1,13 +1,33 @@
 {
-  "name": "client-pc",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "name": "doai-worker",
+  "version": "5.1.0",
+  "description": "DoAi.Me PC Worker - Device Control & Job Execution",
+  "main": "worker.js",
+  "bin": "worker.js",
   "scripts": {
+    "start": "node worker.js",
+    "dev": "nodemon worker.js",
+    "build": "pkg . --targets node18-win-x64 --output doai-worker.exe",
+    "build:dist": "pkg . --targets node18-win-x64 --output dist/DoaiWorker.exe",
+    "build:all": "pkg . --targets node18-win-x64,node18-macos-x64,node18-linux-x64 --out-path dist/",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
-  "author": "",
+  "pkg": {
+    "assets": [
+      "node_modules/**/*"
+    ],
+    "targets": [
+      "node18-win-x64"
+    ],
+    "outputPath": "dist"
+  },
+  "keywords": [
+    "doai",
+    "worker",
+    "adb",
+    "automation"
+  ],
+  "author": "DoAi.Me",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
@@ -18,5 +38,9 @@
     "node-cron": "^4.2.1",
     "sharp": "^0.34.5",
     "socket.io-client": "^4.8.3"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1",
+    "pkg": "^5.8.1"
   }
 }

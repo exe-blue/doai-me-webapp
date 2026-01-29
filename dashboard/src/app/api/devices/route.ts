@@ -72,8 +72,33 @@ export async function GET(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const supabase = getSupabase();
+    
+    // 인증 확인: 현재 세션 검증
+    const { data: { session }, error: authError } = await supabase.auth.getSession();
+    
+    if (authError || !session) {
+      console.warn('[API] Unauthorized DELETE attempt - no valid session');
+      return NextResponse.json(
+        { error: 'Authentication required. Please log in.' },
+        { status: 401 }
+      );
+    }
+    
+    // 사용자 역할/권한 확인 (user_metadata에서 role 확인)
+    const userRole = session.user?.user_metadata?.role;
+    const isAdmin = userRole === 'admin' || session.user?.email?.endsWith('@doai.me');
+    
+    if (!isAdmin) {
+      console.warn(`[API] Unauthorized DELETE attempt by user: ${session.user?.id}`);
+      return NextResponse.json(
+        { error: 'Insufficient permissions. Admin access required.' },
+        { status: 403 }
+      );
+    }
+    
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
+    const confirm = searchParams.get('confirm');
 
     if (!status) {
       return NextResponse.json(
@@ -81,8 +106,16 @@ export async function DELETE(request: NextRequest) {
         { status: 400 }
       );
     }
+    
+    // 확인 플래그 체크 (실수로 인한 삭제 방지)
+    if (confirm !== 'true') {
+      return NextResponse.json(
+        { error: 'Confirmation required. Add ?confirm=true to proceed with deletion.' },
+        { status: 400 }
+      );
+    }
 
-    const { data, error, count } = await supabase
+    const { data, error } = await supabase
       .from('devices')
       .delete()
       .eq('status', status)
@@ -92,6 +125,9 @@ export async function DELETE(request: NextRequest) {
       console.error('[API] Device delete error:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
+
+    // 감사 로그 기록
+    console.log(`[API] Devices deleted by user ${session.user?.id}: ${data?.length || 0} devices with status '${status}'`);
 
     return NextResponse.json({
       deleted: data?.length || 0,

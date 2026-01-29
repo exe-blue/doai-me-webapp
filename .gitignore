@@ -22,3 +22,18 @@ test_job.json
 apk/
 .vercel
 .env*.local
+
+# Docker & Nginx
+nginx/ssl/*.pem
+nginx/logs/*.log
+
+# Client PC build output
+client-pc/dist/*.exe
+client-pc/dist/*-macos
+client-pc/dist/*-linux
+client-pc/doai-worker.exe
+client-pc/Output/*.exe
+
+# Platform tools (user must download)
+client-pc/platform-tools/*.exe
+client-pc/platform-tools/*.dll

@@ -1,0 +1,3 @@
+# SSL certificates go here
+# - fullchain.pem
+# - privkey.pem

@@ -1,0 +1,6 @@
+
+
+# Build artifacts
+platform-tools/
+*.exe
+!scripts/*.exe

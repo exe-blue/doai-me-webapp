@@ -2,7 +2,7 @@
 
 import FlickeringGrid from "@/components/ui/flickering-grid";
 import { cn } from "@/lib/utils";
-import React, { forwardRef, useRef } from "react";
+import React, { forwardRef, useRef, useCallback } from "react";
 
 interface SectionProps {
   id?: string;
@@ -20,7 +20,24 @@ const Section = forwardRef<HTMLElement, SectionProps>(
     forwardedRef
   ) => {
     const internalRef = useRef<HTMLElement>(null);
-    const ref = forwardedRef || internalRef;
+    
+    // ref 콜백을 사용하여 function ref와 object ref 모두 지원
+    const setRef = useCallback(
+      (node: HTMLElement | null) => {
+        // 내부 ref 설정
+        if (internalRef && 'current' in internalRef) {
+          internalRef.current = node;
+        }
+        
+        // 전달받은 ref 설정 (function ref 또는 object ref)
+        if (typeof forwardedRef === 'function') {
+          forwardedRef(node);
+        } else if (forwardedRef && 'current' in forwardedRef) {
+          forwardedRef.current = node;
+        }
+      },
+      [forwardedRef]
+    );
     const alignmentClass =
       align === "left"
         ? "text-left"
@@ -29,7 +46,7 @@ const Section = forwardRef<HTMLElement, SectionProps>(
         : "text-center";
 
     return (
-      <section id={id} ref={ref}>
+      <section id={id} ref={setRef}>
         <div
           className={cn(
             "relative mx-auto container max-w-[var(--container-max-width)]",

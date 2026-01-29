@@ -5,6 +5,7 @@ import { X, Pause, Play, Copy, Check, Terminal, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useSocketContext } from '@/contexts/socket-context';
+import { toast } from 'sonner';
 
 interface LogEntry {
   id: string;
@@ -42,17 +43,24 @@ export function LogDrawer({
   const [autoScroll, setAutoScroll] = useState(true);
   const [isPaused, setIsPaused] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [bufferedCount, setBufferedCount] = useState(0); // 버퍼된 로그 수 (리렌더링 트리거용)
   const scrollRef = useRef<HTMLDivElement>(null);
   const pausedLogsRef = useRef<LogEntry[]>([]);
+  const isPausedRef = useRef(false); // 소켓 핸들러에서 사용할 ref (의존성 배열 제거용)
 
-  // Join/Leave log room
+  // isPausedRef를 isPaused 상태와 동기화
+  useEffect(() => {
+    isPausedRef.current = isPaused;
+  }, [isPaused]);
+
+  // Join/Leave log room (isPaused 제거하여 소켓 재연결 방지)
   useEffect(() => {
     if (!open || !socket || !isConnected) return;
 
     // 로그 룸 참가
     socket.emit('join:log_room', { deviceId, jobId });
 
-    // 로그 수신 핸들러
+    // 로그 수신 핸들러 (isPausedRef 사용으로 의존성 제거)
     const handleLog = (data: {
       deviceId: string;
       level: string;
@@ -66,11 +74,13 @@ export function LogDrawer({
         timestamp: data.timestamp,
       };
 
-      if (isPaused) {
+      if (isPausedRef.current) {
         // 일시정지 상태면 버퍼에 저장
         pausedLogsRef.current.push(entry);
+        setBufferedCount(pausedLogsRef.current.length);
       } else {
-        setLogs(prev => [...prev.slice(-500), entry]); // 최대 500개 유지
+        // 최대 500개 유지
+        setLogs(prev => [...prev, entry].slice(-500));
       }
     };
 
@@ -81,7 +91,7 @@ export function LogDrawer({
       socket.off('device:log', handleLog);
       socket.emit('leave:log_room', { deviceId, jobId });
     };
-  }, [open, socket, isConnected, deviceId, jobId, isPaused]);
+  }, [open, socket, isConnected, deviceId, jobId]);
 
   // Auto-scroll effect
   useEffect(() => {
@@ -95,24 +105,33 @@ export function LogDrawer({
     if (pausedLogsRef.current.length > 0) {
       setLogs(prev => [...prev, ...pausedLogsRef.current].slice(-500));
       pausedLogsRef.current = [];
+      setBufferedCount(0);
     }
     setIsPaused(false);
   }, []);
 
-  // Copy logs to clipboard
-  const handleCopy = useCallback(() => {
+  // Copy logs to clipboard (에러 핸들링 포함)
+  const handleCopy = useCallback(async () => {
     const text = logs
       .map(log => `[${new Date(log.timestamp).toLocaleTimeString()}] [${log.level.toUpperCase()}] ${log.message}`)
       .join('\n');
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (error) {
+      // 클립보드 API 미지원 또는 권한 거부
+      console.error('[LogDrawer] Clipboard write failed:', error);
+      toast.error('클립보드 복사 실패: 브라우저가 클립보드 접근을 허용하지 않습니다.');
+    }
   }, [logs]);
 
   // Clear logs
   const handleClear = useCallback(() => {
     setLogs([]);
     pausedLogsRef.current = [];
+    setBufferedCount(0);
   }, []);
 
   // Log level color for label
@@ -247,7 +266,7 @@ export function LogDrawer({
           <div className="flex items-center gap-3">
             {isPaused && (
               <span className="font-mono text-[10px] text-yellow-400 animate-pulse">
-                ⏸ PAUSED ({pausedLogsRef.current.length} buffered)
+                ⏸ PAUSED ({bufferedCount} buffered)
               </span>
             )}
             <span className="font-mono text-[10px] text-zinc-500">

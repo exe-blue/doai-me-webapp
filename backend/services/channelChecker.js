@@ -244,21 +244,57 @@ async function checkAllChannels() {
   return results;
 }
 
+// 타이머 ID 저장 (graceful shutdown용)
+let channelCheckerIntervalId = null;
+let channelCheckerStartupTimeoutId = null;
+
 /**
  * 채널 체커 시작 (주기적 실행)
  * @param {number} intervalMs - Check interval in ms (default: 30 minutes)
  */
 function startChannelChecker(intervalMs = CHECK_INTERVAL_MS) {
+  // 기존 타이머 정리
+  stopChannelChecker();
+
   console.log(`[ChannelChecker] Started (interval: ${intervalMs / 1000}s)`);
 
   // 시작 후 10초 뒤에 첫 번째 체크 (서버 부팅 대기)
-  setTimeout(() => {
+  channelCheckerStartupTimeoutId = setTimeout(() => {
     checkAllChannels();
+    channelCheckerStartupTimeoutId = null;
   }, 10000);
 
   // 이후 주기적 실행
-  setInterval(checkAllChannels, intervalMs);
+  channelCheckerIntervalId = setInterval(checkAllChannels, intervalMs);
 }
+
+/**
+ * 채널 체커 중지 (graceful shutdown)
+ */
+function stopChannelChecker() {
+  if (channelCheckerIntervalId !== null) {
+    clearInterval(channelCheckerIntervalId);
+    channelCheckerIntervalId = null;
+    console.log('[ChannelChecker] Interval stopped');
+  }
+  
+  if (channelCheckerStartupTimeoutId !== null) {
+    clearTimeout(channelCheckerStartupTimeoutId);
+    channelCheckerStartupTimeoutId = null;
+    console.log('[ChannelChecker] Startup timeout cleared');
+  }
+}
+
+// Graceful shutdown 핸들러
+process.on('SIGINT', () => {
+  console.log('[ChannelChecker] Received SIGINT, stopping...');
+  stopChannelChecker();
+});
+
+process.on('SIGTERM', () => {
+  console.log('[ChannelChecker] Received SIGTERM, stopping...');
+  stopChannelChecker();
+});
 
 module.exports = {
   checkAllChannels,
@@ -266,4 +302,5 @@ module.exports = {
   getLatestVideo,
   resolveChannelId,
   startChannelChecker,
+  stopChannelChecker,
 };

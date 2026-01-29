@@ -303,6 +303,27 @@ export default function JobsPage() {
     }
   };
 
+  // 작업에 할당된 디바이스 ID 조회 (실시간 진행 정보 또는 디바이스 목록에서 조회)
+  const getDeviceIdForJob = useCallback((job: Job): string | undefined => {
+    // 1. 실시간 진행 정보에서 deviceSerial로 조회
+    const progress = jobProgressMap[job.id];
+    if (progress?.deviceSerial) {
+      // devices 목록에서 serial로 device id 찾기
+      const device = devices.find(d => d.serial_number === progress.deviceSerial);
+      if (device) return device.id;
+    }
+    
+    // 2. 실행 중인 작업의 경우, busy 상태인 디바이스 중 첫 번째 반환
+    // (다수 디바이스가 동시 실행 중인 경우 첫 번째만 표시 - 추후 개선 가능)
+    if (job.stats?.running && job.stats.running > 0) {
+      // 현재 busy 중인 디바이스 찾기 (busy = 작업 실행 중)
+      const busyDevice = devices.find(d => d.status === 'busy');
+      if (busyDevice) return busyDevice.id;
+    }
+    
+    return undefined;
+  }, [jobProgressMap, devices]);
+
   const handleOpenLogs = useCallback((job: Job) => {
     setSelectedJobForLogs(job);
     setLogDrawerOpen(true);
@@ -606,6 +627,7 @@ export default function JobsPage() {
         onClose={handleCloseLogs}
         jobId={selectedJobForLogs?.id}
         jobTitle={selectedJobForLogs?.display_name || selectedJobForLogs?.title}
+        deviceId={selectedJobForLogs ? getDeviceIdForJob(selectedJobForLogs) : undefined}
       />
     </div>
   );

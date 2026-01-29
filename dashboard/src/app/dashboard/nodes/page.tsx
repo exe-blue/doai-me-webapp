@@ -21,6 +21,16 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { useSocketContext } from '@/contexts/socket-context';
@@ -82,6 +92,9 @@ export default function NodesPage() {
 
   // Modal-level broadcast state
   const [modalBroadcastEnabled, setModalBroadcastEnabled] = useState(false);
+
+  // Clear Offline confirmation dialog state
+  const [showClearOfflineDialog, setShowClearOfflineDialog] = useState(false);
 
   // Loading state based on connection
   const isLoading = !isConnected;
@@ -372,10 +385,10 @@ export default function NodesPage() {
     toast.success(`${onlineDevices.length}대 기기 밝기 최소화 명령 전송됨`);
   }, [validDevices, isConnected, broadcastCommand, deviceSettings]);
 
-  // Clear offline devices from DB
+  // Clear offline devices from DB (실제 삭제 수행)
   const clearOfflineDevices = useCallback(async () => {
     try {
-      const response = await fetch('/api/devices?status=offline', { method: 'DELETE' });
+      const response = await fetch('/api/devices?status=offline&confirm=true', { method: 'DELETE' });
       const data = await response.json();
       if (response.ok) {
         toast.success(`오프라인 기기 ${data.deleted}개 삭제됨`);
@@ -387,6 +400,12 @@ export default function NodesPage() {
       toast.error('오프라인 기기 삭제 중 오류 발생');
     }
   }, []);
+
+  // Clear offline 확인 후 실행
+  const handleClearOfflineConfirm = useCallback(() => {
+    setShowClearOfflineDialog(false);
+    clearOfflineDevices();
+  }, [clearOfflineDevices]);
 
   // Set volume to 0 on all devices
   const setVolumeAll = useCallback(() => {
@@ -570,12 +589,41 @@ export default function NodesPage() {
                 전체 초기화
               </DropdownMenuItem>
               <DropdownMenuSeparator className="bg-zinc-700" />
-              <DropdownMenuItem onClick={clearOfflineDevices} className="cursor-pointer text-red-400">
+              <DropdownMenuItem 
+                onClick={() => setShowClearOfflineDialog(true)} 
+                className="cursor-pointer text-red-400"
+                disabled={stats.offline === 0}
+              >
                 <Trash2 className="h-3.5 w-3.5 mr-2 text-red-400" />
                 Clear Offline ({stats.offline})
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+
+          {/* Clear Offline Confirmation Dialog */}
+          <AlertDialog open={showClearOfflineDialog} onOpenChange={setShowClearOfflineDialog}>
+            <AlertDialogContent className="bg-zinc-900 border-zinc-700">
+              <AlertDialogHeader>
+                <AlertDialogTitle className="text-white">오프라인 기기 삭제</AlertDialogTitle>
+                <AlertDialogDescription className="text-zinc-400">
+                  정말로 <span className="text-red-400 font-bold">{stats.offline}개</span>의 오프라인 기기를 삭제하시겠습니까?
+                  <br /><br />
+                  이 작업은 되돌릴 수 없으며, 삭제된 기기는 다시 연결될 때 새로운 슬롯이 할당됩니다.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel className="bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700">
+                  취소
+                </AlertDialogCancel>
+                <AlertDialogAction 
+                  onClick={handleClearOfflineConfirm}
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                >
+                  삭제 ({stats.offline}개)
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
           <Button
             variant="outline"

@@ -150,6 +150,8 @@ var Logger = (function() {
 
     /**
      * 로그 파일 로테이션
+     * AutoX.js의 files.move()를 사용하여 파일 이동
+     * (files.rename()은 같은 디렉토리 내에서만 동작)
      */
     function _rotateLogFile() {
         try {
@@ -157,7 +159,7 @@ var Logger = (function() {
             var backupFile = CONFIG.LOG_DIR + '/bot_log_' + timestamp + '.txt';
             
             if (typeof files !== 'undefined' && files.exists(CONFIG.LOG_FILE)) {
-                files.rename(CONFIG.LOG_FILE, backupFile);
+                files.move(CONFIG.LOG_FILE, backupFile);
                 console.log('[Logger] 로그 파일 로테이션: ' + backupFile);
             }
         } catch (e) {

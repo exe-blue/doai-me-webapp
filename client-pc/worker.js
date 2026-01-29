@@ -1,9 +1,15 @@
 const fs = require('fs');
 const path = require('path');
 
+// =============================================
+// [PKG 호환] process.cwd()를 사용하여 외부 파일 경로 참조
+// .exe 파일이 있는 위치에서 .env, device-map.json 등을 읽음
+// =============================================
+const APP_ROOT = process.cwd();
+
 // Load .env.local first (for local testing), fallback to .env
-const localEnvPath = path.join(__dirname, '.env.local');
-const defaultEnvPath = path.join(__dirname, '.env');
+const localEnvPath = path.join(APP_ROOT, '.env.local');
+const defaultEnvPath = path.join(APP_ROOT, '.env');
 
 if (fs.existsSync(localEnvPath)) {
     require('dotenv').config({ path: localEnvPath });
@@ -16,6 +22,8 @@ if (fs.existsSync(localEnvPath)) {
     console.log('[Config] No local .env found, using defaults');
 }
 
+console.log(`[Config] APP_ROOT: ${APP_ROOT}`);
+
 const { io } = require("socket.io-client");
 const { exec, spawn, execFile } = require('child_process');
 
@@ -23,7 +31,7 @@ const { exec, spawn, execFile } = require('child_process');
 const PC_CODE = process.env.PC_CODE || 'P01'; // .env에 P01 필수
 const SERVER_URL = process.env.API_BASE_URL || 'https://doai.me';
 const ADB_PATH = process.env.ADB_PATH || 'adb';
-const MAP_FILE = path.join(__dirname, 'device-map.json');
+const MAP_FILE = path.join(APP_ROOT, 'device-map.json');
 const MAX_SLOTS = 20;
 
 console.log(`🛡️ Worker Started. Identity: [${PC_CODE}] Target: ${SERVER_URL}`);
@@ -615,7 +623,7 @@ async function startJobOnDevice(serial, assignmentId, job) {
  * job.json 파일을 디바이스에 저장
  */
 async function writeJobJsonToDevice(serial, jobPayload) {
-    const tempFile = path.join(__dirname, `temp_job_${Date.now()}.json`);
+    const tempFile = path.join(APP_ROOT, `temp_job_${Date.now()}.json`);
     
     try {
         // 로컬에 임시 파일 생성
@@ -664,19 +672,27 @@ async function runAutoXjsWithBroadcast(serial) {
 
 /**
  * ADB shell 명령 실행 (범용)
+ * execFile 사용으로 command injection 방지
  */
 function runAdbShell(serial, shellCmd) {
     return new Promise((resolve, reject) => {
-        exec(`${ADB_PATH} -s ${serial} shell "${shellCmd.replace(/"/g, '\\"')}"`, 
-            { timeout: 15000 },
-            (error, stdout, stderr) => {
-                if (error) {
-                    reject(new Error(`ADB shell error: ${error.message}`));
-                } else {
-                    resolve(stdout ? stdout.trim() : '');
-                }
+        try {
+            // 시리얼 검증 (command injection 방지)
+            validateSerial(serial);
+        } catch (err) {
+            return reject(err);
+        }
+
+        // execFile 사용: shell=false로 명령어 인젝션 방지
+        const args = ['-s', serial, 'shell', shellCmd];
+
+        execFile(ADB_PATH, args, { timeout: 15000 }, (error, stdout, stderr) => {
+            if (error) {
+                reject(new Error(`ADB shell error: ${error.message}`));
+            } else {
+                resolve(stdout ? stdout.trim() : '');
             }
-        );
+        });
     });
 }
 
