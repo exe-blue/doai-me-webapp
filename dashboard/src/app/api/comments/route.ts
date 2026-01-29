@@ -103,8 +103,9 @@ export async function GET(request: NextRequest) {
 }
 
 // Fallback: DB 함수가 없는 경우
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function fallbackGetComment(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   jobId: string,
   deviceId: string
 ) {
