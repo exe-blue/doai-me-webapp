@@ -46,6 +46,7 @@ interface RemoteViewModalProps {
   broadcastDeviceIds?: string[]; // All devices in broadcast group
   broadcastDevices?: BroadcastDevice[]; // Full device info for broadcast targets
   deviceResolution?: { width: number; height: number };
+  autoStream?: boolean; // Auto-start streaming when modal opens
 }
 
 // Default device resolution (can be unified via wm size command)
@@ -60,7 +61,8 @@ export function RemoteViewModal({
   onBroadcastToggle,
   broadcastDeviceIds = [],
   broadcastDevices = [],
-  deviceResolution = DEFAULT_RESOLUTION
+  deviceResolution = DEFAULT_RESOLUTION,
+  autoStream = true
 }: RemoteViewModalProps) {
   const [screenshot, setScreenshot] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -71,11 +73,26 @@ export function RemoteViewModal({
   // Socket.io integration
   const { isConnected, startStream, stopStream, sendCommand, broadcastCommand } = useSocketContext();
 
+  // Auto-start streaming when modal opens
+  useEffect(() => {
+    if (open && autoStream && device && isConnected && !isStreaming) {
+      // Small delay to ensure modal is fully rendered
+      const timer = setTimeout(() => {
+        startStream(device.id, (frameData) => {
+          setScreenshot(`data:image/jpeg;base64,${frameData.frame}`);
+        });
+        setIsStreaming(true);
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [open, autoStream, device, isConnected, isStreaming, startStream]);
+
   // Stop streaming when modal closes
   useEffect(() => {
     if (!open && isStreaming && device) {
       stopStream(device.id);
       setIsStreaming(false);
+      setScreenshot(null); // Clear screenshot on close
     }
   }, [open, isStreaming, device, stopStream]);
 

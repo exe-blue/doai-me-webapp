@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { RefreshCw, Monitor, WifiOff, Loader2, Zap, Sun, Volume2, Filter, AlertCircle, ChevronDown, Home, Youtube, Power } from 'lucide-react';
+import { RefreshCw, Monitor, WifiOff, Loader2, Zap, Sun, Volume2, Filter, AlertCircle, ChevronDown, Home, Youtube, Power, RotateCcw, AppWindow } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,6 +21,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { useSocketContext } from '@/contexts/socket-context';
 
@@ -61,7 +62,10 @@ export default function NodesPage() {
   // Filter state
   const [filterPC, setFilterPC] = useState<string>('all');
   const [filterBoard, setFilterBoard] = useState<string>('all');
-  const [filterStatus, setFilterStatus] = useState<string>('all');
+  // Status checkboxes: Normal (Sleep+Running), Error, Offline
+  const [showNormal, setShowNormal] = useState(true);
+  const [showError, setShowError] = useState(true);
+  const [showOffline, setShowOffline] = useState(true);
 
   // Load settings from localStorage on mount
   useEffect(() => {
@@ -100,6 +104,19 @@ export default function NodesPage() {
     return Array.from(boards).sort();
   }, [devices]);
 
+  // Helper function to determine device health status
+  const getDeviceHealthStatus = useCallback((device: Device) => {
+    if (device.status === 'offline') return 'offline';
+    if (device.status === 'busy') return 'running'; // Running (working)
+    // Check heartbeat freshness (1 minute threshold)
+    if (device.last_seen_at) {
+      const lastSeen = new Date(device.last_seen_at);
+      const diffMs = Date.now() - lastSeen.getTime();
+      if (diffMs > 60000) return 'error';
+    }
+    return 'sleep'; // Normal/Sleep state
+  }, []);
+
   // Filter devices
   const filteredDevices = useMemo(() => {
     return devices.filter(device => {
@@ -113,24 +130,17 @@ export default function NodesPage() {
         if (deviceBoard !== filterBoard) return false;
       }
 
-      // Status filter
-      if (filterStatus === 'idle' && device.status !== 'idle') return false;
-      if (filterStatus === 'running' && device.status !== 'busy') return false;
-      if (filterStatus === 'error') {
-        // Check if device is stale (no heartbeat for 1 minute)
-        if (device.last_seen_at) {
-          const lastSeen = new Date(device.last_seen_at);
-          const diffMs = Date.now() - lastSeen.getTime();
-          if (diffMs < 60000) return false; // Not stale
-        }
-        if (device.status === 'offline') return true;
-        return false;
-      }
-      if (filterStatus === 'offline' && device.status !== 'offline') return false;
+      // Status checkbox filter
+      const healthStatus = getDeviceHealthStatus(device);
+
+      // Normal = sleep (idle) + running (busy)
+      if (!showNormal && (healthStatus === 'sleep' || healthStatus === 'running')) return false;
+      if (!showError && healthStatus === 'error') return false;
+      if (!showOffline && healthStatus === 'offline') return false;
 
       return true;
     });
-  }, [devices, filterPC, filterBoard, filterStatus]);
+  }, [devices, filterPC, filterBoard, showNormal, showError, showOffline, getDeviceHealthStatus]);
 
   // Group devices by pc_id (filtered)
   const devicesByPc = useMemo(() => {
@@ -336,11 +346,16 @@ export default function NodesPage() {
     toast.success(`${onlineDevices.length}대 기기 볼륨 음소거 명령 전송됨`);
   }, [devices, isConnected, broadcastCommand, deviceSettings]);
 
-  // Batch Actions: Wake Up All
+  // Get target devices for batch actions (filtered devices that are not offline)
+  const getTargetDevices = useCallback(() => {
+    return filteredDevices.filter(d => d.status !== 'offline');
+  }, [filteredDevices]);
+
+  // Batch Actions: Wake Up All (filtered devices)
   const wakeUpAll = useCallback(() => {
-    const onlineDevices = devices.filter(d => d.status !== 'offline');
-    if (onlineDevices.length === 0) {
-      toast.error('온라인 기기가 없습니다');
+    const targetDevices = getTargetDevices();
+    if (targetDevices.length === 0) {
+      toast.error('대상 기기가 없습니다');
       return;
     }
 
@@ -349,16 +364,16 @@ export default function NodesPage() {
       return;
     }
 
-    const deviceIds = onlineDevices.map(d => d.id);
+    const deviceIds = targetDevices.map(d => d.id);
     broadcastCommand(deviceIds, 'keyevent', { keycode: 224 }); // KEYCODE_WAKEUP = 224
-    toast.success(`${onlineDevices.length}대 기기 화면 켜기 명령 전송됨`);
-  }, [devices, isConnected, broadcastCommand]);
+    toast.success(`${targetDevices.length}대 기기 화면 켜기 명령 전송됨`);
+  }, [getTargetDevices, isConnected, broadcastCommand]);
 
-  // Batch Actions: Home All
+  // Batch Actions: Home All (filtered devices)
   const homeAll = useCallback(() => {
-    const onlineDevices = devices.filter(d => d.status !== 'offline');
-    if (onlineDevices.length === 0) {
-      toast.error('온라인 기기가 없습니다');
+    const targetDevices = getTargetDevices();
+    if (targetDevices.length === 0) {
+      toast.error('대상 기기가 없습니다');
       return;
     }
 
@@ -367,16 +382,16 @@ export default function NodesPage() {
       return;
     }
 
-    const deviceIds = onlineDevices.map(d => d.id);
+    const deviceIds = targetDevices.map(d => d.id);
     broadcastCommand(deviceIds, 'keyevent', { keycode: 3 }); // KEYCODE_HOME = 3
-    toast.success(`${onlineDevices.length}대 기기 홈 화면 이동 명령 전송됨`);
-  }, [devices, isConnected, broadcastCommand]);
+    toast.success(`${targetDevices.length}대 기기 홈 화면 이동 명령 전송됨`);
+  }, [getTargetDevices, isConnected, broadcastCommand]);
 
-  // Batch Actions: YouTube All
-  const openYoutubeAll = useCallback(() => {
-    const onlineDevices = devices.filter(d => d.status !== 'offline');
-    if (onlineDevices.length === 0) {
-      toast.error('온라인 기기가 없습니다');
+  // Batch Actions: Reboot All (filtered devices)
+  const rebootAll = useCallback(() => {
+    const targetDevices = getTargetDevices();
+    if (targetDevices.length === 0) {
+      toast.error('대상 기기가 없습니다');
       return;
     }
 
@@ -385,12 +400,51 @@ export default function NodesPage() {
       return;
     }
 
-    const deviceIds = onlineDevices.map(d => d.id);
+    const deviceIds = targetDevices.map(d => d.id);
+    broadcastCommand(deviceIds, 'shell', { shellCommand: 'reboot' });
+    toast.success(`${targetDevices.length}대 기기 재부팅 명령 전송됨`);
+  }, [getTargetDevices, isConnected, broadcastCommand]);
+
+  // Batch Actions: Restart App (YouTube)
+  const restartAppAll = useCallback(() => {
+    const targetDevices = getTargetDevices();
+    if (targetDevices.length === 0) {
+      toast.error('대상 기기가 없습니다');
+      return;
+    }
+
+    if (!isConnected) {
+      toast.error('Socket.io 연결 필요');
+      return;
+    }
+
+    const deviceIds = targetDevices.map(d => d.id);
+    // Force stop and restart YouTube
+    broadcastCommand(deviceIds, 'shell', {
+      shellCommand: 'am force-stop com.google.android.youtube && am start -n com.google.android.youtube/.HomeActivity'
+    });
+    toast.success(`${targetDevices.length}대 기기 앱 재시작 명령 전송됨`);
+  }, [getTargetDevices, isConnected, broadcastCommand]);
+
+  // Batch Actions: YouTube All (filtered devices)
+  const openYoutubeAll = useCallback(() => {
+    const targetDevices = getTargetDevices();
+    if (targetDevices.length === 0) {
+      toast.error('대상 기기가 없습니다');
+      return;
+    }
+
+    if (!isConnected) {
+      toast.error('Socket.io 연결 필요');
+      return;
+    }
+
+    const deviceIds = targetDevices.map(d => d.id);
     broadcastCommand(deviceIds, 'shell', {
       shellCommand: 'am start -n com.google.android.youtube/.HomeActivity'
     });
-    toast.success(`${onlineDevices.length}대 기기 YouTube 앱 열기 명령 전송됨`);
-  }, [devices, isConnected, broadcastCommand]);
+    toast.success(`${targetDevices.length}대 기기 YouTube 앱 열기 명령 전송됨`);
+  }, [getTargetDevices, isConnected, broadcastCommand]);
 
   return (
     <div className="space-y-6">
@@ -419,24 +473,36 @@ export default function NodesPage() {
                 className="font-mono text-xs border-green-700 bg-green-500/10 text-green-400 hover:border-green-600 hover:bg-green-500/20"
               >
                 <Zap className="h-3.5 w-3.5 mr-1.5" />
-                BATCH_ACTIONS
+                BATCH ({getTargetDevices().length})
                 <ChevronDown className="h-3 w-3 ml-1" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="font-mono text-xs bg-zinc-900 border-zinc-700">
+              <div className="px-2 py-1.5 text-[10px] text-zinc-500">
+                대상: 필터된 {getTargetDevices().length}대 기기
+              </div>
+              <DropdownMenuSeparator className="bg-zinc-700" />
               <DropdownMenuItem onClick={wakeUpAll} className="cursor-pointer">
                 <Power className="h-3.5 w-3.5 mr-2 text-yellow-400" />
-                전체 화면 켜기
+                Wake Up
               </DropdownMenuItem>
               <DropdownMenuItem onClick={homeAll} className="cursor-pointer">
                 <Home className="h-3.5 w-3.5 mr-2 text-blue-400" />
-                전체 홈 화면
+                Go Home
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={openYoutubeAll} className="cursor-pointer">
-                <Youtube className="h-3.5 w-3.5 mr-2 text-red-400" />
-                전체 YouTube 실행
+              <DropdownMenuItem onClick={rebootAll} className="cursor-pointer">
+                <RotateCcw className="h-3.5 w-3.5 mr-2 text-orange-400" />
+                Reboot
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={restartAppAll} className="cursor-pointer">
+                <AppWindow className="h-3.5 w-3.5 mr-2 text-cyan-400" />
+                Restart App
               </DropdownMenuItem>
               <DropdownMenuSeparator className="bg-zinc-700" />
+              <DropdownMenuItem onClick={openYoutubeAll} className="cursor-pointer">
+                <Youtube className="h-3.5 w-3.5 mr-2 text-red-400" />
+                YouTube 실행
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={initializeAllDevices} className="cursor-pointer">
                 <Zap className="h-3.5 w-3.5 mr-2 text-purple-400" />
                 전체 초기화
@@ -536,64 +602,106 @@ export default function NodesPage() {
       </div>
 
       {/* Filter Bar */}
-      <div className="flex items-center gap-3 p-3 rounded-md border border-zinc-800 bg-black dark:bg-zinc-950">
+      <div className="flex items-center gap-4 p-3 rounded-md border border-zinc-800 bg-black dark:bg-zinc-950">
         <Filter className="h-4 w-4 text-zinc-500" />
-        <span className="font-mono text-xs text-zinc-500">필터:</span>
 
-        {/* PC Select */}
-        <Select value={filterPC} onValueChange={setFilterPC}>
-          <SelectTrigger className="w-[140px] h-8 font-mono text-xs bg-zinc-900 border-zinc-700">
-            <SelectValue placeholder="전체 PC" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">전체 PC</SelectItem>
-            {pcList.map(pc => (
-              <SelectItem key={pc} value={pc}>{pc}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {/* Group Filters */}
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-[10px] text-zinc-500 uppercase">Groups:</span>
+          {/* PC Select */}
+          <Select value={filterPC} onValueChange={setFilterPC}>
+            <SelectTrigger className="w-[100px] h-7 font-mono text-xs bg-zinc-900 border-zinc-700">
+              <SelectValue placeholder="PC" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All PC</SelectItem>
+              {pcList.map(pc => (
+                <SelectItem key={pc} value={pc}>{pc}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-        {/* Board Select */}
-        <Select value={filterBoard} onValueChange={setFilterBoard}>
-          <SelectTrigger className="w-[120px] h-8 font-mono text-xs bg-zinc-900 border-zinc-700">
-            <SelectValue placeholder="전체 보드" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">전체 보드</SelectItem>
-            {boardList.map(board => (
-              <SelectItem key={board} value={board}>{board}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          {/* Board Select */}
+          <Select value={filterBoard} onValueChange={setFilterBoard}>
+            <SelectTrigger className="w-[90px] h-7 font-mono text-xs bg-zinc-900 border-zinc-700">
+              <SelectValue placeholder="Board" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Board</SelectItem>
+              {boardList.map(board => (
+                <SelectItem key={board} value={board}>{board}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-        {/* Status Select */}
-        <Select value={filterStatus} onValueChange={setFilterStatus}>
-          <SelectTrigger className="w-[140px] h-8 font-mono text-xs bg-zinc-900 border-zinc-700">
-            <SelectValue placeholder="전체 상태" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">전체 상태</SelectItem>
-            <SelectItem value="idle">대기</SelectItem>
-            <SelectItem value="running">작업중</SelectItem>
-            <SelectItem value="error">오류</SelectItem>
-            <SelectItem value="offline">오프라인</SelectItem>
-          </SelectContent>
-        </Select>
+        {/* Separator */}
+        <div className="h-6 w-px bg-zinc-800" />
+
+        {/* Status Checkboxes */}
+        <div className="flex items-center gap-4">
+          <span className="font-mono text-[10px] text-zinc-500 uppercase">Status:</span>
+
+          {/* Normal (Sleep + Running) */}
+          <label className="flex items-center gap-1.5 cursor-pointer group">
+            <Checkbox
+              checked={showNormal}
+              onCheckedChange={(checked) => setShowNormal(checked === true)}
+              className="h-4 w-4 border-zinc-600 data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
+            />
+            <span className="font-mono text-xs text-zinc-400 group-hover:text-zinc-300">
+              Normal
+            </span>
+            <div className="h-1.5 w-1.5 rounded-full bg-green-500" />
+          </label>
+
+          {/* Error */}
+          <label className="flex items-center gap-1.5 cursor-pointer group">
+            <Checkbox
+              checked={showError}
+              onCheckedChange={(checked) => setShowError(checked === true)}
+              className="h-4 w-4 border-zinc-600 data-[state=checked]:bg-red-500 data-[state=checked]:border-red-500"
+            />
+            <span className="font-mono text-xs text-zinc-400 group-hover:text-zinc-300">
+              Error
+            </span>
+            <div className="h-1.5 w-1.5 rounded-full bg-red-500" />
+          </label>
+
+          {/* Offline */}
+          <label className="flex items-center gap-1.5 cursor-pointer group">
+            <Checkbox
+              checked={showOffline}
+              onCheckedChange={(checked) => setShowOffline(checked === true)}
+              className="h-4 w-4 border-zinc-600 data-[state=checked]:bg-zinc-500 data-[state=checked]:border-zinc-500"
+            />
+            <span className="font-mono text-xs text-zinc-400 group-hover:text-zinc-300">
+              Offline
+            </span>
+            <div className="h-1.5 w-1.5 rounded-full bg-zinc-500" />
+          </label>
+        </div>
 
         {/* Filter count */}
         <span className="font-mono text-xs text-zinc-600 ml-auto">
-          {filteredDevices.length} / {devices.length}개 기기
+          {filteredDevices.length} / {devices.length}
         </span>
 
         {/* Reset filter */}
-        {(filterPC !== 'all' || filterBoard !== 'all' || filterStatus !== 'all') && (
+        {(filterPC !== 'all' || filterBoard !== 'all' || !showNormal || !showError || !showOffline) && (
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => { setFilterPC('all'); setFilterBoard('all'); setFilterStatus('all'); }}
-            className="h-8 font-mono text-xs text-zinc-400 hover:text-white"
+            onClick={() => {
+              setFilterPC('all');
+              setFilterBoard('all');
+              setShowNormal(true);
+              setShowError(true);
+              setShowOffline(true);
+            }}
+            className="h-7 font-mono text-xs text-zinc-400 hover:text-white"
           >
-            초기화
+            Reset
           </Button>
         )}
       </div>
