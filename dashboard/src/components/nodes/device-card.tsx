@@ -33,15 +33,6 @@ function getDeviceHealth(device: Device): DeviceHealthStatus {
   return 'sleep';
 }
 
-/**
- * Extract slot ID from pc_id (e.g., "P01-B01S01" -> "B01S01")
- */
-function extractSlotId(pcId: string | undefined): string {
-  if (!pcId) return 'UNKNOWN';
-  const match = pcId.match(/(B\d+S\d+)/);
-  return match ? match[1] : pcId;
-}
-
 const statusConfig: Record<DeviceHealthStatus, {
   bgGradient: string;
   borderColor: string;
@@ -88,15 +79,17 @@ export function DeviceCard({ device, onClick, isSelected, isMaster }: DeviceCard
   const health = useMemo(() => getDeviceHealth(device), [device]);
   const config = statusConfig[health];
 
-  // Extract slot ID for header (B01S01)
-  const slotId = extractSlotId(device.pc_id);
-  // Show last 4 chars of serial
-  const serialShort = device.serial_number?.slice(-4)?.toUpperCase() || '----';
+  // Device name: use pc_id directly (P01-001 format)
+  const deviceName = device.pc_id || 'UNKNOWN';
+  // Serial: show first 4 chars
+  const serialShort = device.serial_number?.slice(0, 4)?.toLowerCase() || '----';
+  // IP validation
+  const hasValidIp = device.ip && device.ip !== '-' && device.ip !== '';
 
   const handleClick = () => {
     if (health === 'offline') {
       toast.error('연결되지 않은 기기입니다', {
-        description: `${slotId}가 오프라인 상태입니다.`,
+        description: `${deviceName}가 오프라인 상태입니다.`,
       });
       return;
     }
@@ -112,7 +105,7 @@ export function DeviceCard({ device, onClick, isSelected, isMaster }: DeviceCard
       <div
         onClick={handleClick}
         className={cn(
-          // Base styles - Compact MagicUI aesthetic
+          // Base styles - MagicUI aesthetic
           'relative cursor-pointer rounded-md border overflow-hidden transition-all duration-200',
           'bg-gradient-to-b bg-black dark:bg-zinc-950',
           config.bgGradient,
@@ -122,19 +115,19 @@ export function DeviceCard({ device, onClick, isSelected, isMaster }: DeviceCard
           isSelected && 'ring-1 ring-primary border-primary',
           // Master badge glow
           isMaster && 'ring-1 ring-blue-500 border-blue-500',
-          // Offline state
-          health === 'offline' && 'opacity-60 cursor-not-allowed'
+          // Offline state - Ghost style but visible
+          health === 'offline' && 'opacity-50'
         )}
       >
         {/* Neon Status Bar (Top) */}
         <div className={cn('h-0.5 w-full', config.neonBar)} />
 
-        {/* Content - Compact */}
-        <div className="p-2">
-          {/* Header: Slot ID + Master Badge */}
-          <div className="flex items-center justify-between mb-1">
-            <span className="font-mono text-xs font-bold text-white">
-              {slotId}
+        {/* Content */}
+        <div className="p-2.5">
+          {/* Header: Device Name (P01-001) - Large, Bold */}
+          <div className="flex items-center justify-between mb-2">
+            <span className="font-mono text-sm font-bold text-white">
+              {deviceName}
             </span>
             {isMaster && (
               <span className="text-[8px] font-mono font-semibold text-blue-400 bg-blue-500/20 px-1 rounded">
@@ -143,18 +136,30 @@ export function DeviceCard({ device, onClick, isSelected, isMaster }: DeviceCard
             )}
           </div>
 
-          {/* Body: IP (single row) */}
+          {/* Row 1: Serial */}
           <div className="flex items-center justify-between text-[10px] mb-1">
-            <span className="font-mono text-zinc-500">
-              {serialShort}
-            </span>
-            <span className="font-mono text-cyan-400 truncate ml-1">
-              {device.ip && device.ip !== '-' ? device.ip.split('.').slice(-1)[0] : '---'}
+            <span className="font-mono text-zinc-500">Serial:</span>
+            <span className="font-mono text-zinc-400">
+              {serialShort}...
             </span>
           </div>
 
-          {/* Footer: Status Label */}
-          <div className={cn('font-mono text-[10px] font-medium text-center', config.labelColor)}>
+          {/* Row 2: IP - Full display */}
+          <div className="flex items-center justify-between text-[10px] mb-2">
+            <span className="font-mono text-zinc-500">IP:</span>
+            <span className={cn(
+              'font-mono',
+              hasValidIp ? 'text-green-400' : 'text-red-400'
+            )}>
+              {hasValidIp ? device.ip : '---'}
+            </span>
+          </div>
+
+          {/* Status Badge */}
+          <div className={cn(
+            'font-mono text-[10px] font-medium text-center py-0.5 rounded',
+            health === 'offline' ? 'bg-zinc-800/50 text-zinc-500' : `${config.labelColor}`
+          )}>
             {config.label}
           </div>
         </div>

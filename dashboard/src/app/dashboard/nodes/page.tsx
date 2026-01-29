@@ -86,9 +86,16 @@ export default function NodesPage() {
   // Loading state based on connection
   const isLoading = !isConnected;
 
-  // Get unique PC list for filter
+  // Get unique PC list for filter (extract PC code like P01 from P01-001)
   const pcList = useMemo(() => {
-    const pcs = new Set(devices.map(d => d.pc_id));
+    const pcs = new Set<string>();
+    devices.forEach(d => {
+      if (d.pc_id && d.pc_id.startsWith('P')) {
+        // Extract PC code (P01) from pc_id (P01-001)
+        const pcCode = d.pc_id.split('-')[0];
+        if (pcCode) pcs.add(pcCode);
+      }
+    });
     return Array.from(pcs).sort();
   }, [devices]);
 
@@ -117,17 +124,28 @@ export default function NodesPage() {
     return 'sleep'; // Normal/Sleep state
   }, []);
 
-  // Filter devices
+  // Filter devices - includes strict naming convention filter
   const filteredDevices = useMemo(() => {
     return devices.filter(device => {
-      // PC filter
-      if (filterPC !== 'all' && device.pc_id !== filterPC) return false;
+      // STRICT FILTER: Only show devices with valid naming convention (P{PC}-{001~999})
+      // This filters out garbage data like "device", "List", "TEST-PC"
+      if (!device.pc_id || !device.pc_id.startsWith('P')) return false;
 
-      // Board filter (extract B## from pc_id)
+      // PC filter (e.g., P01, P02)
+      if (filterPC !== 'all') {
+        // Extract PC code (P01, P02) from pc_id (P01-001)
+        const devicePcCode = device.pc_id.split('-')[0];
+        if (devicePcCode !== filterPC) return false;
+      }
+
+      // Board filter - now simplified (no B/S logic, just for backwards compat)
       if (filterBoard !== 'all') {
+        // Skip board filter if no board info in naming
         const match = device.pc_id?.match(/B(\d+)/);
-        const deviceBoard = match ? `B${match[1].padStart(2, '0')}` : null;
-        if (deviceBoard !== filterBoard) return false;
+        if (match) {
+          const deviceBoard = `B${match[1].padStart(2, '0')}`;
+          if (deviceBoard !== filterBoard) return false;
+        }
       }
 
       // Status checkbox filter
@@ -142,26 +160,38 @@ export default function NodesPage() {
     });
   }, [devices, filterPC, filterBoard, showNormal, showError, showOffline, getDeviceHealthStatus]);
 
-  // Group devices by pc_id (filtered)
+  // Group devices by PC code (P01, P02) - extract from pc_id like P01-001
   const devicesByPc = useMemo(() => {
     const grouped: Record<string, Device[]> = {};
     filteredDevices.forEach(device => {
-      if (!grouped[device.pc_id]) {
-        grouped[device.pc_id] = [];
+      // Extract PC code (P01) from pc_id (P01-001)
+      const pcCode = device.pc_id?.split('-')[0] || 'UNKNOWN';
+      if (!grouped[pcCode]) {
+        grouped[pcCode] = [];
       }
-      grouped[device.pc_id].push(device);
+      grouped[pcCode].push(device);
+    });
+    // Sort devices within each group by their sequential number
+    Object.keys(grouped).forEach(pcCode => {
+      grouped[pcCode].sort((a, b) => {
+        const numA = parseInt(a.pc_id?.split('-')[1] || '0', 10);
+        const numB = parseInt(b.pc_id?.split('-')[1] || '0', 10);
+        return numA - numB;
+      });
     });
     return grouped;
   }, [filteredDevices]);
 
-  // Stats (from all devices, not filtered)
+  // Stats (from valid devices only - those with pc_id starting with 'P')
   const stats = useMemo(() => {
-    const total = devices.length;
-    const online = devices.filter(d => d.status !== 'offline').length;
-    const working = devices.filter(d => d.status === 'busy').length;
-    const offline = devices.filter(d => d.status === 'offline').length;
+    // Filter to valid devices only
+    const validDevices = devices.filter(d => d.pc_id && d.pc_id.startsWith('P'));
+    const total = validDevices.length;
+    const online = validDevices.filter(d => d.status !== 'offline').length;
+    const working = validDevices.filter(d => d.status === 'busy').length;
+    const offline = validDevices.filter(d => d.status === 'offline').length;
     // Error: stale heartbeat (over 1 minute)
-    const error = devices.filter(d => {
+    const error = validDevices.filter(d => {
       if (d.status === 'offline') return false;
       if (d.last_seen_at) {
         const lastSeen = new Date(d.last_seen_at);
@@ -170,33 +200,29 @@ export default function NodesPage() {
       }
       return false;
     }).length;
-    const pcCount = new Set(devices.map(d => d.pc_id)).size;
+    // Count unique PC codes (P01, P02, etc.)
+    const pcCount = new Set(validDevices.map(d => d.pc_id?.split('-')[0])).size;
     return { total, online, working, offline, error, pcCount };
   }, [devices]);
 
-  // Get devices in same PC group as selected device
+  // Get devices in same PC group as selected device (by PC code like P01)
   const sameGroupDeviceIds = useMemo(() => {
     if (!selectedDevice) return [];
+    const selectedPcCode = selectedDevice.pc_id?.split('-')[0];
     return devices
-      .filter(d => d.pc_id === selectedDevice.pc_id && d.id !== selectedDevice.id)
+      .filter(d => d.pc_id?.split('-')[0] === selectedPcCode && d.id !== selectedDevice.id)
       .map(d => d.id);
   }, [selectedDevice, devices]);
 
   // Get broadcast devices info for modal
-  // Extract slot name (B01S02) from full pc_id (P01-B01S02)
-  const extractSlotName = (pcId: string | undefined): string => {
-    if (!pcId) return 'UNKNOWN';
-    const match = pcId.match(/(B\d+S\d+)/);
-    return match ? match[1] : pcId;
-  };
-
   const broadcastDevices = useMemo(() => {
     if (!selectedDevice) return [];
+    const selectedPcCode = selectedDevice.pc_id?.split('-')[0];
     return devices
-      .filter(d => d.pc_id === selectedDevice.pc_id && d.id !== selectedDevice.id)
+      .filter(d => d.pc_id?.split('-')[0] === selectedPcCode && d.id !== selectedDevice.id)
       .map(d => ({
         id: d.id,
-        name: extractSlotName(d.pc_id), // Display B01S02 format
+        name: d.pc_id || 'UNKNOWN', // Display full pc_id (P01-001 format)
         status: d.status
       }));
   }, [selectedDevice, devices]);

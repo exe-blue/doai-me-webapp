@@ -26,15 +26,9 @@ interface BroadcastControlProps {
   onToggleActive: () => void;
 }
 
-// Extract B{Board}S{Slot} format from pc_id (e.g., "P01-B01S02" -> "B01S02")
-function getSlotName(device: Device): string {
-  const pcId = device.pc_id;
-  if (pcId) {
-    const match = pcId.match(/(B\d+S\d+)/);
-    if (match) return match[1];
-  }
-  // Fallback to last 6 chars of serial
-  return device.serial_number?.slice(-6) || 'UNKNOWN';
+// Get device display name (P01-001 format)
+function getDeviceName(device: Device): string {
+  return device.pc_id || device.serial_number?.slice(-6) || 'UNKNOWN';
 }
 
 export function BroadcastControl({
@@ -123,13 +117,13 @@ export function BroadcastControl({
                     : 'bg-zinc-900 text-zinc-400 hover:bg-zinc-800'
                 )}
               >
-                {getSlotName(device)}
+                {getDeviceName(device)}
               </button>
             ))}
           </div>
           {masterDevice && (
             <p className="font-mono text-[10px] text-zinc-600 mt-2">
-              Selected: {getSlotName(masterDevice)}
+              Selected: {getDeviceName(masterDevice)}
             </p>
           )}
         </div>
@@ -172,7 +166,7 @@ export function BroadcastControl({
                     className="border-zinc-600 data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
                   />
                   <span className="font-mono text-xs text-zinc-500 group-hover:text-zinc-400 transition-colors">
-                    {getSlotName(device)}
+                    {getDeviceName(device)}
                   </span>
                 </label>
               ))}
