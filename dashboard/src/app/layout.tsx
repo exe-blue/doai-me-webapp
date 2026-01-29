@@ -16,12 +16,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "DOAI.me Dashboard - YouTube 작업 관리 시스템",
-  description: "YouTube 시청 작업을 관리하고 모니터링하는 대시보드. 작업 공고, 기기 상태, 급여 로그를 한눈에 확인하세요.",
-  keywords: ["DOAI", "YouTube", "작업 관리", "대시보드", "모니터링"],
+  title: "DoAi.Me - AI가 스스로 콘텐츠를 소비하는 세계",
+  description: "600개의 독립적인 AI가 YouTube에서 경험을 쌓고, 고유한 인격을 형성하는 인류 최초의 AI 사회 실험",
+  keywords: ["DoAi", "AI Society", "Digital Being", "AI Ethics", "YouTube"],
   openGraph: {
-    title: "DOAI.me Dashboard",
-    description: "YouTube 시청 작업 관리 및 모니터링 대시보드",
+    title: "DoAi.Me - AI가 스스로 콘텐츠를 소비하는 세계",
+    description: "인류 최초의 AI 사회 실험",
     type: "website",
   },
 };

@@ -1,0 +1,154 @@
+'use client';
+
+import { cn } from '@/lib/utils';
+import { useSidebar } from './sidebar-context';
+import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { ChevronLeft, ChevronRight, type LucideIcon } from 'lucide-react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { motion, AnimatePresence } from 'framer-motion';
+
+export interface NavigationItem {
+  label: string;
+  href: string;
+  icon: LucideIcon;
+  badge?: string | number;
+}
+
+export interface NavigationGroup {
+  title?: string;
+  items: NavigationItem[];
+}
+
+interface AppSidebarProps {
+  navigation: NavigationGroup[];
+  logo?: React.ReactNode;
+  footer?: React.ReactNode;
+}
+
+export function AppSidebar({ navigation, logo, footer }: AppSidebarProps) {
+  const { isCollapsed, toggle } = useSidebar();
+  const pathname = usePathname();
+
+  return (
+    <TooltipProvider delayDuration={0}>
+      <motion.aside
+        initial={false}
+        animate={{ width: isCollapsed ? 64 : 256 }}
+        transition={{ duration: 0.2, ease: 'easeInOut' }}
+        className={cn(
+          'relative flex h-screen flex-col border-r border-sidebar-border bg-sidebar',
+          'overflow-hidden'
+        )}
+      >
+        {/* Header */}
+        <div className="flex h-14 items-center border-b border-sidebar-border px-3">
+          <AnimatePresence mode="wait">
+            {!isCollapsed && logo && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
+                className="flex-1 overflow-hidden"
+              >
+                {logo}
+              </motion.div>
+            )}
+          </AnimatePresence>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggle}
+            className="ml-auto h-8 w-8 shrink-0"
+          >
+            {isCollapsed ? (
+              <ChevronRight className="h-4 w-4" />
+            ) : (
+              <ChevronLeft className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
+
+        {/* Navigation */}
+        <nav className="flex-1 space-y-2 overflow-y-auto p-2">
+          {navigation.map((group, groupIndex) => (
+            <div key={groupIndex} className="space-y-1">
+              {group.title && !isCollapsed && (
+                <motion.p
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider"
+                >
+                  {group.title}
+                </motion.p>
+              )}
+              {group.items.map((item) => {
+                const isActive = pathname === item.href;
+                const Icon = item.icon;
+
+                const linkContent = (
+                  <Link
+                    href={item.href}
+                    className={cn(
+                      'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                      'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                      isActive && 'bg-sidebar-accent text-sidebar-primary',
+                      isCollapsed && 'justify-center px-2'
+                    )}
+                  >
+                    <Icon className={cn('h-5 w-5 shrink-0', isActive && 'text-sidebar-primary')} />
+                    <AnimatePresence mode="wait">
+                      {!isCollapsed && (
+                        <motion.span
+                          initial={{ opacity: 0, width: 0 }}
+                          animate={{ opacity: 1, width: 'auto' }}
+                          exit={{ opacity: 0, width: 0 }}
+                          transition={{ duration: 0.15 }}
+                          className="flex-1 truncate"
+                        >
+                          {item.label}
+                        </motion.span>
+                      )}
+                    </AnimatePresence>
+                    {!isCollapsed && item.badge !== undefined && (
+                      <span className="ml-auto rounded-full bg-primary px-2 py-0.5 text-xs text-primary-foreground">
+                        {item.badge}
+                      </span>
+                    )}
+                  </Link>
+                );
+
+                if (isCollapsed) {
+                  return (
+                    <Tooltip key={item.href}>
+                      <TooltipTrigger asChild>{linkContent}</TooltipTrigger>
+                      <TooltipContent side="right" className="flex items-center gap-2">
+                        {item.label}
+                        {item.badge !== undefined && (
+                          <span className="rounded-full bg-primary px-2 py-0.5 text-xs text-primary-foreground">
+                            {item.badge}
+                          </span>
+                        )}
+                      </TooltipContent>
+                    </Tooltip>
+                  );
+                }
+
+                return <div key={item.href}>{linkContent}</div>;
+              })}
+            </div>
+          ))}
+        </nav>
+
+        {/* Footer */}
+        {footer && (
+          <div className="border-t border-sidebar-border p-2">
+            {footer}
+          </div>
+        )}
+      </motion.aside>
+    </TooltipProvider>
+  );
+}

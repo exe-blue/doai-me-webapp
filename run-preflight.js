@@ -260,7 +260,7 @@ async function deployBotFiles(serial) {
 
     // Push files
     const filesToDeploy = [
-        { local: 'client-mobile/bot-webview-autojs.js', remote: `${SCRIPT_BASE_PATH}/webview_bot.js` },
+        { local: 'client-mobile/bot.js', remote: `${SCRIPT_BASE_PATH}/webview_bot.js` },
         { local: 'client-mobile/config.json', remote: `${SCRIPT_BASE_PATH}/config.json` },
         { local: 'client-mobile/selectors.json', remote: `${SCRIPT_BASE_PATH}/selectors.json` },
         { local: 'client-mobile/modules/webview-setup.js', remote: `${SCRIPT_BASE_PATH}/modules/webview-setup.js` },

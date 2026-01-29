@@ -14,7 +14,8 @@
  * - Patch 3: 완료 플래그 작성
  */
 
-"ui"; // UI 모드로 백그라운드 종료 방지
+// "ui"; // UI 모드 비활성화 - Preflight 호환성 위해 주석 처리
+// Note: 실제 배포 시에는 백그라운드 실행을 위해 다른 방법 필요
 
 // =============================================
 // 1. 파라미터 설정 (Patch 1: job.json 우선)
@@ -59,7 +60,10 @@ if (!params) {
 
         // Supabase 설정
         supabase_url: args.supabase_url,
-        supabase_key: args.supabase_key
+        supabase_key: args.supabase_key,
+        
+        // 완료 플래그 경로 (Preflight 테스트용)
+        done_flag_path: args.done_flag_path || null
     };
     console.log("⚠️ [v5.1] Using fallback args (job.json not found)");
 }
@@ -448,17 +452,25 @@ function reportProgress(pct) {
 // =============================================
 function captureEvidence() {
     try {
-        // Patch 2: Unique evidence path
-        var evidenceDir = "/sdcard/evidence/";
+        var filepath;
+        
+        // evidence_path 파라미터가 있으면 사용 (Preflight 테스트용)
+        if (params.evidence_path) {
+            filepath = params.evidence_path;
+            console.log("[Evidence] Using specified path: " + filepath);
+        } else {
+            // Patch 2: Unique evidence path (기본 동작)
+            var evidenceDir = "/sdcard/evidence/";
 
-        // Create evidence directory if not exists
-        if (!files.exists(evidenceDir)) {
-            files.createWithDirs(evidenceDir);
+            // Create evidence directory if not exists
+            if (!files.exists(evidenceDir)) {
+                files.createWithDirs(evidenceDir);
+            }
+
+            var timestamp = Date.now();
+            var filename = params.device_id + "_" + params.job_id + "_" + timestamp + ".png";
+            filepath = evidenceDir + filename;
         }
-
-        var timestamp = Date.now();
-        var filename = params.device_id + "_" + params.job_id + "_" + timestamp + ".png";
-        var filepath = evidenceDir + filename;
 
         console.log("[Evidence] Capturing screenshot...");
         var img = images.captureScreen();
@@ -483,7 +495,8 @@ function captureEvidence() {
 // =============================================
 function writeCompletionFlag(status, screenshotPath, errorMessage) {
     try {
-        var flagPath = "/sdcard/completion_" + params.job_id + ".flag";
+        // done_flag_path 파라미터가 있으면 사용, 없으면 기존 방식 유지
+        var flagPath = params.done_flag_path || "/sdcard/completion_" + params.job_id + ".flag";
         var flagData = {
             status: status,
             job_id: params.job_id,

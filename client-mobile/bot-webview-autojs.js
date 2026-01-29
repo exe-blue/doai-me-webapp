@@ -11,6 +11,13 @@
  * - Supabase Edge Function 호출
  */
 
+// IMMEDIATE checkpoint - no setTimeout (for debugging)
+try {
+    files.write('/sdcard/checkpoint_00_immediate.txt', 'Script start: ' + new Date().toISOString());
+} catch (e) {
+    // Ignore
+}
+
 // Debug checkpoint helper (writes files for external monitoring)
 // Uses setTimeout to work in UI mode when called before UI is ready
 function checkpoint(name, data) {

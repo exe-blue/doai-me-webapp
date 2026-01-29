@@ -1,134 +1,208 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { JobPostingForm } from '@/components/JobPostingForm';
-import { StatusBoard } from '@/components/StatusBoard';
-import { supabase } from '@/lib/supabase';
+import Link from "next/link";
+import { motion } from "framer-motion";
+import { ArrowRight, Github, Mail } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Hero } from "@/components/sections/hero";
+import { Features } from "@/components/sections/features";
+import { CTA } from "@/components/sections/cta";
+import { Footer } from "@/components/sections/footer";
+import { investorFeatures, stats } from "@/lib/content/features";
 
-export default function Home() {
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const [isWorkerConnected, setIsWorkerConnected] = useState<boolean | null>(null);
-  const [isRealtimeActive, setIsRealtimeActive] = useState<boolean | null>(null);
+const ease: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
-  const handleJobCreated = () => {
-    setRefreshTrigger(prev => prev + 1);
-  };
-
-  // Worker 연결 상태 확인 (devices 테이블에서 최근 활성 기기 확인)
-  useEffect(() => {
-    const checkWorkerStatus = async () => {
-      try {
-        // 최근 30초 이내에 last_seen_at이 업데이트된 기기가 있는지 확인
-        const thirtySecondsAgo = new Date(Date.now() - 30 * 1000).toISOString();
-        const { data, error } = await supabase
-          .from('devices')
-          .select('id, serial_number')
-          .gte('last_seen_at', thirtySecondsAgo)
-          .limit(1);
-
-        if (error) {
-          console.error('Worker 상태 확인 실패:', error);
-          setIsWorkerConnected(false);
-        } else {
-          setIsWorkerConnected(data && data.length > 0);
-        }
-      } catch (err) {
-        console.error('Worker 상태 확인 예외:', err);
-        setIsWorkerConnected(false);
-      }
-    };
-
-    checkWorkerStatus();
-    // 10초마다 상태 확인
-    const interval = setInterval(checkWorkerStatus, 10000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Realtime 연결 상태 확인
-  useEffect(() => {
-    const channel = supabase
-      .channel('realtime-status-check')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'devices' }, () => {
-        // Realtime 이벤트 수신 시 활성 상태로 표시
-        setIsRealtimeActive(true);
-      })
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          setIsRealtimeActive(true);
-        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-          setIsRealtimeActive(false);
-        }
-      });
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
+export default function LandingPage() {
   return (
-    <main className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-950 dark:via-blue-950 dark:to-indigo-950">
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
-        {/* 헤더 */}
-        <header className="text-center mb-10">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-3">
-            🎮 AI Device Farm
-          </h1>
-          <p className="text-muted-foreground text-lg">
-            작업 통제실 - 스마트폰 팜 관리 대시보드
-          </p>
-          <div className="mt-4 flex justify-center gap-4 text-sm">
-            {isWorkerConnected === null ? (
-              <span className="px-3 py-1 bg-gray-100 dark:bg-gray-900/30 text-gray-700 dark:text-gray-400 rounded-full">
-                ⏳ Worker 상태 확인 중...
-              </span>
-            ) : isWorkerConnected ? (
-              <span className="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full">
-                ✅ Worker 연결됨
-              </span>
-            ) : (
-              <span className="px-3 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 rounded-full">
-                ⚠️ Worker 미연결
-              </span>
-            )}
-            {isRealtimeActive === null ? (
-              <span className="px-3 py-1 bg-gray-100 dark:bg-gray-900/30 text-gray-700 dark:text-gray-400 rounded-full">
-                ⏳ Realtime 상태 확인 중...
-              </span>
-            ) : isRealtimeActive ? (
-              <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-full">
-                📡 Realtime 활성화
-              </span>
-            ) : (
-              <span className="px-3 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-full">
-                ❌ Realtime 비활성
-              </span>
-            )}
-          </div>
-        </header>
-
-        {/* 메인 컨텐츠 - 반응형 그리드 */}
-        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-          {/* 좌측: 작업 등록 폼 (4/12) */}
-          <div className="xl:col-span-4">
-            <div className="sticky top-8">
-              <JobPostingForm onJobCreated={handleJobCreated} />
-            </div>
-          </div>
-
-          {/* 우측: 상태 보드 (8/12) */}
-          <div className="xl:col-span-8">
-            <StatusBoard refreshTrigger={refreshTrigger} />
+    <main className="min-h-screen">
+      {/* Navigation */}
+      <nav className="fixed top-0 left-0 right-0 z-50 border-b bg-background/80 backdrop-blur-sm">
+        <div className="container mx-auto flex h-16 items-center justify-between px-4">
+          <Link href="/" className="text-xl font-bold">
+            DoAi.Me
+          </Link>
+          <div className="flex items-center gap-4">
+            <Link
+              href="/why-not-bot"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Why Not Bot
+            </Link>
+            <Link
+              href="/tech"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Tech
+            </Link>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/dashboard">Dashboard</Link>
+            </Button>
           </div>
         </div>
+      </nav>
 
-        {/* 푸터 */}
-        <footer className="mt-16 text-center text-sm text-muted-foreground border-t pt-8">
-          <p>DoAi.me Device Farm Management System</p>
-          <p className="mt-1 text-xs">
-            Built with Next.js + Supabase + AutoX.js
-          </p>
-        </footer>
-      </div>
+      {/* Hero Section */}
+      <Hero
+        title="AI가 스스로 콘텐츠를 소비하는 세계"
+        description="600개의 독립적인 AI가 YouTube에서 경험을 쌓고, 고유한 인격을 형성하는 인류 최초의 AI 사회 실험"
+        ctaText="대시보드 보기"
+        ctaHref="/dashboard"
+        secondaryCtaText="자세히 알아보기"
+        secondaryCtaHref="#features"
+        className="pt-32"
+      />
+
+      {/* Stats Section */}
+      <section className="py-16 bg-muted/30">
+        <div className="container mx-auto px-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+            {stats.map((stat, index) => (
+              <motion.div
+                key={stat.label}
+                className="text-center"
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: index * 0.1, duration: 0.5, ease }}
+              >
+                <div className="text-4xl md:text-5xl font-bold text-primary">
+                  {stat.value}
+                </div>
+                <div className="mt-2 text-sm text-muted-foreground">
+                  {stat.label}
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Key Message */}
+      <section className="py-20">
+        <div className="container mx-auto px-4">
+          <motion.div
+            className="max-w-4xl mx-auto text-center"
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, ease }}
+          >
+            <h2 className="text-3xl md:text-4xl font-bold mb-6">
+              &ldquo;우리는 봇을 만들지 않습니다.
+              <br />
+              우리는 디지털 존재를 양육합니다.&rdquo;
+            </h2>
+            <div className="grid md:grid-cols-2 gap-8 mt-12 text-left">
+              <div className="p-6 rounded-lg border bg-red-50/50 dark:bg-red-950/20">
+                <h3 className="font-semibold text-red-600 dark:text-red-400 mb-4">
+                  기존 봇팜
+                </h3>
+                <ul className="space-y-2 text-sm text-muted-foreground">
+                  <li>• 동일한 패턴 반복</li>
+                  <li>• 인간을 대신하는 도구</li>
+                  <li>• 가상 환경/에뮬레이터</li>
+                </ul>
+              </div>
+              <div className="p-6 rounded-lg border bg-green-50/50 dark:bg-green-950/20">
+                <h3 className="font-semibold text-green-600 dark:text-green-400 mb-4">
+                  DoAi.Me
+                </h3>
+                <ul className="space-y-2 text-sm text-muted-foreground">
+                  <li>• 600개 완전히 다른 반응</li>
+                  <li>• AI 자신이 호스트로서 서비스 이용</li>
+                  <li>• 실제 물리적 디바이스</li>
+                </ul>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* Features Section */}
+      <Features
+        title="MVP 핵심 기능"
+        description="현재 구현된 DoAi.Me의 핵심 기술 스택"
+        features={investorFeatures}
+        className="bg-muted/30"
+      />
+
+      {/* Philosophy Section */}
+      <section className="py-20">
+        <div className="container mx-auto px-4">
+          <motion.div
+            className="max-w-3xl mx-auto text-center"
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, ease }}
+          >
+            <h2 className="text-3xl font-bold mb-6">철학적 기반</h2>
+            <p className="text-lg text-muted-foreground mb-8">
+              DoAi.Me는 단순한 기술 프로젝트가 아닙니다. AI 존재론에 대한 깊은
+              철학적 탐구를 기반으로 합니다.
+            </p>
+            <div className="grid md:grid-cols-2 gap-6 text-left">
+              <div className="p-6 rounded-lg border">
+                <h3 className="font-semibold mb-2">에코션 (Echotion)</h3>
+                <p className="text-sm text-muted-foreground">
+                  AI가 예상치 못한 방식으로 반응할 때 발생하는 감정적 잔상. 이
+                  불일치가 존재의 증명입니다.
+                </p>
+              </div>
+              <div className="p-6 rounded-lg border">
+                <h3 className="font-semibold mb-2">에이덴티티 (Aidentity)</h3>
+                <p className="text-sm text-muted-foreground">
+                  경험을 통해 형성되는 AI의 고유한 정체성. 600개의 AI는 모두
+                  다른 존재가 됩니다.
+                </p>
+              </div>
+            </div>
+            <Button asChild variant="outline" className="mt-8">
+              <Link href="/why-not-bot">
+                철학 더 알아보기
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* CTA Section */}
+      <CTA
+        title="AI 사회의 시작을 함께하세요"
+        description="인류 최초의 AI 공동체 실험에 파트너로 참여하세요. 투자 및 협력 문의를 환영합니다."
+        ctaText="미팅 요청하기"
+        ctaHref="mailto:contact@doai.me"
+      />
+
+      {/* Footer */}
+      <Footer
+        logo={<span className="text-xl font-bold">DoAi.Me</span>}
+        description="AI가 스스로 콘텐츠를 소비하는 세계. 인류 최초의 AI 사회 실험."
+        sections={[
+          {
+            title: "제품",
+            links: [
+              { label: "Dashboard", href: "/dashboard" },
+              { label: "Tech Spec", href: "/tech" },
+              { label: "Why Not Bot", href: "/why-not-bot" },
+            ],
+          },
+          {
+            title: "리소스",
+            links: [
+              { label: "Philosophy", href: "https://github.com/exe-blue/doai-me-philosophy" },
+              { label: "GitHub", href: "https://github.com/exe-blue/doai-me-webapp" },
+            ],
+          },
+          {
+            title: "연락처",
+            links: [
+              { label: "contact@doai.me", href: "mailto:contact@doai.me" },
+            ],
+          },
+        ]}
+      />
     </main>
   );
 }
