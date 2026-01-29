@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { supabase, type JobAssignment, type Job, type Device, type ScrcpyCommand } from '@/lib/supabase';
 import { computeHealthStatus, getHealthIndicator } from '@/lib/healthStatus';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,6 +30,11 @@ export function StatusBoard({ refreshTrigger }: StatusBoardProps) {
   // Scrcpy 버튼 상태 (device_id -> state)
   const [scrcpyStates, setScrcpyStates] = useState<Record<string, ScrcpyButtonState>>({});
   const [pendingScrcpyCommands, setPendingScrcpyCommands] = useState<Record<string, string>>({});
+
+  // Ref: 최신 handleScrcpyCommandUpdate 핸들러를 저장 (stale closure 방지)
+  const scrcpyHandlerRef = useRef<((cmd: ScrcpyCommand) => void) | null>(null);
+  // Ref: setTimeout ID들을 저장 (언마운트 시 정리용)
+  const timersRef = useRef<NodeJS.Timeout[]>([]);
 
   // 로드 에러 상태
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -86,7 +91,8 @@ export function StatusBoard({ refreshTrigger }: StatusBoardProps) {
         (payload) => {
           if (payload.new && typeof payload.new === 'object') {
             const cmd = payload.new as ScrcpyCommand;
-            handleScrcpyCommandUpdate(cmd);
+            // ref를 통해 최신 핸들러 호출 (stale closure 방지)
+            scrcpyHandlerRef.current?.(cmd);
           }
         }
       )
@@ -119,36 +125,55 @@ export function StatusBoard({ refreshTrigger }: StatusBoardProps) {
 
   // Scrcpy 명령 상태 업데이트 핸들러
   const handleScrcpyCommandUpdate = useCallback((cmd: ScrcpyCommand) => {
-    // pending commands에서 device_id 찾기
-    const deviceId = Object.entries(pendingScrcpyCommands).find(
-      ([, cmdId]) => cmdId === cmd.id
-    )?.[0];
+    // pending commands에서 device_id 찾기 (functional update를 위해 현재 상태 참조)
+    setPendingScrcpyCommands(prevPending => {
+      const deviceId = Object.entries(prevPending).find(
+        ([, cmdId]) => cmdId === cmd.id
+      )?.[0];
 
-    if (!deviceId) return;
+      if (!deviceId) return prevPending;
 
-    if (cmd.status === 'completed') {
-      setScrcpyStates(prev => ({ ...prev, [deviceId]: 'success' }));
-      // 3초 후 idle로 복귀
-      setTimeout(() => {
-        setScrcpyStates(prev => ({ ...prev, [deviceId]: 'idle' }));
-        setPendingScrcpyCommands(prev => {
-          const next = { ...prev };
-          delete next[deviceId];
-          return next;
-        });
-      }, 3000);
-    } else if (cmd.status === 'failed' || cmd.status === 'timeout') {
-      setScrcpyStates(prev => ({ ...prev, [deviceId]: 'error' }));
-      setTimeout(() => {
-        setScrcpyStates(prev => ({ ...prev, [deviceId]: 'idle' }));
-        setPendingScrcpyCommands(prev => {
-          const next = { ...prev };
-          delete next[deviceId];
-          return next;
-        });
-      }, 3000);
-    }
-  }, [pendingScrcpyCommands]);
+      if (cmd.status === 'completed') {
+        setScrcpyStates(prev => ({ ...prev, [deviceId]: 'success' }));
+        // 3초 후 idle로 복귀 (타이머 ID 저장)
+        const timerId = setTimeout(() => {
+          setScrcpyStates(prev => ({ ...prev, [deviceId]: 'idle' }));
+          setPendingScrcpyCommands(prev => {
+            const next = { ...prev };
+            delete next[deviceId];
+            return next;
+          });
+        }, 3000);
+        timersRef.current.push(timerId);
+      } else if (cmd.status === 'failed' || cmd.status === 'timeout') {
+        setScrcpyStates(prev => ({ ...prev, [deviceId]: 'error' }));
+        const timerId = setTimeout(() => {
+          setScrcpyStates(prev => ({ ...prev, [deviceId]: 'idle' }));
+          setPendingScrcpyCommands(prev => {
+            const next = { ...prev };
+            delete next[deviceId];
+            return next;
+          });
+        }, 3000);
+        timersRef.current.push(timerId);
+      }
+
+      return prevPending; // 여기서는 상태를 변경하지 않음 (setTimeout 내에서 처리)
+    });
+  }, []); // 의존성 배열 비움 - functional update 사용으로 stale closure 방지
+
+  // scrcpyHandlerRef를 최신 핸들러로 업데이트
+  useEffect(() => {
+    scrcpyHandlerRef.current = handleScrcpyCommandUpdate;
+  }, [handleScrcpyCommandUpdate]);
+
+  // 컴포넌트 언마운트 시 모든 타이머 정리
+  useEffect(() => {
+    return () => {
+      timersRef.current.forEach(timerId => clearTimeout(timerId));
+      timersRef.current = [];
+    };
+  }, []);
 
   const loadDevices = async () => {
     const { data, error, count } = await supabase
@@ -236,9 +261,10 @@ export function StatusBoard({ refreshTrigger }: StatusBoardProps) {
     if (error) {
       console.error('Scrcpy 명령 생성 실패:', error);
       setScrcpyStates(prev => ({ ...prev, [device.id]: 'error' }));
-      setTimeout(() => {
+      const timerId = setTimeout(() => {
         setScrcpyStates(prev => ({ ...prev, [device.id]: 'idle' }));
       }, 3000);
+      timersRef.current.push(timerId);
       return;
     }
 
