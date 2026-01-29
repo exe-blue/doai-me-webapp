@@ -494,7 +494,12 @@ export function StatusBoard({ refreshTrigger }: StatusBoardProps) {
                   </div>
                 </div>
 
-                {/* 상태 통계 바 */}
+                {/* 
+                  상태 통계 바 - 동적 너비 계산을 위해 inline style 사용
+                  Note: Microsoft Edge Tools에서 inline style 경고가 표시되지만,
+                  런타임 데이터 기반의 동적 너비 계산은 CSS 클래스로 처리할 수 없어
+                  inline style이 React의 표준 패턴입니다.
+                */}
                 <div className="flex gap-1 h-2 rounded-full overflow-hidden bg-gray-200">
                   {stats.completed > 0 && (
                     <div
