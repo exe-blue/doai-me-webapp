@@ -494,21 +494,225 @@ socket.on('job:assign', async (payload) => {
     const { assignmentId, deviceId, deviceSerial, job } = payload;
     console.log(`📋 Job assigned: ${assignmentId} for ${deviceSerial || deviceId}`);
 
-    // 작업 실행 로직은 별도 모듈로 분리 가능
-    // 현재는 로그만 출력
-    socket.emit('job:ack', {
-        assignmentId,
-        status: 'received'
-    });
+    try {
+        // 시리얼 번호 확인
+        const serial = deviceSerial || await getSerialFromDeviceId(deviceId);
+        if (!serial || serial === '-') {
+            throw new Error(`Device serial not found for ${deviceId}`);
+        }
+
+        // 작업 실행
+        await startJobOnDevice(serial, assignmentId, job);
+
+        socket.emit('job:ack', {
+            assignmentId,
+            status: 'started',
+            deviceId,
+            timestamp: Date.now()
+        });
+        console.log(`✅ Job started: ${assignmentId}`);
+    } catch (error) {
+        console.error(`❌ Job start failed: ${error.message}`);
+        socket.emit('job:ack', {
+            assignmentId,
+            status: 'failed',
+            error: error.message
+        });
+    }
 });
 
 socket.on('job:paused', (payload) => {
     console.log(`⏸️ Job paused: ${payload.jobId}`);
+    // TODO: AutoX.js 스크립트에 pause 신호 전송
 });
 
 socket.on('job:cancelled', (payload) => {
     console.log(`🛑 Job cancelled: ${payload.jobId}`);
+    // TODO: AutoX.js 스크립트 강제 종료
 });
 
-console.log('[System] Worker v5.0 (Simplified) started');
+// --- [8] AutoX.js 스크립트 실행 ---
+const AUTOXJS_SCRIPT_PATH = '/sdcard/Scripts/doai-bot/bot.js';
+const JOB_JSON_PATH = '/sdcard/job.json';
+
+/**
+ * 디바이스에서 AutoX.js 스크립트 실행
+ * @param {string} serial - 디바이스 시리얼
+ * @param {string} assignmentId - 작업 할당 ID
+ * @param {object} job - 작업 데이터
+ */
+async function startJobOnDevice(serial, assignmentId, job) {
+    console.log(`🚀 Starting job on ${serial}: ${job.display_name || job.id}`);
+
+    // 1. Job Payload 구성
+    const jobPayload = {
+        // 작업 식별
+        job_id: job.id,
+        assignment_id: assignmentId,
+        device_id: `${PC_CODE}-${await getSlotFromSerial(serial)}`,
+        
+        // 영상 정보
+        video_url: job.target_url,
+        video_title: job.video_title || job.title || '',
+        keyword: job.keyword || '',
+        
+        // 시청 시간 설정
+        duration_min_sec: job.watch_duration_min || job.duration_sec || 60,
+        duration_max_sec: job.watch_duration_max || (job.duration_sec ? job.duration_sec * 2 : 180),
+        
+        // 상호작용 확률
+        prob_like: job.prob_like || 0,
+        prob_comment: job.prob_comment || 0,
+        prob_subscribe: job.prob_subscribe || 0,
+        prob_playlist: job.prob_playlist || 0,
+        
+        // 댓글 목록 (서버에서 미리 생성됨: 확률 * 노드수 * 2)
+        comments: job.comments || [],
+        
+        // 기능 플래그
+        enable_search: job.enable_search !== false,
+        enable_forward_action: job.enable_forward_action !== false,
+        enable_random_surf: job.enable_random_surf !== false,
+        forward_action_count: job.forward_action_count || 5,
+        surf_video_count: job.surf_video_count || 1,
+        
+        // Supabase 연결 (옵션)
+        supabase_url: process.env.SUPABASE_URL || '',
+        supabase_key: process.env.SUPABASE_ANON_KEY || '',
+        
+        // 완료 플래그 경로
+        done_flag_path: `/sdcard/completion_${assignmentId}.flag`,
+        
+        // 메타데이터
+        created_at: job.created_at || new Date().toISOString(),
+        worker_version: '5.1'
+    };
+
+    // 2. JSON을 Base64로 인코딩
+    const payloadStr = JSON.stringify(jobPayload);
+    const payloadB64 = Buffer.from(payloadStr).toString('base64');
+
+    console.log(`[Job] Payload prepared (${payloadStr.length} bytes -> ${payloadB64.length} B64)`);
+
+    // 3. job.json 파일로 먼저 전송 (안정적인 방법)
+    await writeJobJsonToDevice(serial, jobPayload);
+
+    // 4. AutoX.js 실행 (두 가지 방법 시도)
+    try {
+        // 방법 A: RunIntent로 Base64 전달
+        await runAutoXjsWithIntent(serial, payloadB64);
+    } catch (intentError) {
+        console.warn(`[Job] Intent 방식 실패, Broadcast 시도: ${intentError.message}`);
+        
+        // 방법 B: Broadcast로 스크립트 실행 (job.json 파일 사용)
+        await runAutoXjsWithBroadcast(serial);
+    }
+
+    console.log(`[Job] AutoX.js 실행 완료: ${assignmentId}`);
+}
+
+/**
+ * job.json 파일을 디바이스에 저장
+ */
+async function writeJobJsonToDevice(serial, jobPayload) {
+    const tempFile = path.join(__dirname, `temp_job_${Date.now()}.json`);
+    
+    try {
+        // 로컬에 임시 파일 생성
+        fs.writeFileSync(tempFile, JSON.stringify(jobPayload, null, 2));
+        
+        // ADB push로 디바이스에 전송
+        await new Promise((resolve, reject) => {
+            execFile(ADB_PATH, ['-s', serial, 'push', tempFile, JOB_JSON_PATH], 
+                { timeout: 10000 },
+                (error, stdout, stderr) => {
+                    if (error) reject(error);
+                    else resolve(stdout);
+                }
+            );
+        });
+        
+        console.log(`[Job] job.json pushed to device: ${JOB_JSON_PATH}`);
+    } finally {
+        // 임시 파일 삭제
+        try { fs.unlinkSync(tempFile); } catch (_) {}
+    }
+}
+
+/**
+ * AutoX.js RunIntent로 스크립트 실행 (Base64 payload 전달)
+ */
+async function runAutoXjsWithIntent(serial, payloadB64) {
+    // AutoX.js RunIntent 형식
+    const cmd = `am start -n org.autojs.autojs/.external.open.RunIntentActivity ` +
+                `-d "file://${AUTOXJS_SCRIPT_PATH}" ` +
+                `--es "jobDataB64" "${payloadB64}"`;
+    
+    await runAdbShell(serial, cmd);
+}
+
+/**
+ * AutoX.js Broadcast로 스크립트 실행 (job.json 파일 사용)
+ */
+async function runAutoXjsWithBroadcast(serial) {
+    // AutoX.js 브로드캐스트 실행
+    const cmd = `am broadcast -a org.autojs.autojs.action.RUN_SCRIPT ` +
+                `-e "path" "${AUTOXJS_SCRIPT_PATH}"`;
+    
+    await runAdbShell(serial, cmd);
+}
+
+/**
+ * ADB shell 명령 실행 (범용)
+ */
+function runAdbShell(serial, shellCmd) {
+    return new Promise((resolve, reject) => {
+        exec(`${ADB_PATH} -s ${serial} shell "${shellCmd.replace(/"/g, '\\"')}"`, 
+            { timeout: 15000 },
+            (error, stdout, stderr) => {
+                if (error) {
+                    reject(new Error(`ADB shell error: ${error.message}`));
+                } else {
+                    resolve(stdout ? stdout.trim() : '');
+                }
+            }
+        );
+    });
+}
+
+/**
+ * 시리얼에서 슬롯 번호 가져오기
+ */
+async function getSlotFromSerial(serial) {
+    try {
+        if (fs.existsSync(MAP_FILE)) {
+            const mapData = JSON.parse(fs.readFileSync(MAP_FILE, 'utf8'));
+            return mapData[serial] || '000';
+        }
+    } catch (e) {}
+    return '000';
+}
+
+// --- [9] 작업 완료 모니터링 ---
+const activeJobs = new Map(); // assignmentId -> { serial, startTime, ... }
+
+/**
+ * 완료 플래그 파일 모니터링 (폴링 방식)
+ */
+async function checkJobCompletion(serial, assignmentId) {
+    const flagPath = `/sdcard/completion_${assignmentId}.flag`;
+    
+    try {
+        const flagContent = await runAdbCommand(serial, `cat ${flagPath}`);
+        if (flagContent) {
+            const result = JSON.parse(flagContent);
+            return result;
+        }
+    } catch (e) {
+        // 파일이 없거나 읽기 실패
+    }
+    return null;
+}
+
+console.log('[System] Worker v5.1 (Job Executor) started');
 console.log('[System] Waiting for Socket.io connection...');
