@@ -1,20 +1,25 @@
 {
-  "name": "doai-me-webapp",
+  "name": "doai-me-monorepo",
   "version": "1.0.0",
   "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "infra/*"
+  ],
   "scripts": {
-    "dev": "npm run dev --prefix dashboard",
-    "build": "npm run build --prefix dashboard",
-    "start": "npm run start --prefix dashboard",
-    "lint": "npm run lint --prefix dashboard",
-    "install:dashboard": "cd dashboard && npm install",
-    "install:client-pc": "cd client-pc && npm install",
-    "postinstall": "cd dashboard && npm install"
+    "dev:dashboard": "npm run dev --workspace=apps/dashboard",
+    "dev:bot": "npm run dev --workspace=apps/desktop-bot",
+    "dev:web": "npm run dev --workspace=apps/web-client",
+    "dev:backend": "npm run dev --workspace=apps/backend",
+    "build:all": "npm run build --workspaces",
+    "lint:all": "npm run lint --workspaces",
+    "clean": "rm -rf node_modules apps/*/node_modules packages/*/node_modules"
   },
-  "dependencies": {
-    "@supabase/supabase-js": "^2.93.2",
-    "dotenv": "^17.2.3",
-    "next": "16.1.6"
+  "devDependencies": {
+    "eslint": "^9.39.2",
+    "prettier": "^3.0.0",
+    "typescript": "^5.0.0"
   },
   "engines": {
     "node": ">=18.0.0"

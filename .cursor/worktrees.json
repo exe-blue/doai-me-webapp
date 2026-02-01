@@ -1,0 +1,12 @@
+{
+  "setup-worktree": [
+    "echo '🚀 Setting up Monorepo Workspace...'",
+    "echo '📂 Loading rules from .cursor/rules/...'",
+    "cp .env.example .env", 
+    "npm install",
+    "echo '✅ Setup Complete. Ready for parallel processing.'"
+  ],
+  "cleanup-worktree": [
+    "echo '🧹 Cleaning up workspace...'"
+  ]
+}
