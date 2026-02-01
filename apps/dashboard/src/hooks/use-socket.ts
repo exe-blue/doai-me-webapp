@@ -3,6 +3,11 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import type { Device } from '@/lib/supabase';
+import { 
+  DASHBOARD_EVENTS, 
+  SOCKET_NAMESPACES, 
+  TIMING 
+} from '@doai/shared';
 
 interface SocketHookOptions {
   autoConnect?: boolean;
@@ -74,11 +79,11 @@ export function useSocket(options: SocketHookOptions = {}) {
   useEffect(() => {
     if (!autoConnect) return;
 
-    const socket = io(`${SOCKET_SERVER_URL}/dashboard`, {
+    const socket = io(`${SOCKET_SERVER_URL}${SOCKET_NAMESPACES.DASHBOARD}`, {
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionAttempts: 5,
-      reconnectionDelay: 1000
+      reconnectionDelay: TIMING.RECONNECT_DELAY
     });
 
     socketRef.current = socket;
@@ -98,7 +103,7 @@ export function useSocket(options: SocketHookOptions = {}) {
     });
 
     // Initial device list from Socket - merge with persisted data
-    socket.on('devices:initial', (initialDevices: Device[]) => {
+    socket.on(DASHBOARD_EVENTS.DEVICES_INITIAL, (initialDevices: Device[]) => {
       console.log('[Socket] Received initial devices from socket:', initialDevices.length);
       setDevices(prev => {
         // Merge: socket devices override persisted by ID
@@ -149,7 +154,7 @@ export function useSocket(options: SocketHookOptions = {}) {
     });
 
     // Stream frames
-    socket.on('stream:frame', (data: StreamFrame) => {
+    socket.on(DASHBOARD_EVENTS.STREAM_DATA, (data: StreamFrame) => {
       const listener = frameListenersRef.current.get(data.deviceId);
       if (listener) {
         listener(data);
@@ -176,7 +181,7 @@ export function useSocket(options: SocketHookOptions = {}) {
     if (!socketRef.current) return;
 
     frameListenersRef.current.set(deviceId, onFrame);
-    socketRef.current.emit('stream:start', { deviceId });
+    socketRef.current.emit(DASHBOARD_EVENTS.STREAM_START, { deviceId });
     console.log('[Socket] Started stream for device:', deviceId);
   }, []);
 
@@ -185,7 +190,7 @@ export function useSocket(options: SocketHookOptions = {}) {
     if (!socketRef.current) return;
 
     frameListenersRef.current.delete(deviceId);
-    socketRef.current.emit('stream:stop', { deviceId });
+    socketRef.current.emit(DASHBOARD_EVENTS.STREAM_STOP, { deviceId });
     console.log('[Socket] Stopped stream for device:', deviceId);
   }, []);
 
@@ -197,7 +202,7 @@ export function useSocket(options: SocketHookOptions = {}) {
   ) => {
     if (!socketRef.current) return;
 
-    socketRef.current.emit('command:send', { deviceId, command, params });
+    socketRef.current.emit(DASHBOARD_EVENTS.COMMAND_SEND, { deviceId, command, params });
     console.log('[Socket] Sent command:', command, 'to device:', deviceId);
   }, []);
 
@@ -209,7 +214,7 @@ export function useSocket(options: SocketHookOptions = {}) {
   ) => {
     if (!socketRef.current) return;
 
-    socketRef.current.emit('command:broadcast', { deviceIds, command, params });
+    socketRef.current.emit(DASHBOARD_EVENTS.COMMAND_BROADCAST, { deviceIds, command, params });
     console.log('[Socket] Broadcast command:', command, 'to', deviceIds.length, 'devices');
   }, []);
 
