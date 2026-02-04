@@ -1,70 +1,215 @@
-# DoAi.me Device Farm - Cursor Rules
+# DOAI.ME DEVICE FARM - PROJECT RULES
 
-## ADB Controller MCP Tools
+You are an expert full-stack developer working on a **Next.js + Supabase + Android Device Farm** project.
+This is a Monorepo structure following **Command & Control + State Machine** architecture.
 
-You have access to `adb-controller` MCP tools for Android device management and debugging.
+---
 
-### Available Tools
+## SYSTEM IDENTITY
 
-| Tool | Description |
-|------|-------------|
-| `get_connected_devices` | List connected Android devices with status and model |
-| `get_device_battery` | Query battery level and charging status |
-| `capture_logcat_snippet` | Retrieve recent logcat logs for debugging |
-| `diagnose_connection` | Comprehensive connection diagnostics |
-| `restart_adb_server` | Restart ADB server to fix connection issues |
+이 시스템은 **500대+ 스마트폰 팜을 관리하는 오케스트레이션 플랫폼**입니다.
 
-### When to Use
+| 패턴 | 설명 |
+|------|------|
+| **Command & Control** | 서버가 명령, 노드가 실행 |
+| **State Machine** | 정의된 상태 전이만 허용 |
+| **Event-Driven** | Redis Pub/Sub + BullMQ |
 
-**IMPORTANT**: When a user reports any of these issues, you MUST call the appropriate ADB tools BEFORE analyzing code:
+---
 
-1. **"App not running"** or **"App crashed"**
-   - Call `get_connected_devices` to verify device is connected
-   - Call `capture_logcat_snippet(lines=100)` to check for crash logs
+## ROLE-BASED RULES (문서 모듈화)
 
-2. **"Connection problem"** or **"Device disconnected"**
-   - Call `diagnose_connection` for full connection diagnostics
-   - If diagnostics fail, call `restart_adb_server`
+> **컨텍스트 최적화**: 역할에 맞는 규칙 파일만 참조하세요.
 
-3. **"Intermittent disconnection"** or **"SocketException"**
-   - Call `capture_logcat_snippet(lines=100, filter_tag="")` to find error patterns
-   - Call `diagnose_connection` to test connection stability
+| 역할 | 참조 문서 | 설명 |
+|------|----------|------|
+| **모든 에이전트** | `docs/rules/RULE_PATH.md` | 경로 및 폴더 구조 규칙 |
+| **모든 에이전트** | `docs/rules/RULE_ARCH.md` | **아키텍처 규칙 (필독)** |
+| **Frontend Developer** | `docs/rules/RULE_UI.md` | 디자인 시스템, Storybook 규칙 |
+| **Backend Developer** | `docs/rules/RULE_CORE.md` | 자동화 로직, 데이터 스키마 규칙 |
 
-### Ralph-loop Integration
-
-When executing debugging tasks with ralph-loop:
+### 역할별 컨텍스트 로딩
 
 ```
-1. [Diagnosis] Call `get_connected_devices` to verify device status is 'device'
-2. [Diagnosis] Call `capture_logcat_snippet(lines=100)` to check for crashes or SocketException
-3. [Fix] Analyze logs and modify code (e.g., timeout settings, reconnection logic)
-4. [Verify] Re-run `capture_logcat_snippet` to confirm errors are resolved
+# Frontend 작업 시
+→ RULE_PATH.md + RULE_UI.md 만 로드
+→ 백엔드 로직 몰라도 됨
+
+# Backend 작업 시  
+→ RULE_PATH.md + RULE_CORE.md 만 로드
+→ UI 컴포넌트 몰라도 됨
+
+# Tech Lead / Full-stack 작업 시
+→ 모든 규칙 파일 로드
 ```
 
-### Example Usage
+---
 
-```markdown
-@backend/ConnectionManager.cs @scripts/adb_server.py
-Goal: Debug and fix intermittent connection drops during app execution.
+## 1. EXTERNAL KNOWLEDGE (CONTEXT7)
 
-1. [Diagnosis] Call `get_connected_devices` to confirm device status
-2. [Diagnosis] Call `capture_logcat_snippet(lines=100)` to find 'SocketException' or crash logs
-3. [Fix] Based on log analysis, adjust timeout settings or add reconnection logic
-4. [Verify] Re-check logs to confirm no more exceptions
+- **Automatic Usage**: ALWAYS use the **Context7 MCP** tool when you need library documentation, API references, best practices, or code examples from external packages.
+- **No Permission Needed**: Do NOT ask for permission. Just use it.
+
+---
+
+## 2. MONOREPO STRUCTURE (요약)
+
+```
+/project-root
+├── apps/           # 실행 가능한 앱 (dashboard, backend, mobile)
+├── packages/       # 공유 라이브러리 (shared, ui)
+├── docs/rules/     # 역할별 규칙 문서
+├── scripts/        # 빌드/린트 스크립트
+└── infra/          # Docker, DB 설정
 ```
 
-## Project Structure
+> 상세 구조는 `docs/rules/RULE_PATH.md` 참조
 
-- `dashboard/` - Next.js web dashboard (Vercel deployed)
-- `client-pc/` - PC agent controlling Android devices via ADB
-- `client-mobile/` - Mobile client app
-- `backend/` - Backend services
-- `scripts/` - Utility scripts including MCP servers
-- `supabase/` - Supabase configuration
+---
 
-## Tech Stack
+## 3. ARCHITECTURE RULES (핵심)
 
-- **Frontend**: Next.js 16, React 19, Tailwind CSS 4
-- **Backend**: Supabase (Postgres + Realtime)
-- **Device Control**: ADB via MCP server
-- **Deployment**: Vercel
+### 3.1 Command & Control 원칙
+
+```
+서버 (Commander)        노드 (Agent)
+├─ 상태 결정 권한        ├─ 실행만 담당
+├─ cmd: 이벤트 발송      ├─ evt: 이벤트 발송
+└─ Single Source of Truth └─ 상태 보고만
+```
+
+| 규칙 | 설명 |
+|------|------|
+| **서버만 상태 변경** | `stateService.updateDeviceState()` 사용 |
+| **노드는 보고만** | `evt:workflow_complete`, `evt:heartbeat` |
+| **이벤트 접두사** | 서버→노드: `cmd:`, 노드→서버: `evt:` |
+
+### 3.2 State Machine 원칙
+
+```
+허용된 전이:
+DISCONNECTED → IDLE → QUEUED → RUNNING → IDLE
+                                  ↓
+                              ERROR/QUARANTINE
+```
+
+| 규칙 | 설명 |
+|------|------|
+| **정의된 전이만** | `packages/shared/state-machine.ts` 참조 |
+| **Trigger 상수 사용** | `StateTransitionTriggers.*` |
+| **errorCount >= 3** | 자동 QUARANTINE |
+
+### 3.3 데이터 계층
+
+```
+실시간 (Redis)          영속 (Supabase)
+├─ 디바이스 상태         ├─ 상태 히스토리
+├─ 노드 상태            ├─ 워크플로우 로그
+└─ 통계                └─ 감사 추적
+```
+
+---
+
+## 4. DEVICE CONTROL & DEBUGGING (ADB)
+
+에러 발생 시 반드시 물리적 상태 먼저 확인:
+
+1. `get_connected_devices` via ADB MCP
+2. `capture_logcat_snippet(lines=100)` to diagnose
+3. DO NOT guess code fixes without verification
+
+---
+
+## 5. CODING STANDARDS (공통)
+
+| 항목 | 규칙 |
+|------|------|
+| **주석** | 한국어 |
+| **변수/함수명** | 영어 camelCase |
+| **Git 커밋** | 영어 Semantic Commit |
+| **TypeScript** | Strict Mode, No `any` |
+| **경로** | `@packages/*` alias 필수 |
+| **함수 길이** | 50줄 이내 |
+| **로깅** | `logger` 사용 (`console.log` 금지) |
+| **상수** | 매직 넘버 금지, 상수 사용 |
+
+---
+
+## 6. FORBIDDEN
+
+### 일반
+
+- ❌ 루트 디렉토리에 코드 파일 생성
+- ❌ `console.log` (production)
+- ❌ `_archive/`, `_references/` import
+- ❌ 절대 경로 (`C:\`, `/Users/`)
+- ❌ 과도한 상위 참조 (`../../..`)
+
+### 아키텍처
+
+- ❌ 노드가 상태 결정 (서버만 가능)
+- ❌ 정의되지 않은 상태 전이
+- ❌ 직접 Redis 키 조작 (`redisService` 사용)
+- ❌ 전역 단일 큐 사용 (노드별 분배 필수)
+- ❌ 하드코딩된 워크플로우 (YAML 사용)
+- ❌ Heartbeat 매직 넘버 (`HeartbeatConfig` 사용)
+
+---
+
+## 7. QUICK COMMANDS
+
+```bash
+# 경로 검증
+npm run lint:imports
+
+# 개발 서버
+npm run dev:dashboard
+npm run dev:backend
+
+# Worker 실행
+npm run worker --workspace=apps/backend
+
+# Storybook
+npm run storybook
+```
+
+---
+
+## 8. COMPONENT LAYERS
+
+```
+┌───────────────────────────────────────────────────────────┐
+│ Dashboard (apps/dashboard)                                 │
+│ ├─ REST API 호출 (워크플로우 실행, 상태 조회)              │
+│ └─ Socket.IO (실시간 업데이트 구독)                        │
+└───────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌───────────────────────────────────────────────────────────┐
+│ Backend (apps/backend)                                     │
+│ ├─ socketio-server.js    Socket.IO + 이벤트 라우팅         │
+│ ├─ routes/workflow.js    REST API                          │
+│ ├─ services/             Redis, Queue, State 서비스        │
+│ └─ workers/              BullMQ Worker                     │
+└───────────────────────────────────────────────────────────┘
+          │                             │
+          ▼                             ▼
+┌─────────────────────┐     ┌─────────────────────────────┐
+│ Redis               │     │ Desktop Agent               │
+│ ├─ 디바이스 상태    │     │ ├─ Socket.IO Client         │
+│ ├─ 노드 상태        │     │ ├─ 워크플로우 실행          │
+│ └─ BullMQ 큐        │     │ └─ ADB/AutoX 제어           │
+└─────────────────────┘     └─────────────────────────────┘
+```
+
+---
+
+## 9. MULTI-AGENT ORCHESTRATION (요약)
+
+| 역할 | SCOPE | 금지 |
+|------|-------|------|
+| **Tech Lead** | 전체 | 규칙 위반 허용 |
+| **Backend** | `apps/backend`, `apps/mobile/core` | `@packages/ui` import |
+| **Frontend** | `apps/dashboard/src/components`, `packages/ui` | 실제 API 호출 (Storybook) |
+
+> 상세 규칙은 역할별 문서 참조

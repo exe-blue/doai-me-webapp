@@ -32,10 +32,22 @@ interface SocketContextValue {
 const SocketContext = createContext<SocketContextValue | null>(null);
 
 export function SocketProvider({ children }: { children: ReactNode }) {
-  const socket = useSocket({ autoConnect: true });
+  // TODO: 이 context는 SocketProvider.tsx와 통합 리팩토링 필요
+  // 현재는 기존 코드 호환성을 위해 빈 구현 제공
+  const baseSocket = useSocket();
+  
+  const contextValue: SocketContextValue = {
+    ...baseSocket,
+    devices: [],
+    startStream: () => {},
+    stopStream: () => {},
+    sendCommand: () => {},
+    broadcastCommand: () => {},
+    onCommandResult: () => () => {},
+  };
 
   return (
-    <SocketContext.Provider value={socket}>
+    <SocketContext.Provider value={contextValue}>
       {children}
     </SocketContext.Provider>
   );

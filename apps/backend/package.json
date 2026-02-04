@@ -10,7 +10,9 @@
     "test:latency": "ts-node latency_test.ts",
     "test": "npm run test:latency",
     "socketio": "node socketio-server.js",
-    "socketio:dev": "nodemon socketio-server.js"
+    "socketio:dev": "nodemon socketio-server.js",
+    "worker": "node workers/workflowWorker.js",
+    "worker:dev": "nodemon workers/workflowWorker.js"
   },
   "keywords": [
     "websocket",
@@ -20,8 +22,14 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@supabase/supabase-js": "^2.93.2",
-    "dotenv": "^16.3.1",
+    "@socket.io/redis-adapter": "^8.3.0",
+    "@supabase/supabase-js": "^2.93.3",
+    "bullmq": "^5.0.0",
+    "cors": "^2.8.6",
+    "dotenv": "^16.6.1",
+    "express": "^4.21.0",
+    "ioredis": "^5.3.2",
+    "jsonwebtoken": "^9.0.2",
     "openai": "^6.17.0",
     "socket.io": "^4.8.3",
     "ws": "^8.18.0"

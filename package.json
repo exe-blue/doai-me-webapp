@@ -1,6 +1,5 @@
 {
-  "name": "doai-me-monorepo",
-  "version": "1.0.0",
+  "name": "doai-device-farm",
   "private": true,
   "workspaces": [
     "apps/*",
@@ -9,17 +8,36 @@
   ],
   "scripts": {
     "dev:dashboard": "npm run dev --workspace=apps/dashboard",
-    "dev:bot": "npm run dev --workspace=apps/desktop-bot",
-    "dev:web": "npm run dev --workspace=apps/web-client",
     "dev:backend": "npm run dev --workspace=apps/backend",
-    "build:all": "npm run build --workspaces",
-    "lint:all": "npm run lint --workspaces",
-    "clean": "rm -rf node_modules apps/*/node_modules packages/*/node_modules"
+    "dev:agent": "npm run start --workspace=apps/desktop-agent",
+    "storybook": "npm run storybook --workspace=packages/ui",
+    "build:storybook": "npm run build-storybook --workspace=packages/ui",
+    "build": "npm run build --workspaces",
+    "lint": "eslint .",
+    "lint:imports": "node scripts/lint-imports.js",
+    "lint:all": "npm run lint && npm run lint:imports",
+    "typecheck": "tsc --noEmit",
+    "precommit": "npm run lint:imports",
+    "prepare": "husky || true",
+    "clean": "npx rimraf node_modules apps/*/node_modules packages/*/node_modules infra/*/node_modules",
+    "sb": "npm run storybook --workspace=@packages/ui"
   },
   "devDependencies": {
-    "eslint": "^9.39.2",
+    "@eslint/js": "^9.0.0",
+    "eslint": "^9.0.0",
+    "husky": "^9.0.0",
+    "js-yaml": "^4.1.1",
+    "lint-staged": "^15.0.0",
     "prettier": "^3.0.0",
-    "typescript": "^5.0.0"
+    "turbo": "2.8.0",
+    "typescript": "^5.0.0",
+    "typescript-eslint": "^8.0.0"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": [
+      "eslint --fix",
+      "node scripts/lint-imports.js"
+    ]
   },
   "engines": {
     "node": ">=18.0.0"

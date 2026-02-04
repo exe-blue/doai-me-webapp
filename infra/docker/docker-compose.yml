@@ -2,6 +2,28 @@ version: '3.8'
 
 services:
   # ===========================================
+  # Redis (State Cache + Pub/Sub + Queue)
+  # 500대 규모에서 충분한 256MB 할당
+  # 로컬만 접근 가능 (보안)
+  # ===========================================
+  redis:
+    image: redis:7-alpine
+    container_name: doai-redis
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "127.0.0.1:6379:6379"  # 로컬만 접근 (보안)
+    volumes:
+      - redis_data:/data
+    restart: always
+    networks:
+      - doai-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ===========================================
   # Frontend (Next.js Dashboard)
   # ===========================================
   frontend:
@@ -31,7 +53,7 @@ services:
   # ===========================================
   backend:
     build:
-      context: ./backend
+      context: ../../apps/backend
       dockerfile: Dockerfile
     container_name: doai-backend
     ports:
@@ -39,11 +61,15 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=4000
+      - REDIS_URL=redis://redis:6379
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_KEY=${SUPABASE_KEY}
       - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - CORS_ORIGIN=${CORS_ORIGIN:-https://doai.me}
+    depends_on:
+      redis:
+        condition: service_healthy
     restart: always
     networks:
       - doai-network
@@ -52,6 +78,29 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+
+  # ===========================================
+  # BullMQ Worker (Workflow Processing)
+  # ===========================================
+  worker:
+    build:
+      context: ../../apps/backend
+      dockerfile: Dockerfile
+    container_name: doai-worker
+    command: ["node", "workers/workflowWorker.js"]
+    environment:
+      - NODE_ENV=production
+      - REDIS_URL=redis://redis:6379
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+    depends_on:
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    restart: always
+    networks:
+      - doai-network
 
   # ===========================================
   # Nginx (Reverse Proxy + SSL Termination)
@@ -79,3 +128,5 @@ networks:
 
 volumes:
   nginx-logs:
+  redis_data:
+    driver: local

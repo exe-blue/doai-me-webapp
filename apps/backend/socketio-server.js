@@ -1,32 +1,163 @@
 /**
- * DoAi.Me Socket.io Server v1.0
+ * DoAi.Me Socket.io Server v2.0
  *
  * Real-time communication hub for:
  * - PC Workers (device control, heartbeat, streaming)
  * - Dashboard clients (monitoring, remote control)
  *
+ * Security Features (v2.0):
+ * - JWT Authentication (Supabase)
+ * - Redis Adapter (horizontal scaling)
+ * - Graceful Shutdown
+ *
  * Namespaces:
- * - /worker: PC Worker connections
- * - /dashboard: Dashboard client connections
+ * - /worker: PC Worker connections (server token auth)
+ * - /dashboard: Dashboard client connections (Supabase JWT auth)
  */
 
 require('dotenv').config({ path: '../.env' });
-const http = require('http');
+const http = require('node:http');
 const { Server } = require('socket.io');
+
+// Redis Adapter (horizontal scaling)
+let createAdapter;
+let Redis;
+try {
+  createAdapter = require('@socket.io/redis-adapter').createAdapter;
+  Redis = require('ioredis');
+} catch (err) {
+  console.warn('[Server] Redis adapter not installed. Running in standalone mode.');
+  console.warn('[Server] To enable horizontal scaling: npm install @socket.io/redis-adapter ioredis');
+}
+
+// Authentication Middleware
+const { dashboardAuthMiddleware, workerAuthMiddleware, isTokenValid } = require('./middleware/auth');
 
 // Supabase Service for centralized DB operations
 const supabaseService = require('./services/supabaseService');
 const { supabase } = supabaseService;
 
+// State Machine Service for device state management
+const stateService = require('./services/stateService');
+const { DeviceStates, StateTransitionTriggers } = stateService;
+
 // Channel Checker Service (auto-monitoring)
 const { startChannelChecker } = require('./services/channelChecker');
+
+// C2 Protocol Handlers (새 프로토콜)
+const { registerWorkerProtocolHandlers } = require('./handlers/protocolHandlers');
 
 // =============================================
 // Configuration
 // =============================================
 
+const NODE_ENV = process.env.NODE_ENV || 'development';
+const IS_PRODUCTION = NODE_ENV === 'production';
 const PORT = process.env.SOCKET_PORT || 3001;
-const CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
+const HOST = process.env.HOST || (IS_PRODUCTION ? '0.0.0.0' : 'localhost');
+const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
+const ENABLE_REDIS = process.env.ENABLE_REDIS === 'true' && Redis && createAdapter;
+
+// Token expiration check interval (5 minutes)
+const TOKEN_CHECK_INTERVAL = 5 * 60 * 1000;
+
+// =============================================
+// CORS Configuration (Environment-based)
+// =============================================
+
+/**
+ * 프로덕션 허용 Origin 목록 (Vercel Frontend)
+ * @description 이 목록에 없는 origin은 차단됩니다.
+ */
+const PRODUCTION_ALLOWED_ORIGINS = [
+  'https://doai.me',
+  'https://www.doai.me',
+];
+
+/**
+ * 개발 환경 허용 Origin 목록
+ */
+const DEVELOPMENT_ALLOWED_ORIGINS = [
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'http://localhost:4000',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:3001',
+  'http://127.0.0.1:4000',
+];
+
+/**
+ * CORS Origin 설정을 환경에 따라 반환합니다.
+ * - Production: doai.me, www.doai.me만 허용 (Strict)
+ * - Development: localhost 허용
+ */
+function getCorsOrigin() {
+  // 환경변수로 명시된 경우 우선 (추가 도메인 허용)
+  if (process.env.CORS_ORIGIN) {
+    const envOrigins = process.env.CORS_ORIGIN.split(',').map(o => o.trim());
+    
+    if (IS_PRODUCTION) {
+      // 프로덕션: 기본 허용 목록 + 환경변수 추가 도메인
+      return [...new Set([...PRODUCTION_ALLOWED_ORIGINS, ...envOrigins])];
+    }
+    
+    return envOrigins;
+  }
+
+  // 환경변수 없으면 기본 허용 목록 사용
+  return IS_PRODUCTION ? PRODUCTION_ALLOWED_ORIGINS : DEVELOPMENT_ALLOWED_ORIGINS;
+}
+
+/**
+ * CORS 옵션을 환경에 따라 반환합니다.
+ * @description Production에서는 화이트리스트 기반 검증을 수행합니다.
+ */
+function getCorsOptions() {
+  const allowedOrigins = getCorsOrigin();
+
+  console.log(`[CORS] Mode: ${IS_PRODUCTION ? 'PRODUCTION (Strict)' : 'DEVELOPMENT'}`);
+  console.log(`[CORS] Allowed Origins: ${allowedOrigins.join(', ')}`);
+
+  return {
+    origin: (requestOrigin, callback) => {
+      // 서버-서버 요청 (origin 없음) - 내부 health check 및 server-to-server 요청 허용
+      // 브라우저에서 오는 요청은 항상 origin 헤더를 포함하므로, origin이 없는 요청은
+      // 서버 간 통신(internal health checks, load balancer probes) 또는 직접 curl 요청입니다.
+      // 이러한 요청은 프로덕션에서도 허용합니다.
+      if (!requestOrigin) {
+        callback(null, true);
+        return;
+      }
+
+      // 화이트리스트 검증
+      if (allowedOrigins.includes(requestOrigin)) {
+        callback(null, true);
+      } else {
+        console.warn(`[CORS] ❌ Blocked request from unauthorized origin: ${requestOrigin}`);
+        console.warn(`[CORS] Allowed origins: ${allowedOrigins.join(', ')}`);
+        callback(new Error(`CORS policy: Origin ${requestOrigin} not allowed`), false);
+      }
+    },
+    methods: ['GET', 'POST', 'OPTIONS'],
+    credentials: true,  // 쿠키 및 인증 헤더 허용
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    exposedHeaders: ['X-Request-Id'],
+    maxAge: 86400,  // Preflight 캐시: 24시간
+  };
+}
+
+// =============================================
+// Cookie Security Configuration
+// =============================================
+
+const COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: IS_PRODUCTION,                    // HTTPS only in production
+  sameSite: IS_PRODUCTION ? 'strict' : 'lax', // Strict in production
+  maxAge: 7 * 24 * 60 * 60 * 1000,           // 7 days
+  path: '/',
+  domain: IS_PRODUCTION ? process.env.COOKIE_DOMAIN : undefined,
+};
 
 // =============================================
 // State Management
@@ -35,7 +166,7 @@ const CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
 // Connected workers: pcId -> { socketId, devices: Map<serial, deviceInfo> }
 const connectedWorkers = new Map();
 
-// Connected dashboard clients: socketId -> { subscribedDevices: Set }
+// Connected dashboard clients: socketId -> { subscribedDevices: Set, user: Object }
 const connectedDashboards = new Map();
 
 // Device states: deviceId -> { serial, pcId, status, lastHeartbeat, streamingTo: Set }
@@ -53,22 +184,72 @@ const DEVICE_INIT_CONFIG = {
   density: 420
 };
 
+// Shutdown flag
+let isShuttingDown = false;
+
 // =============================================
 // HTTP Server & Socket.io Setup
 // =============================================
 
+/**
+ * CORS 헤더를 응답에 추가합니다.
+ * @param {http.IncomingMessage} req - HTTP 요청
+ * @param {http.ServerResponse} res - HTTP 응답
+ */
+function setCorsHeaders(req, res) {
+  const origin = req.headers.origin;
+  const allowedOrigins = getCorsOrigin();
+
+  // Origin 검증: 화이트리스트에 있거나 개발 환경이면 허용
+  const isAllowed = origin && (allowedOrigins.includes(origin) || !IS_PRODUCTION);
+  
+  if (isAllowed) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  }
+
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Max-Age', '86400');
+}
+
 const httpServer = http.createServer((req, res) => {
+  // CORS 헤더 설정
+  setCorsHeaders(req, res);
+
+  // Preflight 요청 처리
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+
   // Health check endpoint
   if (req.url === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
-      status: 'ok',
+      status: isShuttingDown ? 'shutting_down' : 'ok',
+      env: NODE_ENV,
       workers: connectedWorkers.size,
       dashboards: connectedDashboards.size,
       devices: deviceStates.size,
       streams: activeStreams.size,
+      redis: ENABLE_REDIS ? 'connected' : 'disabled',
+      corsMode: IS_PRODUCTION ? 'strict' : 'development',
       timestamp: new Date().toISOString()
     }));
+    return;
+  }
+
+  // Ready check for load balancer
+  if (req.url === '/ready') {
+    if (isShuttingDown) {
+      res.writeHead(503, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ status: 'shutting_down' }));
+      return;
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 'ready' }));
     return;
   }
 
@@ -77,14 +258,62 @@ const httpServer = http.createServer((req, res) => {
 });
 
 const io = new Server(httpServer, {
-  cors: {
-    origin: CORS_ORIGIN,
-    methods: ['GET', 'POST']
-  },
+  cors: getCorsOptions(),
   transports: ['websocket', 'polling'],
   pingInterval: 10000,
-  pingTimeout: 5000
+  pingTimeout: 5000,
+  // Production: Cookie 설정
+  cookie: IS_PRODUCTION ? {
+    name: 'doai_io',
+    httpOnly: COOKIE_OPTIONS.httpOnly,
+    secure: COOKIE_OPTIONS.secure,
+    sameSite: COOKIE_OPTIONS.sameSite,
+    maxAge: COOKIE_OPTIONS.maxAge,
+  } : false,
 });
+
+// =============================================
+// Redis Adapter Setup (Horizontal Scaling)
+// =============================================
+
+async function setupRedisAdapter() {
+  if (!ENABLE_REDIS) {
+    console.log('[Redis] Adapter disabled. Running in standalone mode.');
+    return;
+  }
+
+  try {
+    console.log('[Redis] Connecting to:', REDIS_URL);
+
+    const pubClient = new Redis(REDIS_URL, {
+      retryDelayOnFailover: 100,
+      maxRetriesPerRequest: 3,
+      lazyConnect: true
+    });
+
+    const subClient = pubClient.duplicate();
+
+    // 연결 이벤트 핸들러
+    pubClient.on('connect', () => console.log('[Redis] Pub client connected'));
+    pubClient.on('error', (err) => console.error('[Redis] Pub client error:', err.message));
+    subClient.on('connect', () => console.log('[Redis] Sub client connected'));
+    subClient.on('error', (err) => console.error('[Redis] Sub client error:', err.message));
+
+    // 연결 시도
+    await Promise.all([pubClient.connect(), subClient.connect()]);
+
+    // Adapter 설정
+    io.adapter(createAdapter(pubClient, subClient));
+
+    console.log('[Redis] Adapter successfully configured');
+
+    // 저장 (graceful shutdown 시 사용)
+    io.redisClients = { pubClient, subClient };
+  } catch (err) {
+    console.error('[Redis] Failed to connect:', err.message);
+    console.log('[Redis] Falling back to standalone mode');
+  }
+}
 
 // =============================================
 // Worker Namespace (/worker)
@@ -92,23 +321,11 @@ const io = new Server(httpServer, {
 
 const workerNs = io.of('/worker');
 
+// Authentication middleware
+workerNs.use(workerAuthMiddleware);
+
 workerNs.on('connection', (socket) => {
-  const { pcId, token } = socket.handshake.auth;
-
-  if (!pcId) {
-    console.log('[Worker] Connection rejected: missing pcId');
-    socket.disconnect();
-    return;
-  }
-
-  // STRICT: Reject workers with invalid pcId format (must be P{num}-WORKER or P{num})
-  // This blocks ghost workers like "PC-01", "device", "List" etc.
-  const validWorkerPattern = /^P\d{1,2}(-WORKER)?$/;
-  if (!validWorkerPattern.test(pcId)) {
-    console.log(`[Worker] Connection rejected: invalid pcId format "${pcId}" (expected P01, P01-WORKER, etc.)`);
-    socket.disconnect();
-    return;
-  }
+  const { pcId } = socket.worker;
 
   console.log(`[Worker] Connected: ${pcId} (${socket.id})`);
 
@@ -123,9 +340,18 @@ workerNs.on('connection', (socket) => {
   // Send pending assignments to reconnecting worker
   sendPendingAssignmentsToWorker(socket, pcId);
 
-  // Heartbeat handler
+  // =============================================
+  // 새 C2 프로토콜 핸들러 등록 (evt:* 이벤트)
+  // =============================================
+  registerWorkerProtocolHandlers(socket, pcId, dashboardNs, connectedWorkers);
+
+  // =============================================
+  // 레거시 핸들러 (기존 호환성 유지)
+  // =============================================
+
+  // Heartbeat handler (레거시 - worker:heartbeat도 지원)
   socket.on('worker:heartbeat', async (data) => {
-    const { devices, timestamp } = data;
+    const { devices } = data;
     const worker = connectedWorkers.get(pcId);
 
     if (!worker) return;
@@ -145,6 +371,14 @@ workerNs.on('connection', (socket) => {
           devicesToInit.push({ deviceId, serial });
         }
 
+        // 상태 머신 업데이트 (새 프로토콜)
+        stateService.updateDeviceState(
+          deviceId,
+          serial,
+          StateTransitionTriggers.HEARTBEAT_RECEIVED,
+          { metadata: { pcId, adbConnected: device.adbConnected !== false } }
+        );
+
         deviceStates.set(deviceId, {
           serial,
           pcId,
@@ -156,11 +390,10 @@ workerNs.on('connection', (socket) => {
         });
 
         // Broadcast to dashboards
-        // Note: pc_id should be the full device slotId (P01-001), not just pcId (P01)
         dashboardNs.emit('device:status:update', {
           device_id: deviceId,
           serial_number: serial,
-          pc_id: deviceId, // Full device identifier (P01-001 format)
+          pc_id: deviceId,
           status: device.status || 'idle',
           health_status: 'healthy',
           last_seen_at: new Date().toISOString(),
@@ -179,7 +412,7 @@ workerNs.on('connection', (socket) => {
       });
     }
 
-    // UPSERT devices to Supabase (new implementation)
+    // UPSERT devices to Supabase (using SERVICE_ROLE_KEY)
     supabaseService.upsertDevicesBatch(devices, pcId).then(result => {
       if (result.upserted > 0) {
         console.log(`[Worker] Devices UPSERT: ${result.upserted} updated, ${result.skipped} skipped`);
@@ -199,13 +432,13 @@ workerNs.on('connection', (socket) => {
     // Send acknowledgment
     socket.emit('worker:heartbeat:ack', {
       received_at: new Date().toISOString(),
-      pending_commands: 0 // TODO: Count pending commands
+      pending_commands: 0
     });
   });
 
   // Command acknowledgment from worker
   socket.on('command:ack', (data) => {
-    const { commandId, deviceId, status, error, result } = data;
+    const { commandId, deviceId, status, error } = data;
     console.log(`[Worker] Command ack: ${commandId} - ${status}`);
 
     // Forward to dashboards watching this device
@@ -269,9 +502,8 @@ workerNs.on('connection', (socket) => {
     dashboardNs.emit('job:started', data);
   });
 
-  // Optimized job:progress - lightweight payload for real-time progress bar
+  // Optimized job:progress
   socket.on('job:progress', (data) => {
-    // data: { assignmentId, jobId, deviceId, progressPct, currentStep, totalSteps, status, deviceSerial }
     const progressPayload = {
       jobId: data.jobId,
       assignmentId: data.assignmentId,
@@ -288,10 +520,9 @@ workerNs.on('connection', (socket) => {
 
   // Device log from worker - room-based broadcasting
   socket.on('device:log', (data) => {
-    // data: { deviceId, level, message, timestamp }
     const { deviceId, level, message, timestamp } = data;
     const roomName = `logs:${deviceId}`;
-    
+
     // Only broadcast to clients who joined this specific log room
     dashboardNs.to(roomName).emit('device:log', {
       deviceId,
@@ -305,34 +536,60 @@ workerNs.on('connection', (socket) => {
     console.log(`[Worker] Job completed: ${data.assignmentId}`);
     dashboardNs.emit('job:completed', data);
 
-    // Update assignment status in DB
+    // Update assignment status in DB (using SERVICE_ROLE_KEY)
     await supabaseService.updateAssignmentStatus(data.assignmentId, 'completed', {
       progress_pct: 100,
       final_duration_sec: data.finalDurationSec
     });
 
-    // Update job completed_count
+    // Update job completed_count atomically using RPC or fallback
+    // RPC 함수: increment_job_completed_count (원자적 업데이트)
     if (data.jobId) {
-      const { data: job } = await supabase
-        .from('jobs')
-        .select('completed_count, assigned_count')
-        .eq('id', data.jobId)
-        .single();
-
-      if (job) {
-        const newCount = (job.completed_count || 0) + 1;
-        const updateData = { completed_count: newCount };
-
-        // Check if job is complete
-        if (newCount >= (job.assigned_count || 0)) {
-          updateData.status = 'completed';
-          console.log(`[Worker] Job ${data.jobId} fully completed!`);
+      try {
+        // 원자적 업데이트: completed_count를 1 증가시키고 결과를 반환
+        const { data: rpcResult, error } = await supabase
+          .rpc('increment_job_completed_count', { job_id: data.jobId });
+        
+        if (error) {
+          // RPC가 없는 경우 fallback: 2단계 업데이트 (race condition 가능성 있음)
+          console.warn('[Worker] RPC not available, using fallback:', error.message);
+          
+          // 1단계: 현재 값 조회
+          const { data: currentJob, error: fetchError } = await supabase
+            .from('jobs')
+            .select('completed_count, assigned_count')
+            .eq('id', data.jobId)
+            .single();
+          
+          if (fetchError || !currentJob) {
+            console.error('[Worker] Failed to fetch job:', fetchError?.message);
+          } else {
+            // 2단계: completed_count 증가
+            const newCompletedCount = (currentJob.completed_count || 0) + 1;
+            const updateData = { completed_count: newCompletedCount };
+            
+            // Job 완료 여부 확인
+            if (newCompletedCount >= (currentJob.assigned_count || 0)) {
+              updateData.status = 'completed';
+              console.log(`[Worker] Job ${data.jobId} fully completed!`);
+            }
+            
+            await supabase
+              .from('jobs')
+              .update(updateData)
+              .eq('id', data.jobId);
+          }
+        } else if (rpcResult && rpcResult.length > 0) {
+          // RPC가 성공한 경우 (RETURNS TABLE이므로 배열 반환)
+          const updatedJob = rpcResult[0];
+          console.log(`[Worker] Job ${data.jobId} completed_count: ${updatedJob.completed_count}/${updatedJob.assigned_count}`);
+          
+          if (updatedJob.status === 'completed') {
+            console.log(`[Worker] Job ${data.jobId} fully completed!`);
+          }
         }
-
-        await supabase
-          .from('jobs')
-          .update(updateData)
-          .eq('id', data.jobId);
+      } catch (err) {
+        console.error('[Worker] Error updating job completed_count:', err.message);
       }
     }
   });
@@ -353,7 +610,6 @@ workerNs.on('connection', (socket) => {
     console.log(`[Worker] Job request from device: ${deviceSerial || deviceId}`);
 
     try {
-      // 1. Get next pending job (priority DESC, created_at ASC)
       const job = await supabaseService.getNextPendingJob();
 
       if (!job) {
@@ -365,7 +621,6 @@ workerNs.on('connection', (socket) => {
         return;
       }
 
-      // 2. Get pending assignment for this device
       const { data: assignment, error } = await supabase
         .from('job_assignments')
         .select('*')
@@ -375,7 +630,6 @@ workerNs.on('connection', (socket) => {
         .single();
 
       if (error || !assignment) {
-        // No assignment for this device, create one
         const { data: newAssignment, error: createError } = await supabase
           .from('job_assignments')
           .insert({
@@ -399,7 +653,6 @@ workerNs.on('connection', (socket) => {
           return;
         }
 
-        // Send the new assignment
         socket.emit('job:assign', {
           assignmentId: newAssignment.id,
           deviceId,
@@ -418,7 +671,6 @@ workerNs.on('connection', (socket) => {
           }
         });
 
-        // Update job assigned_count
         await supabase
           .from('jobs')
           .update({ assigned_count: job.assigned_count + 1 })
@@ -431,7 +683,6 @@ workerNs.on('connection', (socket) => {
           jobId: job.id
         });
       } else {
-        // Send existing assignment
         socket.emit('job:assign', {
           assignmentId: assignment.id,
           deviceId,
@@ -518,12 +769,17 @@ workerNs.on('connection', (socket) => {
 
 const dashboardNs = io.of('/dashboard');
 
-dashboardNs.on('connection', (socket) => {
-  console.log(`[Dashboard] Connected: ${socket.id}`);
+// Authentication middleware (Supabase JWT)
+dashboardNs.use(dashboardAuthMiddleware);
 
-  // Register dashboard client
+dashboardNs.on('connection', (socket) => {
+  const user = socket.user;
+  console.log(`[Dashboard] Connected: ${user.email || user.id} (${socket.id})`);
+
+  // Register dashboard client with user info
   connectedDashboards.set(socket.id, {
     subscribedDevices: new Set(),
+    user: user,
     connectedAt: new Date()
   });
 
@@ -542,34 +798,29 @@ dashboardNs.on('connection', (socket) => {
   socket.emit('devices:initial', initialDevices);
 
   // =============================================
-  // Log Room Management (On-demand log streaming)
+  // Log Room Management
   // =============================================
-  
-  // Join log room for a specific device/job - enables log streaming
+
   socket.on('join:log_room', (data) => {
     const { deviceId, jobId } = data;
     const roomName = deviceId ? `logs:${deviceId}` : `logs:job:${jobId}`;
     socket.join(roomName);
-    console.log(`[Dashboard] ${socket.id} joined log room: ${roomName}`);
-    
-    // Acknowledge join
+    console.log(`[Dashboard] ${socket.user.email || socket.id} joined log room: ${roomName}`);
     socket.emit('log_room:joined', { roomName, deviceId, jobId });
   });
 
-  // Leave log room - stops receiving logs
   socket.on('leave:log_room', (data) => {
     const { deviceId, jobId } = data;
     const roomName = deviceId ? `logs:${deviceId}` : `logs:job:${jobId}`;
     socket.leave(roomName);
-    console.log(`[Dashboard] ${socket.id} left log room: ${roomName}`);
+    console.log(`[Dashboard] ${socket.user.email || socket.id} left log room: ${roomName}`);
   });
 
   // Command from dashboard to device
   socket.on('command:send', (data) => {
     const { deviceId, command, params, commandId } = data;
-    console.log(`[Dashboard] Command: ${command} -> ${deviceId}`);
+    console.log(`[Dashboard] ${socket.user.email}: ${command} -> ${deviceId}`);
 
-    // Find worker that owns this device
     const deviceState = deviceStates.get(deviceId);
     if (!deviceState) {
       socket.emit('command:error', { deviceId, error: 'Device not found' });
@@ -582,19 +833,19 @@ dashboardNs.on('connection', (socket) => {
       return;
     }
 
-    // Forward command to worker
     worker.socket.emit('device:command', {
       commandId: commandId || `cmd_${Date.now()}`,
       deviceId,
       command,
-      params
+      params,
+      requestedBy: socket.user.id
     });
   });
 
   // Broadcast command to multiple devices
   socket.on('command:broadcast', (data) => {
     const { deviceIds, command, params, commandId } = data;
-    console.log(`[Dashboard] Broadcast: ${command} -> ${deviceIds.length} devices`);
+    console.log(`[Dashboard] ${socket.user.email}: Broadcast ${command} -> ${deviceIds.length} devices`);
 
     for (const deviceId of deviceIds) {
       const deviceState = deviceStates.get(deviceId);
@@ -607,19 +858,19 @@ dashboardNs.on('connection', (socket) => {
         commandId: `${commandId || 'bc'}_${deviceId}`,
         deviceId,
         command,
-        params
+        params,
+        requestedBy: socket.user.id
       });
     }
   });
 
-  // Job distribution from dashboard (after API creates job)
+  // Job distribution from dashboard
   socket.on('job:distribute', (data) => {
     const { assignments, job } = data;
-    console.log(`[Dashboard] Job distribute: ${job.id} - ${assignments.length} assignments`);
+    console.log(`[Dashboard] ${socket.user.email}: Job distribute ${job.id} - ${assignments.length} assignments`);
 
     const sentCount = sendJobAssignments(assignments, job);
 
-    // Acknowledge
     socket.emit('job:distribute:ack', {
       jobId: job.id,
       totalAssignments: assignments.length,
@@ -627,7 +878,6 @@ dashboardNs.on('connection', (socket) => {
       timestamp: new Date().toISOString()
     });
 
-    // Broadcast to all dashboards
     broadcastJobStatusUpdate(job.id, 'active', {
       assigned: assignments.length,
       sent: sentCount,
@@ -636,27 +886,20 @@ dashboardNs.on('connection', (socket) => {
     });
   });
 
-  // Job pause from dashboard
+  // Job pause
   socket.on('job:pause', async (data) => {
     const { jobId } = data;
-    console.log(`[Dashboard] Job pause: ${jobId}`);
-
-    // Notify all workers about the pause
+    console.log(`[Dashboard] ${socket.user.email}: Job pause ${jobId}`);
     workerNs.emit('job:paused', { jobId });
-
-    // Broadcast to dashboards
     broadcastJobStatusUpdate(jobId, 'paused', null);
   });
 
-  // Job resume from dashboard
+  // Job resume
   socket.on('job:resume', async (data) => {
     const { jobId, assignments, job } = data;
-    console.log(`[Dashboard] Job resume: ${jobId} - ${assignments?.length || 0} assignments`);
-
-    // Notify workers
+    console.log(`[Dashboard] ${socket.user.email}: Job resume ${jobId}`);
     workerNs.emit('job:resumed', { jobId });
 
-    // Send pending assignments
     if (assignments && assignments.length > 0 && job) {
       const sentCount = sendJobAssignments(assignments, job);
       socket.emit('job:resume:ack', {
@@ -666,26 +909,21 @@ dashboardNs.on('connection', (socket) => {
       });
     }
 
-    // Broadcast to dashboards
     broadcastJobStatusUpdate(jobId, 'active', null);
   });
 
-  // Job cancel from dashboard
+  // Job cancel
   socket.on('job:cancel', (data) => {
     const { jobId } = data;
-    console.log(`[Dashboard] Job cancel: ${jobId}`);
-
-    // Notify all workers to stop any running work
+    console.log(`[Dashboard] ${socket.user.email}: Job cancel ${jobId}`);
     workerNs.emit('job:cancelled', { jobId });
-
-    // Broadcast to dashboards
     broadcastJobStatusUpdate(jobId, 'cancelled', null);
   });
 
-  // Start streaming from device
+  // Start streaming
   socket.on('stream:start', (data) => {
     const { deviceId, fps = 2 } = data;
-    console.log(`[Dashboard] Stream start: ${deviceId}`);
+    console.log(`[Dashboard] ${socket.user.email}: Stream start ${deviceId}`);
 
     const deviceState = deviceStates.get(deviceId);
     if (!deviceState) {
@@ -693,14 +931,12 @@ dashboardNs.on('connection', (socket) => {
       return;
     }
 
-    // Register stream subscription
     if (!activeStreams.has(deviceId)) {
       activeStreams.set(deviceId, {
         workerSocketId: deviceState.workerSocketId,
         dashboardSocketIds: new Set()
       });
 
-      // Tell worker to start streaming
       const worker = connectedWorkers.get(deviceState.pcId);
       if (worker && worker.socket) {
         worker.socket.emit('stream:start', { deviceId, fps });
@@ -709,23 +945,21 @@ dashboardNs.on('connection', (socket) => {
 
     activeStreams.get(deviceId).dashboardSocketIds.add(socket.id);
 
-    // Track subscription
     const dashboard = connectedDashboards.get(socket.id);
     if (dashboard) {
       dashboard.subscribedDevices.add(deviceId);
     }
   });
 
-  // Stop streaming from device
+  // Stop streaming
   socket.on('stream:stop', (data) => {
     const { deviceId } = data;
-    console.log(`[Dashboard] Stream stop: ${deviceId}`);
+    console.log(`[Dashboard] ${socket.user.email}: Stream stop ${deviceId}`);
 
     const stream = activeStreams.get(deviceId);
     if (stream) {
       stream.dashboardSocketIds.delete(socket.id);
 
-      // If no more viewers, tell worker to stop
       if (stream.dashboardSocketIds.size === 0) {
         const deviceState = deviceStates.get(deviceId);
         if (deviceState) {
@@ -738,7 +972,6 @@ dashboardNs.on('connection', (socket) => {
       }
     }
 
-    // Remove subscription tracking
     const dashboard = connectedDashboards.get(socket.id);
     if (dashboard) {
       dashboard.subscribedDevices.delete(deviceId);
@@ -747,9 +980,8 @@ dashboardNs.on('connection', (socket) => {
 
   // Disconnect handler
   socket.on('disconnect', (reason) => {
-    console.log(`[Dashboard] Disconnected: ${socket.id} (${reason})`);
+    console.log(`[Dashboard] Disconnected: ${socket.user.email || socket.id} (${reason})`);
 
-    // Clean up stream subscriptions
     const dashboard = connectedDashboards.get(socket.id);
     if (dashboard) {
       for (const deviceId of dashboard.subscribedDevices) {
@@ -757,7 +989,6 @@ dashboardNs.on('connection', (socket) => {
         if (stream) {
           stream.dashboardSocketIds.delete(socket.id);
           if (stream.dashboardSocketIds.size === 0) {
-            // Tell worker to stop streaming
             const deviceState = deviceStates.get(deviceId);
             if (deviceState) {
               const worker = connectedWorkers.get(deviceState.pcId);
@@ -776,12 +1007,24 @@ dashboardNs.on('connection', (socket) => {
 });
 
 // =============================================
+// Token Expiration Check (Periodic)
+// =============================================
+
+setInterval(() => {
+  for (const [socketId, dashboard] of connectedDashboards.entries()) {
+    const socket = dashboardNs.sockets.get(socketId);
+    if (socket && !isTokenValid(socket)) {
+      console.log(`[Auth] Token expired for ${dashboard.user?.email || socketId}, disconnecting`);
+      socket.emit('auth:token_expired', { message: 'Your session has expired. Please re-authenticate.' });
+      socket.disconnect(true);
+    }
+  }
+}, TOKEN_CHECK_INTERVAL);
+
+// =============================================
 // Job Distribution Functions
 // =============================================
 
-/**
- * Send job assignment to a specific device's worker
- */
 function sendJobAssignment(assignment, job) {
   const deviceState = deviceStates.get(assignment.device_id);
   if (!deviceState) {
@@ -817,9 +1060,6 @@ function sendJobAssignment(assignment, job) {
   return true;
 }
 
-/**
- * Send multiple job assignments (bulk)
- */
 function sendJobAssignments(assignments, job) {
   let sentCount = 0;
   for (const assignment of assignments) {
@@ -830,9 +1070,6 @@ function sendJobAssignments(assignments, job) {
   return sentCount;
 }
 
-/**
- * Broadcast job status update to all dashboards
- */
 function broadcastJobStatusUpdate(jobId, status, progress) {
   dashboardNs.emit('job:status:update', {
     jobId,
@@ -842,12 +1079,8 @@ function broadcastJobStatusUpdate(jobId, status, progress) {
   });
 }
 
-/**
- * Send pending assignments to a reconnecting worker
- */
 async function sendPendingAssignmentsToWorker(socket, pcId) {
   try {
-    // Get devices for this PC
     const { data: devices } = await supabase
       .from('devices')
       .select('id')
@@ -857,7 +1090,6 @@ async function sendPendingAssignmentsToWorker(socket, pcId) {
 
     const deviceIds = devices.map(d => d.id);
 
-    // Get pending assignments for these devices with job info
     const { data: assignments } = await supabase
       .from('job_assignments')
       .select(`
@@ -885,7 +1117,6 @@ async function sendPendingAssignmentsToWorker(socket, pcId) {
 
     if (!assignments || assignments.length === 0) return;
 
-    // Filter for active jobs and send
     for (const assignment of assignments) {
       if (assignment.jobs && assignment.jobs.status === 'active') {
         socket.emit('job:assign', {
@@ -904,55 +1135,154 @@ async function sendPendingAssignmentsToWorker(socket, pcId) {
 }
 
 // =============================================
-// Helper Functions
-// =============================================
-
-// Note: Device UPSERT now handled by supabaseService.upsertDevicesBatch()
-// Legacy function kept for compatibility but not used
-async function updateDevicesInSupabase(devices, pcId) {
-  // Deprecated: Use supabaseService.upsertDevicesBatch() instead
-  console.warn('[Deprecated] updateDevicesInSupabase called - use supabaseService instead');
-}
-
-// =============================================
 // Graceful Shutdown
 // =============================================
 
-process.on('SIGINT', () => {
-  console.log('\n[Server] Shutting down...');
+async function gracefulShutdown(signal) {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
 
-  // Notify all clients
-  workerNs.emit('server:shutdown', { message: 'Server is restarting' });
-  dashboardNs.emit('server:shutdown', { message: 'Server is restarting' });
+  console.log(`\n[Server] Received ${signal}. Starting graceful shutdown...`);
 
-  // Close connections
-  io.close(() => {
-    httpServer.close(() => {
-      console.log('[Server] Shutdown complete');
-      process.exit(0);
+  // 1. Stop accepting new connections (health check returns 503)
+  console.log('[Server] Stopping new connections...');
+
+  // 2. Notify all clients
+  console.log('[Server] Notifying connected clients...');
+  workerNs.emit('server:shutdown', {
+    message: 'Server is shutting down',
+    reconnectDelay: 5000
+  });
+  dashboardNs.emit('server:shutdown', {
+    message: 'Server is shutting down',
+    reconnectDelay: 5000
+  });
+
+  // 3. Wait for pending operations (max 10 seconds)
+  console.log('[Server] Waiting for pending operations...');
+  await new Promise(resolve => setTimeout(resolve, 2000));
+
+  // 4. Close Redis connections
+  if (io.redisClients) {
+    console.log('[Server] Closing Redis connections...');
+    try {
+      await Promise.all([
+        io.redisClients.pubClient.quit(),
+        io.redisClients.subClient.quit()
+      ]);
+      console.log('[Server] Redis connections closed');
+    } catch (err) {
+      console.error('[Server] Redis close error:', err.message);
+    }
+  }
+
+  // 5. Close Socket.io
+  console.log('[Server] Closing Socket.io...');
+  await new Promise((resolve) => {
+    io.close(() => {
+      console.log('[Server] Socket.io closed');
+      resolve();
     });
   });
+
+  // 6. Close HTTP server
+  console.log('[Server] Closing HTTP server...');
+  await new Promise((resolve) => {
+    httpServer.close(() => {
+      console.log('[Server] HTTP server closed');
+      resolve();
+    });
+  });
+
+  console.log('[Server] Graceful shutdown complete');
+  process.exit(0);
+}
+
+// Signal handlers
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+
+// Uncaught exception handler
+process.on('uncaughtException', (err) => {
+  console.error('[Server] Uncaught exception:', err);
+  gracefulShutdown('uncaughtException');
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[Server] Unhandled rejection at:', promise, 'reason:', reason);
 });
 
 // =============================================
 // Start Server
 // =============================================
 
-httpServer.listen(PORT, () => {
-  console.log('');
-  console.log('╔═══════════════════════════════════════════════════════════╗');
-  console.log('║        DoAi.Me Socket.io Server v1.0 Started              ║');
-  console.log('╠═══════════════════════════════════════════════════════════╣');
-  console.log(`║  Port: ${PORT}                                                ║`);
-  console.log(`║  Worker NS: /worker                                       ║`);
-  console.log(`║  Dashboard NS: /dashboard                                 ║`);
-  console.log(`║  Health Check: http://localhost:${PORT}/health               ║`);
-  console.log('╚═══════════════════════════════════════════════════════════╝');
-  console.log('');
-  console.log('[Server] Waiting for connections...');
+async function startServer() {
+  // Setup Redis adapter first
+  await setupRedisAdapter();
 
-  // Start Channel Checker (auto-monitoring for CHANNEL_AUTO jobs)
-  startChannelChecker();
-});
+  // Initialize state service (load states from DB, start heartbeat checker)
+  await stateService.loadInitialStates();
+  stateService.startHeartbeatChecker();
+
+  // Log CORS configuration
+  const corsOrigin = getCorsOrigin();
+  console.log('[Server] CORS Configuration:');
+  console.log(`  Environment: ${NODE_ENV}`);
+  console.log(`  Allowed Origins: ${Array.isArray(corsOrigin) ? corsOrigin.join(', ') : corsOrigin}`);
+
+  // Start HTTP server with HOST binding
+  httpServer.listen(PORT, HOST, () => {
+    console.log('');
+    console.log('╔════════════════════════════════════════════════════════════════════╗');
+    console.log('║        DoAi.Me Socket.io Server v2.0 (Secure Edition)              ║');
+    console.log('╠════════════════════════════════════════════════════════════════════╣');
+    console.log(`║  Environment: ${NODE_ENV.toUpperCase().padEnd(52)}║`);
+    console.log(`║  Host: ${HOST.padEnd(59)}║`);
+    console.log(`║  Port: ${String(PORT).padEnd(59)}║`);
+    console.log(`║  Worker NS: /worker (Token Auth)                                   ║`);
+    console.log(`║  Dashboard NS: /dashboard (Supabase JWT Auth)                      ║`);
+    console.log(`║  Redis Adapter: ${(ENABLE_REDIS ? 'Enabled' : 'Disabled').padEnd(50)}║`);
+    console.log(`║  Cookie Secure: ${(IS_PRODUCTION ? 'Yes (HTTPS)' : 'No (HTTP)').padEnd(50)}║`);
+    console.log(`║  Health Check: http://${HOST}:${PORT}/health`.padEnd(69) + '║');
+    console.log('╚════════════════════════════════════════════════════════════════════╝');
+    console.log('');
+    console.log('[Server] Security Features:');
+    console.log('  ✓ JWT Authentication (Supabase)');
+    console.log('  ✓ Worker Token Verification');
+    console.log('  ✓ Token Expiration Monitoring');
+    console.log(`  ${ENABLE_REDIS ? '✓' : '○'} Redis Adapter (Horizontal Scaling)`);
+    console.log('  ✓ Graceful Shutdown');
+    if (IS_PRODUCTION) {
+      console.log('  ✓ Secure Cookies (SameSite: strict)');
+      console.log('  ✓ CORS Whitelist Enforcement');
+    }
+    console.log('');
+    
+    // 환경변수 검증 로그
+    console.log('[Server] Environment Validation:');
+    console.log(`  SUPABASE_SERVICE_ROLE_KEY: ${process.env.SUPABASE_SERVICE_ROLE_KEY ? '✓ Loaded' : '✗ MISSING'}`);
+    console.log(`  SUPABASE_JWT_SECRET: ${process.env.SUPABASE_JWT_SECRET ? '✓ Loaded' : '✗ MISSING'}`);
+    console.log(`  WORKER_SECRET_TOKEN: ${process.env.WORKER_SECRET_TOKEN ? '✓ Loaded' : '○ Using default'}`);
+    console.log('');
+    
+    // CORS 설정 요약
+    console.log('[Server] CORS Policy:');
+    console.log(`  Mode: ${IS_PRODUCTION ? 'STRICT (Production)' : 'Permissive (Development)'}`);
+    console.log(`  Allowed Origins:`);
+    const origins = getCorsOrigin();
+    (Array.isArray(origins) ? origins : [origins]).forEach(o => {
+      console.log(`    - ${o}`);
+    });
+    console.log(`  Credentials: true`);
+    console.log(`  Transports: websocket, polling`);
+    console.log('');
+    console.log('[Server] Waiting for connections...');
+
+    // Start Channel Checker
+    startChannelChecker();
+  });
+}
+
+startServer();
 
 module.exports = { io, workerNs, dashboardNs };

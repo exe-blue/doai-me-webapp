@@ -19,7 +19,11 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@doai/shared": ["../../packages/shared/src/index.ts"],
+      "@doai/shared/*": ["../../packages/shared/src/*"],
+      "@doai/ui": ["../../packages/ui/src/index.ts"],
+      "@doai/ui/*": ["../../packages/ui/src/*"]
     }
   },
   "include": [

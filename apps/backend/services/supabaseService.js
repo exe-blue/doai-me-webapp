@@ -530,6 +530,279 @@ async function updateChannelLastCheck(channelId, lastVideoId = null) {
 }
 
 // =============================================
+// Workflow Operations (C2 아키텍처)
+// =============================================
+
+/**
+ * 워크플로우 목록 조회
+ * @param {boolean} activeOnly - 활성 워크플로우만 조회
+ */
+async function getWorkflows(activeOnly = true) {
+  let query = supabase
+    .from('workflows')
+    .select('*')
+    .order('name');
+  
+  if (activeOnly) {
+    query = query.eq('is_active', true);
+  }
+  
+  const { data, error } = await query;
+  
+  if (error) {
+    console.error('[Supabase] getWorkflows error:', error.message);
+    throw error;
+  }
+  
+  return data || [];
+}
+
+/**
+ * 워크플로우 조회
+ * @param {string} workflowId - 워크플로우 ID
+ */
+async function getWorkflow(workflowId) {
+  const { data, error } = await supabase
+    .from('workflows')
+    .select('*')
+    .eq('id', workflowId)
+    .single();
+  
+  if (error) {
+    console.error('[Supabase] getWorkflow error:', error.message);
+    return null;
+  }
+  
+  return data;
+}
+
+/**
+ * 워크플로우 실행 생성
+ * @param {Object} execution - 실행 정보
+ */
+async function createWorkflowExecution(execution) {
+  const { data, error } = await supabase
+    .from('workflow_executions')
+    .insert({
+      execution_id: execution.executionId,
+      workflow_id: execution.workflowId,
+      workflow_version: execution.version,
+      device_ids: execution.deviceIds,
+      node_ids: execution.nodeIds || [],
+      params: execution.params || {},
+      status: 'pending',
+      total_devices: execution.deviceIds?.length || 0,
+      triggered_by: execution.triggeredBy,
+    })
+    .select()
+    .single();
+  
+  if (error) {
+    console.error('[Supabase] createWorkflowExecution error:', error.message);
+    throw error;
+  }
+  
+  return data;
+}
+
+/**
+ * 워크플로우 실행 상태 업데이트
+ * @param {string} executionId - 실행 ID
+ * @param {Object} updates - 업데이트 내용
+ */
+async function updateWorkflowExecution(executionId, updates) {
+  const { data, error } = await supabase
+    .from('workflow_executions')
+    .update({
+      ...updates,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('execution_id', executionId)
+    .select()
+    .single();
+  
+  if (error) {
+    console.error('[Supabase] updateWorkflowExecution error:', error.message);
+    throw error;
+  }
+  
+  return data;
+}
+
+/**
+ * 워크플로우 실행 시작
+ * @param {string} executionId - 실행 ID
+ */
+async function startWorkflowExecution(executionId) {
+  return updateWorkflowExecution(executionId, {
+    status: 'running',
+    started_at: new Date().toISOString(),
+  });
+}
+
+/**
+ * 워크플로우 실행 완료
+ * @param {string} executionId - 실행 ID
+ * @param {boolean} hasFailures - 실패 디바이스 있음
+ */
+async function completeWorkflowExecution(executionId, hasFailures = false) {
+  return updateWorkflowExecution(executionId, {
+    status: hasFailures ? 'partial' : 'completed',
+    completed_at: new Date().toISOString(),
+  });
+}
+
+/**
+ * 워크플로우 디바이스 완료 카운트 증가
+ * @param {string} executionId - 실행 ID
+ */
+async function incrementExecutionCompleted(executionId) {
+  const { data, error } = await supabase.rpc('increment_workflow_completed', {
+    p_execution_id: executionId,
+  });
+  
+  if (error) {
+    // RPC가 없으면 직접 업데이트
+    const { data: current } = await supabase
+      .from('workflow_executions')
+      .select('completed_devices')
+      .eq('execution_id', executionId)
+      .single();
+    
+    if (current) {
+      await updateWorkflowExecution(executionId, {
+        completed_devices: (current.completed_devices || 0) + 1,
+      });
+    }
+  }
+  
+  return data;
+}
+
+/**
+ * 워크플로우 디바이스 실패 카운트 증가
+ * @param {string} executionId - 실행 ID
+ */
+async function incrementExecutionFailed(executionId) {
+  const { data: current } = await supabase
+    .from('workflow_executions')
+    .select('failed_devices')
+    .eq('execution_id', executionId)
+    .single();
+  
+  if (current) {
+    await updateWorkflowExecution(executionId, {
+      failed_devices: (current.failed_devices || 0) + 1,
+    });
+  }
+}
+
+// =============================================
+// Execution Log Operations
+// =============================================
+
+/**
+ * 실행 로그 삽입
+ * @param {Object} log - 로그 정보
+ */
+async function insertExecutionLog(log) {
+  const { data, error } = await supabase
+    .from('execution_logs')
+    .insert({
+      device_id: log.deviceId,
+      workflow_id: log.workflowId,
+      execution_id: log.executionId,
+      step_id: log.stepId,
+      level: log.level || 'info',
+      status: log.status,
+      message: log.message,
+      details: log.details || {},
+    })
+    .select()
+    .single();
+  
+  if (error) {
+    console.error('[Supabase] insertExecutionLog error:', error.message);
+    // 로그 실패는 치명적이지 않음
+    return null;
+  }
+  
+  return data;
+}
+
+/**
+ * 실행 로그 조회
+ * @param {Object} options - 조회 옵션
+ */
+async function getExecutionLogs(options = {}) {
+  const { deviceId, workflowId, executionId, level, limit = 100, offset = 0 } = options;
+  
+  let query = supabase
+    .from('execution_logs')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1);
+  
+  if (deviceId) query = query.eq('device_id', deviceId);
+  if (workflowId) query = query.eq('workflow_id', workflowId);
+  if (executionId) query = query.eq('execution_id', executionId);
+  if (level) query = query.eq('level', level);
+  
+  const { data, error } = await query;
+  
+  if (error) {
+    console.error('[Supabase] getExecutionLogs error:', error.message);
+    throw error;
+  }
+  
+  return data || [];
+}
+
+// =============================================
+// Device State Operations (Supabase RPC)
+// =============================================
+
+/**
+ * 디바이스 상태 업데이트 (RPC 함수 호출)
+ * @param {string} deviceId - 디바이스 ID
+ * @param {string} newState - 새 상태
+ * @param {string} trigger - 트리거
+ * @param {Object} options - 추가 옵션
+ */
+async function updateDeviceStateRpc(deviceId, newState, trigger, options = {}) {
+  const { data, error } = await supabase.rpc('update_device_state', {
+    p_device_id: deviceId,
+    p_new_state: newState,
+    p_trigger: trigger,
+    p_workflow_id: options.workflowId || null,
+    p_job_id: options.jobId || null,
+    p_error_message: options.errorMessage || null,
+    p_metadata: options.metadata || {},
+  });
+  
+  if (error) {
+    console.error('[Supabase] updateDeviceStateRpc error:', error.message);
+    throw error;
+  }
+  
+  return data;
+}
+
+/**
+ * 디바이스 상태 카운트 조회
+ */
+async function getDeviceStateCounts() {
+  const { data, error } = await supabase.rpc('get_device_state_counts');
+  
+  if (error) {
+    console.error('[Supabase] getDeviceStateCounts error:', error.message);
+    throw error;
+  }
+  
+  return data || [];
+}
+
+// =============================================
 // Export
 // =============================================
 
@@ -557,5 +830,23 @@ module.exports = {
   // Channel operations
   getOrCreateChannel,
   getChannelsToCheck,
-  updateChannelLastCheck
+  updateChannelLastCheck,
+
+  // Workflow operations (C2)
+  getWorkflows,
+  getWorkflow,
+  createWorkflowExecution,
+  updateWorkflowExecution,
+  startWorkflowExecution,
+  completeWorkflowExecution,
+  incrementExecutionCompleted,
+  incrementExecutionFailed,
+
+  // Execution log operations
+  insertExecutionLog,
+  getExecutionLogs,
+
+  // Device state operations
+  updateDeviceStateRpc,
+  getDeviceStateCounts,
 };

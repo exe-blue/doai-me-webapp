@@ -1,0 +1,107 @@
+# 앱 설치 워크플로우
+# 버전 1 - 표준 C2 아키텍처 준수
+
+id: app_install
+name: "Play Store 앱 설치"
+version: 1
+description: "Play Store에서 앱 검색 후 설치"
+
+timeout: 300s  # 앱 다운로드 시간 고려
+retry_policy:
+  default_attempts: 2
+  default_delay: 2000ms
+  backoff: exponential
+
+params:
+  app_name:
+    type: string
+    required: true
+    description: "설치할 앱 이름"
+  package_name:
+    type: string
+    required: false
+    description: "앱 패키지명 (정확한 매칭용)"
+
+steps:
+  - id: open_playstore
+    name: "Play Store 열기"
+    action: autox
+    script: "launch('com.android.vending')"
+    timeout: 10s
+    retry: 3
+    on_error: fail
+    
+  - id: wait_playstore_load
+    name: "Play Store 로딩 대기"
+    action: wait
+    duration: 3s
+    
+  - id: search_app
+    name: "앱 검색"
+    action: autox
+    script: |
+      click('search_bar')
+      input('{{app_name}}')
+      click('search_submit') || press('enter')
+    timeout: 8s
+    retry: 2
+    on_error: fail
+    
+  - id: wait_search_results
+    name: "검색 결과 대기"
+    action: wait
+    duration: 3s
+    
+  - id: select_app
+    name: "앱 선택"
+    action: autox
+    script: "click_app_result('{{app_name}}', '{{package_name}}')"
+    timeout: 5s
+    retry: 2
+    on_error: fail
+    
+  - id: click_install
+    name: "설치 버튼 클릭"
+    action: autox
+    script: |
+      if exists('install_btn'):
+        click('install_btn')
+      elif exists('open_btn'):
+        skip('Already installed')
+      else:
+        fail('Install button not found')
+    timeout: 5s
+    retry: 2
+    on_error: skip  # 이미 설치됨
+    
+  - id: wait_install
+    name: "설치 완료 대기"
+    action: autox
+    script: "wait_for_element('open_btn', timeout=180s)"
+    timeout: 180s  # 3분 다운로드 대기
+    on_error: fail
+    
+  - id: verify_install
+    name: "설치 확인"
+    action: adb
+    command: "pm list packages | grep '{{package_name}}'"
+    timeout: 5s
+    on_error: skip
+    
+  - id: take_evidence
+    name: "증거 스크린샷"
+    action: adb
+    command: "screencap -p /sdcard/install_{{device_id}}_{{timestamp}}.png"
+    timeout: 5s
+    on_error: skip
+    
+  - id: report
+    name: "완료 보고"
+    action: system
+    script: "report_completion()"
+    timeout: 3s
+
+on_error:
+  - id: error_screenshot
+    action: adb
+    command: "screencap -p /sdcard/error_{{device_id}}_{{timestamp}}.png"
