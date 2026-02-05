@@ -359,7 +359,7 @@ export interface SystemOverview {
 // Database 스키마 타입 (Supabase 클라이언트용)
 // ============================================
 
-export interface Database {
+export type Database = {
   public: {
     Tables: {
       nodes: {
