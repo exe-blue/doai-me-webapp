@@ -69,8 +69,8 @@ function Slider({
             "border-2 border-foreground shadow-[2px_2px_0px_0px] shadow-foreground",
             "transition-transform duration-200",
             "hover:scale-110",
-            "focus-visible:outline-none",
-            "disabled:pointer-events-none disabled:opacity-50"
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+            "data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
           )}
         />
       ))}

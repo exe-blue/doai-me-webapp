@@ -250,8 +250,32 @@ export default function DevicesPage() {
   }
 
   async function sendCommand(deviceIds: string[], command: string) {
-    alert(`${deviceIds.length}대에 ${command} 명령을 전송했습니다`);
-    setSelectedDevices([]);
+    try {
+      const response = await fetch("/api/devices/command", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ deviceIds, command }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || `HTTP ${response.status}`);
+      }
+
+      if (!result.success) {
+        throw new Error(result.error || "명령 전송 실패");
+      }
+
+      alert(`${deviceIds.length}대에 ${command} 명령을 성공적으로 전송했습니다`);
+      setSelectedDevices([]);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "알 수 없는 오류";
+      alert(`명령 전송 실패: ${message}`);
+      console.error("sendCommand error:", error);
+    }
   }
 
   async function rebootDevice(deviceId: string) {
@@ -533,7 +557,8 @@ export default function DevicesPage() {
         ) : viewMode === "grid" ? (
           <div className="grid grid-cols-6 gap-3">
             {filteredDevices.slice(0, 120).map((device) => {
-              const StatusIcon = statusConfig[device.status]?.icon || CheckCircle2;
+              // eslint-disable-next-line @typescript-eslint/no-unused-vars
+              const _StatusIcon = statusConfig[device.status]?.icon || CheckCircle2;
               const BattIcon = getBatteryIcon(device.battery_level, device.is_charging);
 
               return (

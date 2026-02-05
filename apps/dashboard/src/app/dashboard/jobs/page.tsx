@@ -60,21 +60,12 @@ function extractVideoId(url: string): string | null {
   return null;
 }
 
-/**
- * 시간 포맷팅 (초 -> MM:SS)
- */
-function formatDuration(seconds: number): string {
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-}
-
 // =============================================
 // Main Component
 // =============================================
 
 export default function JobsPage() {
-  const { isConnected, devices, socket } = useSocketContext();
+  const { isConnected, devices, getSocket } = useSocketContext();
   
   // 모달 상태
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -138,6 +129,7 @@ export default function JobsPage() {
   // =============================================
 
   useEffect(() => {
+    const socket = getSocket();
     if (!socket || !isConnected) return;
 
     const handleJobProgress = (data: JobProgress) => {
@@ -173,12 +165,15 @@ export default function JobsPage() {
     socket.on('job:started', handleJobStarted);
 
     return () => {
-      socket.off('job:progress', handleJobProgress);
-      socket.off('job:completed', handleJobCompleted);
-      socket.off('job:failed', handleJobCompleted);
-      socket.off('job:started', handleJobStarted);
+      const socket = getSocket();
+      if (socket) {
+        socket.off('job:progress', handleJobProgress);
+        socket.off('job:completed', handleJobCompleted);
+        socket.off('job:failed', handleJobCompleted);
+        socket.off('job:started', handleJobStarted);
+      }
     };
-  }, [socket, isConnected, fetchJobs, fetchCompletedJobs]);
+  }, [getSocket, isConnected, fetchJobs, fetchCompletedJobs]);
 
   // Elapsed time ticker
   useEffect(() => {
@@ -238,6 +233,7 @@ export default function JobsPage() {
   const handleJobCreated = (response: CreateJobResponse) => {
     toast.success(`작업 생성: ${response.job.title}`);
     fetchJobs();
+    const socket = getSocket();
     if (isConnected && socket && response.assignments.length > 0) {
       socket.emit('job:distribute', {
         assignments: response.assignments,
@@ -275,6 +271,7 @@ export default function JobsPage() {
         body: JSON.stringify({ status: newStatus }),
       });
       if (!response.ok) throw new Error('Failed to update job');
+      const socket = getSocket();
       if (socket && isConnected) {
         socket.emit(newStatus === 'paused' ? 'job:pause' : 'job:resume', { jobId: job.id });
       }
@@ -290,6 +287,7 @@ export default function JobsPage() {
     if (!confirm(`"${job.display_name || job.title}" 작업을 삭제하시겠습니까?`)) return;
     setActionLoading(job.id);
     try {
+      const socket = getSocket();
       if (socket && isConnected) {
         socket.emit('job:cancel', { jobId: job.id });
       }
@@ -538,6 +536,7 @@ export default function JobsPage() {
                     {/* Small Thumbnail */}
                     <div className="shrink-0 w-10 h-7 rounded overflow-hidden bg-zinc-800">
                       {thumbnailUrl ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
                         <img
                           src={thumbnailUrl}
                           alt=""

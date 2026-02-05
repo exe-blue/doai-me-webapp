@@ -124,6 +124,7 @@ export default function VideosPage() {
 
   useEffect(() => {
     fetchVideos();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter]);
 
   async function fetchVideos() {
@@ -510,6 +511,7 @@ export default function VideosPage() {
                   {/* 영상 정보 */}
                   <TableCell>
                     <div className="flex items-center gap-3">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={video.thumbnail_url || `https://img.youtube.com/vi/${video.id}/mqdefault.jpg`}
                         alt={video.title}

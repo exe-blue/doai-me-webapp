@@ -130,7 +130,8 @@ function calculateETA(queuePosition: number, avgDurationSec: number): string {
 export const JobCard = memo(function JobCard({
   job,
   queuePosition = 0,
-  totalInQueue = 0,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  totalInQueue: _totalInQueue = 0,
   isRunning = false,
   progress,
   isLoading = false,
@@ -236,6 +237,7 @@ export const JobCard = memo(function JobCard({
           title="YouTube에서 보기"
         >
           {thumbnailUrl ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
             <img
               src={thumbnailUrl}
               alt="Video thumbnail"

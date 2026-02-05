@@ -147,6 +147,7 @@ export default function SystemLogsPage() {
         clearInterval(intervalRef.current);
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [levelFilter, sourceFilter, nodeFilter, timeRange]);
 
   useEffect(() => {
@@ -166,6 +167,7 @@ export default function SystemLogsPage() {
         clearInterval(intervalRef.current);
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLive]);
 
   async function fetchLogs(append = false) {

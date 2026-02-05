@@ -10,7 +10,7 @@ console.log('='.repeat(50));
 console.log('🔌 Supabase 연결 테스트');
 console.log('='.repeat(50));
 console.log(`URL: ${supabaseUrl}`);
-console.log(`Key: ${supabaseKey?.slice(0, 20)}...`);
+console.log(`Supabase key present: ${!!supabaseKey}`);
 console.log('');
 
 if (!supabaseUrl || !supabaseKey) {
@@ -28,7 +28,7 @@ async function testConnection() {
     const tables = ['devices', 'jobs', 'job_assignments', 'monitored_channels'];
     
     for (const table of tables) {
-      const { data, error, count } = await supabase
+      const { error, count } = await supabase
         .from(table)
         .select('*', { count: 'exact', head: true });
       

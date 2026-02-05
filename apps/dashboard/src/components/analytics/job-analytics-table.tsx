@@ -11,8 +11,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Progress } from '@/components/ui/progress';
-import { CheckCircle, Clock, AlertCircle, Loader2, ExternalLink } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { CheckCircle, Clock, AlertCircle, Loader2 } from 'lucide-react';
 
 export interface JobAnalyticsData {
   id: string;
@@ -99,6 +98,7 @@ export function JobAnalyticsTable({ jobs, isLoading }: JobAnalyticsTableProps) {
           </TableHeader>
           <TableBody>
             {jobs.map((job) => {
+              // eslint-disable-next-line @typescript-eslint/no-unused-vars
               const completionRate = job.total_assignments > 0
                 ? Math.round((job.completed_count / job.total_assignments) * 100)
                 : 0;

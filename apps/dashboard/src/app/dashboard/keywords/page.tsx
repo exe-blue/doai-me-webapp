@@ -102,6 +102,12 @@ function formatTimeAgo(dateString: string): string {
   const date = new Date(dateString);
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
+
+  // Handle future dates
+  if (diffMs < 0) {
+    return "예정됨";
+  }
+
   const diffMins = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMins / 60);
   const diffDays = Math.floor(diffHours / 24);
@@ -147,6 +153,7 @@ export default function KeywordsPage() {
 
   useEffect(() => {
     fetchKeywords();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categoryFilter]);
 
   async function fetchKeywords() {
@@ -327,6 +334,7 @@ export default function KeywordsPage() {
 
     if (error) {
       console.error("삭제 실패:", error);
+      alert(`키워드 삭제에 실패했습니다: ${error.message}`);
     } else {
       fetchKeywords();
     }

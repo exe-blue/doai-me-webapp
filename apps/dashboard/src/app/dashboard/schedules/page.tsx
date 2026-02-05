@@ -260,19 +260,37 @@ export default function SchedulesPage() {
       supabase.from("keywords").select("id, keyword").eq("is_active", true).limit(50),
     ]);
 
-    setVideos(videosRes.data || []);
-    setChannels(channelsRes.data || []);
-    setKeywords(keywordsRes.data || []);
+    if (videosRes.error) {
+      console.error("Failed to fetch videos:", videosRes.error);
+    } else {
+      setVideos(videosRes.data || []);
+    }
+
+    if (channelsRes.error) {
+      console.error("Failed to fetch channels:", channelsRes.error);
+    } else {
+      setChannels(channelsRes.data || []);
+    }
+
+    if (keywordsRes.error) {
+      console.error("Failed to fetch keywords:", keywordsRes.error);
+    } else {
+      setKeywords(keywordsRes.data || []);
+    }
   }
 
   async function fetchScheduleRuns(scheduleId: string) {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("schedule_runs")
       .select("*")
       .eq("schedule_id", scheduleId)
       .order("started_at", { ascending: false })
       .limit(20);
 
+    if (error) {
+      console.error("Failed to fetch schedule runs:", error);
+      return;
+    }
     setScheduleRuns(data || []);
   }
 

@@ -202,11 +202,13 @@ export default function RunningPage() {
         refreshInterval.current = null;
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAutoRefresh]);
 
   // Re-fetch when nodeFilter changes
   useEffect(() => {
     fetchRunningTasks();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodeFilter]);
 
   function handleRealtimeUpdate(payload: { eventType: string; new?: Record<string, unknown>; old?: Record<string, unknown> }) {
@@ -757,6 +759,7 @@ export default function RunningPage() {
                           onClick={() => setSelectedTask(task)}
                         >
                           <div className="flex gap-3">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                               src={
                                 task.video?.thumbnail_url ||
@@ -826,6 +829,7 @@ export default function RunningPage() {
                           className="flex items-center gap-3 p-2 border border-zinc-700 rounded-lg hover:bg-zinc-800/50 cursor-pointer"
                           onClick={() => setSelectedTask(task)}
                         >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={
                               task.video?.thumbnail_url ||
@@ -914,6 +918,7 @@ export default function RunningPage() {
               <div className="space-y-4">
                 {/* 영상 정보 */}
                 <div className="flex gap-4">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={
                       selectedTask.video?.thumbnail_url ||

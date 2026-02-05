@@ -8,7 +8,7 @@ import { ChevronLeft, ChevronRight, ChevronDown, type LucideIcon } from 'lucide-
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export interface NavigationItem {
   label: string;
@@ -43,11 +43,8 @@ export function AppSidebar({ navigation, logo, footer }: AppSidebarProps) {
     });
     return initial;
   });
-  const [lastPathname, setLastPathname] = useState(pathname);
-
   // 현재 경로에 맞는 메뉴 자동 확장
-  if (pathname !== lastPathname) {
-    setLastPathname(pathname);
+  useEffect(() => {
     const newExpanded = new Set<string>();
     navigation.forEach(group => {
       group.items.forEach(item => {
@@ -56,8 +53,9 @@ export function AppSidebar({ navigation, logo, footer }: AppSidebarProps) {
         }
       });
     });
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setExpandedItems(newExpanded);
-  }
+  }, [pathname, navigation]);
 
   const toggleExpanded = (label: string) => {
     setExpandedItems(prev => {
@@ -81,7 +79,7 @@ export function AppSidebar({ navigation, logo, footer }: AppSidebarProps) {
     // 서브메뉴가 있는 경우
     if (hasChildren) {
       return (
-        <div key={item.label}>
+        <div key={`${item.label}-${item.href ?? 'group'}`}>
           <button
             onClick={() => toggleExpanded(item.label)}
             className={cn(
@@ -234,7 +232,7 @@ export function AppSidebar({ navigation, logo, footer }: AppSidebarProps) {
         {/* Navigation */}
         <nav className="flex-1 space-y-2 overflow-y-auto p-2">
           {navigation.map((group, groupIndex) => (
-            <div key={groupIndex} className="space-y-1">
+            <div key={`group-${groupIndex}-${group.title ?? 'untitled'}`} className="space-y-1">
               {group.title && !isCollapsed && (
                 <motion.p
                   initial={{ opacity: 0 }}
@@ -244,7 +242,11 @@ export function AppSidebar({ navigation, logo, footer }: AppSidebarProps) {
                   {group.title}
                 </motion.p>
               )}
-              {group.items.map(item => renderNavItem(item))}
+              {group.items.map((item, itemIndex) => (
+                <div key={`${groupIndex}-${itemIndex}-${item.href ?? item.label}`}>
+                  {renderNavItem(item)}
+                </div>
+              ))}
             </div>
           ))}
         </nav>

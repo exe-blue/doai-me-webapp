@@ -46,7 +46,7 @@ interface JobListProps {
 }
 
 export function JobList({ onJobUpdated }: JobListProps) {
-  const { socket, isConnected } = useSocketContext();
+  const { getSocket, isConnected } = useSocketContext();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -76,6 +76,7 @@ export function JobList({ onJobUpdated }: JobListProps) {
 
   // Real-time job updates via Socket.io
   useEffect(() => {
+    const socket = getSocket();
     if (!socket || !isConnected) return;
 
     // Job progress updates
@@ -186,13 +187,16 @@ export function JobList({ onJobUpdated }: JobListProps) {
     socket.on('job:status:update', handleJobStatusUpdate);
 
     return () => {
-      socket.off('job:progress', handleJobProgress);
-      socket.off('job:started', handleJobStarted);
-      socket.off('job:completed', handleJobCompleted);
-      socket.off('job:failed', handleJobFailed);
-      socket.off('job:status:update', handleJobStatusUpdate);
+      const socket = getSocket();
+      if (socket) {
+        socket.off('job:progress', handleJobProgress);
+        socket.off('job:started', handleJobStarted);
+        socket.off('job:completed', handleJobCompleted);
+        socket.off('job:failed', handleJobFailed);
+        socket.off('job:status:update', handleJobStatusUpdate);
+      }
     };
-  }, [socket, isConnected]);
+  }, [getSocket, isConnected]);
 
   const toggleExpand = (jobId: string) => {
     setExpandedJobs(prev => {
@@ -221,6 +225,7 @@ export function JobList({ onJobUpdated }: JobListProps) {
       const data = await response.json();
 
       // Emit Socket.io event for real-time coordination with workers
+      const socket = getSocket();
       if (socket && isConnected) {
         if (newStatus === 'paused') {
           socket.emit('job:pause', { jobId: job.id });
@@ -255,6 +260,7 @@ export function JobList({ onJobUpdated }: JobListProps) {
     setActionLoading(job.id);
     try {
       // Emit cancel event to workers first
+      const socket = getSocket();
       if (socket && isConnected) {
         socket.emit('job:cancel', { jobId: job.id });
       }

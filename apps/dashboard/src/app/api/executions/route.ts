@@ -1,7 +1,6 @@
 import { NextRequest } from "next/server";
 import { getServerClient } from "@/lib/supabase-server";
 import {
-  successResponse,
   errorResponse,
   paginatedResponse,
   getQueryParams,

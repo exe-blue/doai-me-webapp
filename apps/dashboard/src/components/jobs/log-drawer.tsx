@@ -38,7 +38,7 @@ export function LogDrawer({
   jobId,
   jobTitle,
 }: LogDrawerProps) {
-  const { socket, isConnected } = useSocketContext();
+  const { getSocket, isConnected } = useSocketContext();
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [autoScroll, setAutoScroll] = useState(true);
   const [isPaused, setIsPaused] = useState(false);
@@ -55,6 +55,7 @@ export function LogDrawer({
 
   // Join/Leave log room (isPaused 제거하여 소켓 재연결 방지)
   useEffect(() => {
+    const socket = getSocket();
     if (!open || !socket || !isConnected) return;
 
     // 로그 룸 참가
@@ -88,10 +89,13 @@ export function LogDrawer({
 
     // Cleanup: 로그 룸 떠나기
     return () => {
-      socket.off('device:log', handleLog);
-      socket.emit('leave:log_room', { deviceId, jobId });
+      const socket = getSocket();
+      if (socket) {
+        socket.off('device:log', handleLog);
+        socket.emit('leave:log_room', { deviceId, jobId });
+      }
     };
-  }, [open, socket, isConnected, deviceId, jobId]);
+  }, [open, getSocket, isConnected, deviceId, jobId]);
 
   // Auto-scroll effect
   useEffect(() => {

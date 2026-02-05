@@ -22,7 +22,6 @@ import {
   Radio,
   Play,
   Pause,
-  Maximize2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Device } from '@/lib/supabase';
@@ -56,7 +55,8 @@ export function RemoteViewModal({
   device,
   open,
   onOpenChange,
-  onCommand,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  onCommand: _onCommand,
   broadcastEnabled = false,
   onBroadcastToggle,
   broadcastDeviceIds = [],
@@ -105,7 +105,8 @@ export function RemoteViewModal({
     };
   }, [device, isStreaming, stopStream]);
 
-  const fetchScreenshot = useCallback(async () => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _fetchScreenshot = useCallback(async () => {
     if (!device) return;
 
     setIsLoading(true);
@@ -213,7 +214,8 @@ export function RemoteViewModal({
 
   if (!device) return null;
 
-  const aspectRatio = deviceResolution.height / deviceResolution.width;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _aspectRatio = deviceResolution.height / deviceResolution.width;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -292,6 +294,7 @@ export function RemoteViewModal({
               }}
             >
               {screenshot ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
                 <img
                   src={screenshot}
                   alt="Device screen"

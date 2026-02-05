@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { RefreshCw, Monitor, WifiOff, Loader2, Zap, Sun, Volume2, Filter, AlertCircle, ChevronDown, Home, Youtube, Power, RotateCcw, AppWindow, Trash2 } from 'lucide-react';
+import { RefreshCw, Monitor, WifiOff, Loader2, Zap, Sun, Volume2, Filter, ChevronDown, Home, Youtube, Power, RotateCcw, AppWindow, Trash2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -114,6 +114,7 @@ export default function NodesPage() {
       }
     });
     return Array.from(pcs).sort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [devices]);
 
   // Get unique Board list for filter (extract B## from pc_id like P01-B01S01)
@@ -150,6 +151,7 @@ export default function NodesPage() {
       if (device.pc_id.toUpperCase().startsWith('PC-')) return false;
       return true;
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [devices]);
 
   // Filter devices - includes strict naming convention filter + user filters
@@ -191,6 +193,7 @@ export default function NodesPage() {
 
       return true;
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [devices, filterPC, filterBoard, showNormal, showError, showOffline, getDeviceHealthStatus]);
 
   // Group devices by PC code (P01, P02) - extract from pc_id like P01-001
@@ -224,7 +227,7 @@ export default function NodesPage() {
     const working = validDevices.filter(d => d.status === 'busy').length;
     const offline = validDevices.filter(d => d.status === 'offline').length;
     // Error: stale heartbeat (over 1 minute)
-    const currentTime = Date.now(); // eslint-disable-line react-hooks/purity
+    const currentTime = Date.now();
     const error = validDevices.filter(d => {
       if (d.status === 'offline') return false;
       if (d.last_seen_at) {
@@ -237,6 +240,7 @@ export default function NodesPage() {
     // Count unique PC codes (P01, P02, etc.)
     const pcCount = new Set(validDevices.map(d => d.pc_id?.split('-')[0])).size;
     return { total, online, working, offline, error, pcCount };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [devices]);
 
   // Get devices in same PC group as selected device (by PC code like P01)

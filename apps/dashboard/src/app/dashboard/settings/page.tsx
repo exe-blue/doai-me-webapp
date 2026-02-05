@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
@@ -65,17 +65,22 @@ const STORAGE_KEY = 'doaime-settings';
 
 export default function SettingsPage() {
   const { isConnected, devices } = useSocketContext();
-  const [settings, setSettings] = useState<GlobalSettings>(() => {
-    if (typeof window === 'undefined') return DEFAULT_SETTINGS;
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      return stored ? { ...DEFAULT_SETTINGS, ...JSON.parse(stored) } : DEFAULT_SETTINGS;
-    } catch {
-      return DEFAULT_SETTINGS;
-    }
-  });
+  const [settings, setSettings] = useState<GlobalSettings>(DEFAULT_SETTINGS);
   const [hasChanges, setHasChanges] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  // Read localStorage in useEffect to avoid SSR hydration mismatch
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(stored) });
+      }
+    } catch {
+      // localStorage not available or parsing failed, keep defaults
+    }
+  }, []);
 
   const updateSetting = <K extends keyof GlobalSettings>(key: K, value: GlobalSettings[K]) => {
     setSettings(prev => ({ ...prev, [key]: value }));

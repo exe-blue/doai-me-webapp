@@ -5,7 +5,6 @@ import { SidebarProvider } from './sidebar-context';
 import { AppSidebar, NavigationGroup } from './app-sidebar';
 import { Header } from './header';
 import { Toaster } from 'sonner';
-import { cn } from '@/lib/utils';
 
 interface AppLayoutProps {
   children: ReactNode;

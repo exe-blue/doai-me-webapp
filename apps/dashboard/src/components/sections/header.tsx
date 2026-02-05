@@ -1,6 +1,6 @@
 "use client";
 
-import { Logo, LogoIcon } from "@/components/icons";
+import { LogoIcon } from "@/components/icons";
 import { MobileDrawer } from "@/components/mobile-drawer";
 import { buttonVariants } from "@/components/ui/button";
 import { siteConfig } from "@/lib/config";

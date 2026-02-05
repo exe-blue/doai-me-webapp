@@ -29,6 +29,7 @@ export function StatusBoard({ refreshTrigger }: StatusBoardProps) {
 
   // Scrcpy 버튼 상태 (device_id -> state)
   const [scrcpyStates, setScrcpyStates] = useState<Record<string, ScrcpyButtonState>>({});
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [pendingScrcpyCommands, setPendingScrcpyCommands] = useState<Record<string, string>>({});
 
   // Ref: 최신 handleScrcpyCommandUpdate 핸들러를 저장 (stale closure 방지)
@@ -53,6 +54,7 @@ export function StatusBoard({ refreshTrigger }: StatusBoardProps) {
       }
     };
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshTrigger]);
 
   // Realtime 구독: job_assignments + devices + scrcpy_commands
@@ -121,6 +123,7 @@ export function StatusBoard({ refreshTrigger }: StatusBoardProps) {
       if (retryTimer) clearTimeout(retryTimer);
       supabase.removeChannel(channel);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Scrcpy 명령 상태 업데이트 핸들러

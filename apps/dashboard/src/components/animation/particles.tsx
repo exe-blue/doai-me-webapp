@@ -48,7 +48,6 @@ export function Particles({
   const canvasContainerRef = useRef<HTMLDivElement>(null);
   const context = useRef<CanvasRenderingContext2D | null>(null);
   const circles = useRef<Particle[]>([]);
-  const mousePosition = useRef<MousePosition>({ x: 0, y: 0 });
   const mouse = useRef<MousePosition>({ x: 0, y: 0 });
   const canvasSize = useRef<{ w: number; h: number }>({ w: 0, h: 0 });
   const dpr = typeof window !== 'undefined' ? window.devicePixelRatio : 1;
@@ -157,6 +156,7 @@ export function Particles({
   };
 
   const animateRef = useRef<() => void>(() => {});
+  const rafIdRef = useRef<number | null>(null);
 
   const animate = useCallback(() => {
     clearContext();
@@ -207,7 +207,7 @@ export function Particles({
         );
       }
     });
-    window.requestAnimationFrame(() => animateRef.current());
+    rafIdRef.current = window.requestAnimationFrame(() => animateRef.current());
   }, [clearContext, circleParams, drawCircle, ease, staticity, vx, vy]);
 
   useEffect(() => {
@@ -224,6 +224,9 @@ export function Particles({
     window.addEventListener('resize', resizeCanvas);
     return () => {
       window.removeEventListener('resize', resizeCanvas);
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current);
+      }
     };
   }, [animate, drawParticles, resizeCanvas, refresh]);
 

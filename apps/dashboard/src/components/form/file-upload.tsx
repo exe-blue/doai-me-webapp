@@ -193,6 +193,7 @@ export function FileUpload({
                 className="flex items-center gap-3 p-3 rounded-lg border bg-muted/50"
               >
                 {filePreview.preview ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
                   <img
                     src={filePreview.preview}
                     alt="Preview"

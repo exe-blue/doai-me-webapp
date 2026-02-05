@@ -8,6 +8,8 @@ import {
   subMonths, 
   startOfMonth, 
   endOfMonth, 
+  startOfWeek,
+  endOfWeek,
   eachDayOfInterval,
   isSameMonth,
   isSameDay,
@@ -34,11 +36,10 @@ function Calendar({
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
-  const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
-
-  // 시작일 전에 빈 칸 추가 (일요일 = 0)
-  const startDay = monthStart.getDay();
-  const emptyDays = Array(startDay).fill(null);
+  // Expand day range to include days from adjacent months for complete weeks
+  const calendarStart = startOfWeek(monthStart, { weekStartsOn: 0 });
+  const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
+  const days = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
 
   const weekDays = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -81,9 +82,6 @@ function Calendar({
 
       {/* Days */}
       <div className="grid grid-cols-7 gap-1">
-        {emptyDays.map((_, i) => (
-          <div key={`empty-${i}`} className="h-9 w-9" />
-        ))}
         {days.map((day) => {
           const isSelected = selected && isSameDay(day, selected);
           const isCurrentDay = isToday(day);

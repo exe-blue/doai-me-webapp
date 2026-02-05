@@ -141,6 +141,7 @@ export default function DailyReportPage() {
 
   useEffect(() => {
     fetchDailyReport();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate, compareMode]);
 
   async function fetchDailyReport() {

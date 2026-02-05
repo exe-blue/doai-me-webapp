@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowLeft, ArrowRight, Server, Smartphone, Database, Wifi, RefreshCw, Shield, Cpu } from "lucide-react";
+import { ArrowLeft, ArrowRight, Server, Smartphone, Wifi, RefreshCw, Shield, Cpu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Header } from "@/components/sections/header";
 import { Footer } from "@/components/sections/footer";

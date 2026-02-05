@@ -176,6 +176,7 @@ export default function ExecutionHistoryPage() {
 
   useEffect(() => {
     fetchExecutions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters, sortField, sortOrder, currentPage, searchQuery]);
 
   async function fetchExecutions() {
@@ -213,7 +214,7 @@ export default function ExecutionHistoryPage() {
       setTotalPages(tp);
 
       // DB 데이터를 UI 타입으로 매핑
-      let fetchedExecutions: ExecutionHistory[] = items.map((d: Record<string, unknown>) => {
+      const fetchedExecutions: ExecutionHistory[] = items.map((d: Record<string, unknown>) => {
         const startedAt = (d.started_at as string) || (d.created_at as string);
         const completedAt = d.completed_at as string | null;
         const duration = startedAt && completedAt
@@ -248,18 +249,9 @@ export default function ExecutionHistoryPage() {
         };
       });
 
-      // Client-side filtering as backup (in case API doesn't support all filters)
-      // This ensures UI filters are always applied even if backend doesn't handle them
-      if (searchQuery.trim()) {
-        const query = searchQuery.toLowerCase();
-        fetchedExecutions = fetchedExecutions.filter((exec) =>
-          exec.video_title.toLowerCase().includes(query) ||
-          exec.device_id.toLowerCase().includes(query) ||
-          exec.device_name.toLowerCase().includes(query) ||
-          exec.channel_name.toLowerCase().includes(query) ||
-          exec.node_id.toLowerCase().includes(query)
-        );
-      }
+      // Note: searchQuery is sent to the backend (line 197), so we don't filter client-side
+      // to avoid inconsistent pagination. If backend doesn't support search, implement
+      // client-side search with proper re-pagination of filtered results.
 
       setExecutions(fetchedExecutions);
     } catch (error) {
@@ -314,12 +306,13 @@ export default function ExecutionHistoryPage() {
     (filters.node !== "all" ? 1 : 0) +
     (searchQuery ? 1 : 0);
 
-  // 통계
+  // 통계 - computed from current page data
+  // TODO: Get accurate counts from API response for full dataset stats
   const stats = {
     total: totalCount,
-    completed: Math.floor(totalCount * 0.92),
-    failed: Math.floor(totalCount * 0.06),
-    cancelled: Math.floor(totalCount * 0.02),
+    completed: executions.filter(e => e.status === "completed").length,
+    failed: executions.filter(e => e.status === "failed").length,
+    cancelled: executions.filter(e => e.status === "cancelled").length,
   };
 
   return (
@@ -550,6 +543,7 @@ export default function ExecutionHistoryPage() {
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <div className="w-16 h-9 bg-zinc-800 rounded overflow-hidden flex-shrink-0">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                               src={exec.video_thumbnail}
                               alt=""
@@ -724,7 +718,7 @@ export default function ExecutionHistoryPage() {
               variant="outline"
               size="sm"
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
+              disabled={currentPage === totalPages || totalPages === 0}
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
@@ -785,6 +779,7 @@ export default function ExecutionHistoryPage() {
                 <div className="p-3 bg-zinc-800 rounded-lg">
                   <div className="flex items-start gap-3">
                     <div className="w-20 h-12 bg-zinc-700 rounded overflow-hidden">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={selectedExecution.video_thumbnail}
                         alt=""

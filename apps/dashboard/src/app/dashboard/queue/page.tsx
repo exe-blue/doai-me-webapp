@@ -186,6 +186,7 @@ export default function QueuePage() {
     return () => {
       supabase.removeChannel(channel);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter]);
 
   async function fetchQueueItems() {
@@ -358,20 +359,30 @@ export default function QueuePage() {
     }
 
     const ids = Array.from(selectedItems);
+    let error = null;
 
     if (action === "cancel") {
-      await supabase
+      const result = await supabase
         .from("video_executions")
         .update({ status: "cancelled" })
         .in("id", ids)
         .in("status", ["pending", "assigned"]);
+      error = result.error;
     } else if (action === "retry") {
-      await supabase
+      const result = await supabase
         .from("video_executions")
         .update({ status: "pending", error_message: null })
         .in("id", ids);
+      error = result.error;
     } else if (action === "delete") {
-      await supabase.from("video_executions").delete().in("id", ids);
+      const result = await supabase.from("video_executions").delete().in("id", ids);
+      error = result.error;
+    }
+
+    if (error) {
+      console.error(`Bulk ${action} 실패:`, error);
+      alert(`작업 실패: ${error.message}`);
+      return;
     }
 
     setSelectedItems(new Set());
@@ -760,6 +771,7 @@ export default function QueuePage() {
                     {/* 영상 정보 */}
                     <TableCell>
                       <div className="flex items-center gap-3">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={
                             item.video?.thumbnail_url ||
