@@ -85,12 +85,12 @@ jobs:
 
       - name: Build Backend Image (validation only)
         run: |
-          docker build -t doai-backend:${{ github.sha }} ./apps/backend
+          docker build -t doai-backend:${{ github.sha }} -f apps/backend/Dockerfile apps/backend
           echo "Backend image built successfully (not pushed - VPS rebuilds directly)"
 
       - name: Build Frontend Image (validation only)
         run: |
-          docker build -t doai-frontend:${{ github.sha }} ./apps/dashboard
+          docker build -t doai-frontend:${{ github.sha }} -f apps/dashboard/Dockerfile .
           echo "Frontend image built successfully (not pushed - VPS rebuilds directly)"
 
   # ===========================================

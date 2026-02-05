@@ -1,5 +1,6 @@
 # ===========================================
 # DoAi.Me Backend - Node.js Socket.io Server
+# Monorepo 호환: 루트 또는 apps/backend 컨텍스트 모두 지원
 # ===========================================
 FROM node:20-alpine
 
@@ -11,7 +12,7 @@ RUN apk add --no-cache curl
 
 # package.json 복사 및 의존성 설치
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm install --omit=dev
 
 # 소스 코드 복사
 COPY . .

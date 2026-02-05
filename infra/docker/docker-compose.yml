@@ -28,8 +28,8 @@ services:
   # ===========================================
   frontend:
     build:
-      context: ./dashboard
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: apps/dashboard/Dockerfile
     container_name: doai-frontend
     ports:
       - "3000:3000"

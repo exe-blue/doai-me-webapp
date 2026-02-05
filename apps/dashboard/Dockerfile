@@ -1,5 +1,7 @@
 # ===========================================
 # DoAi.Me Frontend - Next.js Dashboard
+# Monorepo 호환: 루트 컨텍스트에서 빌드
+# 사용법: docker build -f apps/dashboard/Dockerfile .
 # ===========================================
 
 # Stage 1: 빌드 단계
@@ -7,12 +9,23 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# package.json 복사 및 의존성 설치
-COPY package*.json ./
-RUN npm ci
+# 모노레포 루트 package files
+COPY package.json package-lock.json ./
 
-# 소스 코드 복사
-COPY . .
+# 워크스페이스 package.json 복사 (file: 의존성 해결)
+COPY apps/dashboard/package.json ./apps/dashboard/
+COPY packages/shared/package.json ./packages/shared/
+COPY packages/ui/package.json ./packages/ui/
+
+# 의존성 설치 (workspace mode)
+RUN npm install --workspace=apps/dashboard --include-workspace-root
+
+# 로컬 패키지 소스 복사 (빌드에 필요)
+COPY packages/shared/ ./packages/shared/
+COPY packages/ui/ ./packages/ui/
+
+# 대시보드 소스 복사
+COPY apps/dashboard/ ./apps/dashboard/
 
 # 빌드 시 필요한 환경 변수 (빌드 타임)
 ARG NEXT_PUBLIC_API_URL
@@ -26,6 +39,7 @@ ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
 ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
 
 # Next.js 빌드
+WORKDIR /app/apps/dashboard
 RUN npm run build
 
 # Stage 2: 프로덕션 단계
@@ -45,9 +59,9 @@ RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
 # 빌드 결과물 복사
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/apps/dashboard/public ./public
+COPY --from=builder /app/apps/dashboard/.next/standalone ./
+COPY --from=builder /app/apps/dashboard/.next/static ./.next/static
 
 # 소유권 변경
 RUN chown -R nextjs:nodejs /app
