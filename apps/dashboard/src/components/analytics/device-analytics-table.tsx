@@ -33,9 +33,8 @@ export interface DeviceAnalyticsData {
   id: string;
   serial_number: string;
   pc_id: string;
-  status: 'idle' | 'busy' | 'offline';
-  health_status: 'healthy' | 'zombie' | 'offline';
-  last_seen_at: string;
+  status: 'online' | 'offline' | 'busy' | 'error';
+  last_heartbeat: string | null;
   today_completed_count: number;
   today_failed_count: number;
   recent_error_log: string | null;
@@ -69,8 +68,8 @@ function formatRelativeTime(dateString: string): string {
   return `${Math.floor(diffSec / 86400)}일 전`;
 }
 
-function getStatusBadge(status: string, healthStatus: string) {
-  if (status === 'offline' || healthStatus === 'offline') {
+function getStatusBadge(status: string) {
+  if (status === 'offline') {
     return (
       <Badge variant="outline" className="border-gray-400 text-gray-500">
         <WifiOff className="h-3 w-3 mr-1" />
@@ -79,11 +78,11 @@ function getStatusBadge(status: string, healthStatus: string) {
     );
   }
 
-  if (healthStatus === 'zombie') {
+  if (status === 'error') {
     return (
       <Badge variant="destructive" className="bg-orange-500">
         <AlertTriangle className="h-3 w-3 mr-1" />
-        좀비
+        오류
       </Badge>
     );
   }
@@ -181,7 +180,7 @@ export function DeviceAnalyticsTable({ devices, isLoading }: DeviceAnalyticsTabl
                         </span>
                       </TableCell>
                       <TableCell className="text-center">
-                        {getStatusBadge(device.status, device.health_status)}
+                        {getStatusBadge(device.status)}
                       </TableCell>
                       <TableCell className="text-center">
                         <div className="flex items-center justify-center gap-1 text-green-600">
@@ -245,11 +244,11 @@ export function DeviceAnalyticsTable({ devices, isLoading }: DeviceAnalyticsTabl
                       <TableCell className="text-center">
                         <span className={cn(
                           "text-xs",
-                          device.health_status === 'healthy' ? 'text-green-600' :
-                          device.health_status === 'zombie' ? 'text-orange-600' :
+                          device.status === 'online' || device.status === 'busy' ? 'text-green-600' :
+                          device.status === 'error' ? 'text-orange-600' :
                           'text-gray-500'
                         )}>
-                          {formatRelativeTime(device.last_seen_at)}
+                          {device.last_heartbeat ? formatRelativeTime(device.last_heartbeat) : '-'}
                         </span>
                       </TableCell>
                     </TableRow>

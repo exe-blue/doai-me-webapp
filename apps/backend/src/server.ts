@@ -1401,16 +1401,14 @@ app.get('/api/devices/unassigned', async (req, res) => {
  * 새 디바이스 등록 (device_number 자동 할당)
  */
 app.post('/api/devices/register', async (req, res) => {
-  const { 
-    serial_number, 
-    name, 
-    model, 
-    android_version, 
-    ip_address, 
+  const {
+    serial_number,
+    model,
+    android_version,
+    ip_address,
     pc_id,
     connection_type = 'usb',
     usb_port,
-    metadata = {} 
   } = req.body;
 
   if (!serial_number) {
@@ -1429,7 +1427,6 @@ app.post('/api/devices/register', async (req, res) => {
       .upsert({
         id: serial_number,
         serial_number,
-        name: name || `Device ${deviceNumber}`,
         model,
         android_version,
         ip_address,
@@ -1437,8 +1434,7 @@ app.post('/api/devices/register', async (req, res) => {
         device_number: deviceNumber,
         connection_type,
         usb_port,
-        state: 'DISCONNECTED',
-        metadata,
+        status: 'offline',
       })
       .select()
       .single();
@@ -1478,7 +1474,6 @@ app.post('/api/devices/bulk-register', async (req, res) => {
           .upsert({
             id: device.serial_number,
             serial_number: device.serial_number,
-            name: device.name || `Device ${deviceNumber}`,
             model: device.model,
             android_version: device.android_version,
             ip_address: device.ip_address,
@@ -1486,8 +1481,7 @@ app.post('/api/devices/bulk-register', async (req, res) => {
             device_number: deviceNumber,
             connection_type: device.connection_type || 'usb',
             usb_port: device.usb_port,
-            state: 'DISCONNECTED',
-            metadata: device.metadata || {},
+            status: 'offline',
           })
           .select()
           .single();
@@ -1603,7 +1597,7 @@ app.get('/api/devices/stats', async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('devices')
-      .select('state, pc_id');
+      .select('status, pc_id');
 
     if (error) throw error;
 
@@ -1611,12 +1605,11 @@ app.get('/api/devices/stats', async (req, res) => {
       total: data?.length || 0,
       assigned: data?.filter(d => d.pc_id).length || 0,
       unassigned: data?.filter(d => !d.pc_id).length || 0,
-      by_state: {
-        idle: data?.filter(d => d.state === 'IDLE').length || 0,
-        running: data?.filter(d => d.state === 'RUNNING').length || 0,
-        error: data?.filter(d => d.state === 'ERROR').length || 0,
-        quarantine: data?.filter(d => d.state === 'QUARANTINE').length || 0,
-        disconnected: data?.filter(d => d.state === 'DISCONNECTED').length || 0,
+      by_status: {
+        online: data?.filter(d => d.status === 'online').length || 0,
+        offline: data?.filter(d => d.status === 'offline').length || 0,
+        busy: data?.filter(d => d.status === 'busy').length || 0,
+        error: data?.filter(d => d.status === 'error').length || 0,
       },
     };
 

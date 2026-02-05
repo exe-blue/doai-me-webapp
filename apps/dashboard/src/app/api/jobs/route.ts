@@ -313,8 +313,8 @@ export async function POST(request: NextRequest) {
     const { data: idleDevices, error: devicesError } = await supabase
       .from('devices')
       .select('id, serial_number, pc_id')
-      .eq('status', 'idle')
-      .not('last_seen_at', 'is', null);
+      .eq('status', 'online')
+      .not('last_heartbeat', 'is', null);
 
     if (devicesError) {
       console.error('[API] Devices query error:', devicesError);

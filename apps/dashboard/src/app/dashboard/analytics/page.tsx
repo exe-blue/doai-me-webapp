@@ -86,7 +86,7 @@ export default function AnalyticsPage() {
 
         // Calculate active devices
         const active = data.devices.filter(
-          (d: DeviceAnalyticsData) => d.status !== 'offline' && d.health_status !== 'offline'
+          (d: DeviceAnalyticsData) => d.status !== 'offline' && d.status !== 'error'
         ).length;
 
         setStats(prev => ({

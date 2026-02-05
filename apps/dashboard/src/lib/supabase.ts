@@ -13,35 +13,27 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 // 타입 정의 (실제 DB 스키마 기반 - supabase-schema.sql 참조)
 // =============================================
 
-// devices 테이블 - id가 PK, serial_number는 UNIQUE
+// devices 테이블 - 20260206_device_management.sql 기준
 export interface Device {
   id: string;  // UUID PRIMARY KEY
-  serial_number: string;  // UNIQUE
-  pc_id: string;
-  group_id: string;
-  status: 'idle' | 'busy' | 'offline';
-  last_seen_at: string;
+  pc_id: string | null;  // UUID FK → pcs(id)
+  device_number: number | null;  // 1-999
+  serial_number: string | null;  // VARCHAR(50)
+  ip_address: string | null;  // INET
+  model: string | null;  // VARCHAR(50) DEFAULT 'Galaxy S9'
+  android_version: string | null;  // VARCHAR(20)
+  connection_type: string;  // VARCHAR(10) DEFAULT 'usb'
+  usb_port: number | null;
+  status: 'online' | 'offline' | 'busy' | 'error';  // VARCHAR(20) DEFAULT 'offline'
+  battery_level: number | null;
+  last_heartbeat: string | null;  // TIMESTAMPTZ
+  last_task_at: string | null;  // TIMESTAMPTZ
+  error_count: number;  // DEFAULT 0
+  last_error: string | null;
+  last_error_at: string | null;  // TIMESTAMPTZ
+  management_code: string | null;  // computed by trigger (e.g. PC01-001)
   created_at: string;
-  // 001_scrcpy_heartbeat 마이그레이션 추가 컬럼 (optional - may not exist)
-  last_heartbeat_at?: string | null;  // TIMESTAMPTZ nullable
-  last_job_activity_at?: string | null;  // TIMESTAMPTZ nullable
-  adb_connected?: boolean;  // DEFAULT FALSE (optional until migration applied)
-  consecutive_failures?: number;  // DEFAULT 0
-  health_status?: 'healthy' | 'zombie' | 'offline';  // DEFAULT 'offline'
-  // scrcpy 관련 상태
-  scrcpy_running?: boolean;
-  scrcpy_pid?: number | null;
-  // Fixed Inventory System 추가 필드 (Socket.io heartbeat에서 수신)
-  ip?: string;  // 기기 IP 주소 (예: 192.168.0.123) - from Socket.io
-  ip_address?: string;  // 기기 IP 주소 - from DB (003 migration)
-  slotNum?: number;  // 슬롯 번호 (1-20)
-  boardId?: string;  // 보드 ID (예: B01)
-  slotId?: string;   // 슬롯 ID (예: S01)
-  connection_info?: {
-    pcCode?: string;
-    slotNum?: number;
-    adbConnected?: boolean;
-  };
+  updated_at: string;
 }
 
 // jobs 테이블 - 실제 DB 스키마 기반 (supabase-schema.sql 참조)

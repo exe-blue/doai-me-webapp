@@ -86,7 +86,7 @@ export default function JobsPage() {
   // 히스토리 페이지네이션
   const [historyPage, setHistoryPage] = useState(1);
 
-  const idleDevices = devices.filter(d => d.status === 'idle');
+  const idleDevices = devices.filter(d => d.status === 'online');
 
   // =============================================
   // Data Fetching

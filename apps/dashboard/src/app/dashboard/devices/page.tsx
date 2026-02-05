@@ -68,6 +68,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Checkbox } from "@/components/ui/checkbox";
+import { StatsCard } from "@/components/ui/stats-card";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
 interface Device {
   id: string;
@@ -79,7 +81,7 @@ interface Device {
   name: string;
   model: string;
   android_version: string;
-  status: "online" | "offline" | "busy" | "error" | "idle" | "running" | "disconnected";
+  status: "online" | "offline" | "busy" | "error";
   battery_level: number;
   is_charging: boolean;
   memory_used: number;
@@ -90,7 +92,7 @@ interface Device {
   temperature: number;
   wifi_signal: number;
   current_task_id: string | null;
-  last_seen_at: string;
+  last_heartbeat: string;
   uptime_seconds: number;
   total_tasks_completed: number;
   total_tasks_failed: number;
@@ -114,11 +116,8 @@ interface PCSummary {
 
 const statusConfig: Record<string, { label: string; color: string; icon: React.ComponentType<{ className?: string }> }> = {
   online: { label: "온라인", color: "bg-green-400 text-green-900 border-green-900", icon: CheckCircle2 },
-  idle: { label: "대기", color: "bg-green-400 text-green-900 border-green-900", icon: CheckCircle2 },
-  running: { label: "작업중", color: "bg-blue-400 text-blue-900 border-blue-900", icon: Activity },
   busy: { label: "작업중", color: "bg-blue-400 text-blue-900 border-blue-900", icon: Activity },
   offline: { label: "오프라인", color: "bg-gray-400 text-gray-900 border-gray-900", icon: WifiOff },
-  disconnected: { label: "연결끊김", color: "bg-gray-400 text-gray-900 border-gray-900", icon: WifiOff },
   error: { label: "오류", color: "bg-red-400 text-red-900 border-red-900", icon: AlertTriangle },
 };
 
@@ -208,10 +207,10 @@ export default function DevicesPage() {
         pc_number: (d.pc_number as string) || undefined,
         device_number: (d.device_number as number) || undefined,
         management_code: (d.management_code as string) || undefined,
-        name: (d.name as string) || `Device ${d.id}`,
+        name: (d.management_code as string) || `Device ${d.id}`,
         model: (d.model as string) || "Unknown",
         android_version: (d.android_version as string) || "Unknown",
-        status: ((d.state as string) || (d.status as string) || "offline").toLowerCase() as Device["status"],
+        status: ((d.status as string) || "offline") as Device["status"],
         battery_level: (d.battery_level as number) ?? 0,
         is_charging: (d.is_charging as boolean) ?? false,
         memory_used: (d.memory_used as number) ?? 0,
@@ -222,7 +221,7 @@ export default function DevicesPage() {
         temperature: (d.temperature as number) ?? 35,
         wifi_signal: (d.wifi_signal as number) ?? 80,
         current_task_id: (d.current_task_id as string) || (d.current_job_id as string) || null,
-        last_seen_at: (d.last_seen_at as string) || (d.last_heartbeat_at as string) || new Date().toISOString(),
+        last_heartbeat: (d.last_heartbeat as string) || new Date().toISOString(),
         uptime_seconds: (d.uptime_seconds as number) ?? 0,
         total_tasks_completed: (d.total_tasks_completed as number) ?? (d.completed_jobs as number) ?? 0,
         total_tasks_failed: (d.total_tasks_failed as number) ?? (d.failed_jobs as number) ?? 0,
@@ -240,7 +239,7 @@ export default function DevicesPage() {
         const pcSummaries: PCSummary[] = pcList.map((pc: Record<string, unknown>) => {
           const pcDevices = fetchedDevices.filter((d) => d.pc_id === pc.id);
           const hasOnlineDevice = pcDevices.some((d) => 
-            d.status === "online" || d.status === "idle" || d.status === "busy" || d.status === "running"
+            d.status === "online" || d.status === "busy"
           );
           return {
             id: pc.id as string,
@@ -248,10 +247,10 @@ export default function DevicesPage() {
             label: (pc.label as string) || (pc.pc_number as string),
             status: (pc.status as "online" | "offline") || (hasOnlineDevice ? "online" : "offline"),
             total: pcDevices.length,
-            online: pcDevices.filter((d) => d.status === "online" || d.status === "idle").length,
-            busy: pcDevices.filter((d) => d.status === "busy" || d.status === "running").length,
+            online: pcDevices.filter((d) => d.status === "online").length,
+            busy: pcDevices.filter((d) => d.status === "busy").length,
             error: pcDevices.filter((d) => d.status === "error").length,
-            offline: pcDevices.filter((d) => d.status === "offline" || d.status === "disconnected").length,
+            offline: pcDevices.filter((d) => d.status === "offline").length,
           };
         });
         setPCs(pcSummaries);
@@ -261,17 +260,17 @@ export default function DevicesPage() {
         const pcSummaries: PCSummary[] = pcIds.map((pcId, idx) => {
           const pcDevices = fetchedDevices.filter((d) => d.pc_id === pcId);
           const hasOnlineDevice = pcDevices.some((d) => 
-            d.status === "online" || d.status === "idle" || d.status === "busy" || d.status === "running"
+            d.status === "online" || d.status === "busy"
           );
           return {
             id: pcId,
             pc_number: `PC${String(idx + 1).padStart(2, "0")}`,
             status: hasOnlineDevice ? "online" : "offline",
             total: pcDevices.length,
-            online: pcDevices.filter((d) => d.status === "online" || d.status === "idle").length,
-            busy: pcDevices.filter((d) => d.status === "busy" || d.status === "running").length,
+            online: pcDevices.filter((d) => d.status === "online").length,
+            busy: pcDevices.filter((d) => d.status === "busy").length,
             error: pcDevices.filter((d) => d.status === "error").length,
-            offline: pcDevices.filter((d) => d.status === "offline" || d.status === "disconnected").length,
+            offline: pcDevices.filter((d) => d.status === "offline").length,
           };
         });
         setPCs(pcSummaries);
@@ -385,73 +384,23 @@ export default function DevicesPage() {
 
         {/* 상태 요약 카드 */}
         <div className="grid grid-cols-6 gap-4">
-          <div className="border-2 border-foreground bg-card shadow-[4px_4px_0px_0px] shadow-foreground p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground font-medium">전체</p>
-                <p className="text-2xl font-bold text-foreground">{stats.total}</p>
-              </div>
-              <Smartphone className="h-8 w-8 text-muted-foreground" />
-            </div>
-          </div>
-
-          <div className="border-2 border-green-600 bg-card shadow-[4px_4px_0px_0px] shadow-green-600 p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground font-medium">온라인</p>
-                <p className="text-2xl font-bold text-green-600">{stats.online}</p>
-              </div>
-              <CheckCircle2 className="h-8 w-8 text-green-600" />
-            </div>
-          </div>
-
-          <div className="border-2 border-blue-600 bg-card shadow-[4px_4px_0px_0px] shadow-blue-600 p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground font-medium">작업중</p>
-                <p className="text-2xl font-bold text-blue-600">{stats.busy}</p>
-              </div>
-              <Activity className="h-8 w-8 text-blue-600" />
-            </div>
-          </div>
-
-          <div className="border-2 border-red-600 bg-card shadow-[4px_4px_0px_0px] shadow-red-600 p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground font-medium">오류</p>
-                <p className="text-2xl font-bold text-red-600">{stats.error}</p>
-              </div>
-              <AlertTriangle className="h-8 w-8 text-red-600" />
-            </div>
-          </div>
-
-          <div className="border-2 border-foreground bg-card shadow-[4px_4px_0px_0px] shadow-foreground p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground font-medium">오프라인</p>
-                <p className="text-2xl font-bold text-muted-foreground">{stats.offline}</p>
-              </div>
-              <WifiOff className="h-8 w-8 text-muted-foreground" />
-            </div>
-          </div>
-
-          <div className="border-2 border-yellow-600 bg-card shadow-[4px_4px_0px_0px] shadow-yellow-600 p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground font-medium">배터리 부족</p>
-                <p className="text-2xl font-bold text-yellow-600">{stats.lowBattery}</p>
-              </div>
-              <BatteryLow className="h-8 w-8 text-yellow-600" />
-            </div>
-          </div>
+          <StatsCard label="전체" value={stats.total} icon={<Smartphone className="h-8 w-8" />} />
+          <StatsCard variant="success" label="온라인" value={stats.online} icon={<CheckCircle2 className="h-8 w-8" />} />
+          <StatsCard variant="info" label="작업중" value={stats.busy} icon={<Activity className="h-8 w-8" />} />
+          <StatsCard variant="danger" label="오류" value={stats.error} icon={<AlertTriangle className="h-8 w-8" />} />
+          <StatsCard variant="muted" label="오프라인" value={stats.offline} icon={<WifiOff className="h-8 w-8" />} />
+          <StatsCard variant="warning" label="배터리 부족" value={stats.lowBattery} icon={<BatteryLow className="h-8 w-8" />} />
         </div>
 
         {/* PC별 요약 */}
-        <div className="border-2 border-foreground bg-card shadow-[4px_4px_0px_0px] shadow-foreground p-4">
-          <h2 className="text-lg font-bold text-foreground flex items-center gap-2 mb-4">
-            <Server className="h-5 w-5" />
-            PC별 현황
-          </h2>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Server className="h-5 w-5" />
+              PC별 현황
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
           <div className="grid grid-cols-5 gap-3">
             {pcs.map((pc) => (
               <div
@@ -513,7 +462,8 @@ export default function DevicesPage() {
               </div>
             ))}
           </div>
-        </div>
+          </CardContent>
+        </Card>
 
         {/* 필터 & 검색 */}
         <div className="flex items-center gap-4">
@@ -774,7 +724,7 @@ export default function DevicesPage() {
                       <TableCell className="text-muted-foreground">{formatUptime(device.uptime_seconds)}</TableCell>
 
                       <TableCell className="text-muted-foreground">
-                        {formatTimeAgo(device.last_seen_at)}
+                        {formatTimeAgo(device.last_heartbeat)}
                       </TableCell>
 
                       <TableCell>

@@ -75,7 +75,7 @@ export function StatusBoard({ refreshTrigger }: StatusBoardProps) {
           }
         }
       )
-      // devices 변경 감지 (health_status 업데이트)
+      // devices 변경 감지 (status 업데이트)
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'devices' },
@@ -358,8 +358,8 @@ export function StatusBoard({ refreshTrigger }: StatusBoardProps) {
                       <span className="ml-2 font-medium">{hoveredAssignment.device?.pc_id || 'Unknown'}</span>
                     </div>
                     <div>
-                      <span className="text-muted-foreground">그룹:</span>
-                      <span className="ml-2 font-medium">{hoveredAssignment.device?.group_id || 'Unknown'}</span>
+                      <span className="text-muted-foreground">PC:</span>
+                      <span className="ml-2 font-medium">{hoveredAssignment.device?.pc_id || 'Unknown'}</span>
                     </div>
                     <div>
                       <span className="text-muted-foreground">Serial:</span>
@@ -391,8 +391,8 @@ export function StatusBoard({ refreshTrigger }: StatusBoardProps) {
                             <span className="ml-2 font-medium">{hoveredDevice.pc_id}</span>
                           </div>
                           <div>
-                            <span className="text-muted-foreground">그룹:</span>
-                            <span className="ml-2 font-medium">{hoveredDevice.group_id}</span>
+                            <span className="text-muted-foreground">PC:</span>
+                            <span className="ml-2 font-medium">{hoveredDevice.pc_id}</span>
                           </div>
                           <div>
                             <span className="text-muted-foreground">Serial:</span>

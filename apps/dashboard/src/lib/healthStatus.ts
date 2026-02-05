@@ -13,7 +13,8 @@ const ZOMBIE_THRESHOLD_MS = 180_000;   // 180초 초과 무활동 → zombie
  * @returns 'healthy' | 'zombie' | 'offline'
  *
  * 로직:
- * - ADB 연결 끊김 → 'offline' (Gray)
+ * - status가 offline이면 → 'offline' (Gray)
+ * - status가 error이면 → 'zombie' (Red)
  * - 활동 기록 없음 → 'offline' (Gray)
  * - 60초 이내 활동 → 'healthy' (Green)
  * - 60초~180초 사이 → 'healthy' (Green, 중간 상태는 healthy로 유지)
@@ -25,19 +26,19 @@ export function computeHealthStatus(device: Device): HealthStatus {
     return 'offline';
   }
 
-  // ADB 연결이 명시적으로 false인 경우 오프라인 (undefined는 무시)
-  if (device.adb_connected === false) {
-    return 'offline';
+  // error 상태는 zombie로 매핑
+  if (device.status === 'error') {
+    return 'zombie';
   }
 
-  // 마지막 활동 시간 계산 (heartbeat와 job activity 중 최신 값)
-  const lastHeartbeat = device.last_heartbeat_at
-    ? new Date(device.last_heartbeat_at).getTime()
+  // 마지막 활동 시간 계산 (heartbeat와 last_task_at 중 최신 값)
+  const lastHeartbeat = device.last_heartbeat
+    ? new Date(device.last_heartbeat).getTime()
     : 0;
-  const lastJobActivity = device.last_job_activity_at
-    ? new Date(device.last_job_activity_at).getTime()
+  const lastTaskAt = device.last_task_at
+    ? new Date(device.last_task_at).getTime()
     : 0;
-  const lastActivity = Math.max(lastHeartbeat, lastJobActivity);
+  const lastActivity = Math.max(lastHeartbeat, lastTaskAt);
 
   // 활동 기록이 없으면 오프라인
   if (lastActivity === 0) {
@@ -50,12 +51,12 @@ export function computeHealthStatus(device: Device): HealthStatus {
   if (elapsedMs <= HEALTHY_THRESHOLD_MS) {
     return 'healthy';
   }
-  
+
   // 180초 초과 무활동 → zombie
   if (elapsedMs > ZOMBIE_THRESHOLD_MS) {
     return 'zombie';
   }
-  
+
   // 60초~180초 중간 상태 → healthy 유지 (경계 구간)
   return 'healthy';
 }

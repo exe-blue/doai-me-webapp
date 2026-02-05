@@ -5,13 +5,13 @@
  */
 
 import { getSupabase } from '../supabase';
-import type { 
-  Device, 
-  DeviceInsert, 
-  DeviceUpdate, 
-  DeviceState, 
+import type {
+  Device,
+  DeviceInsert,
+  DeviceUpdate,
+  DeviceStatus,
   DeviceStats,
-  DeviceStateRecord 
+  DeviceStateRecord
 } from '../types';
 
 export class DeviceRepository {
@@ -41,14 +41,14 @@ export class DeviceRepository {
   }
 
   /**
-   * 노드 ID로 디바이스 목록 조회
+   * PC ID로 디바이스 목록 조회
    */
-  async findByNodeId(nodeId: string): Promise<Device[]> {
+  async findByPcId(pcId: string): Promise<Device[]> {
     const { data, error } = await this.db
       .from('devices')
       .select('*')
-      .eq('node_id', nodeId)
-      .order('name');
+      .eq('pc_id', pcId)
+      .order('device_number');
 
     if (error) throw error;
     return data || [];
@@ -57,11 +57,11 @@ export class DeviceRepository {
   /**
    * 상태로 디바이스 목록 조회
    */
-  async findByState(state: DeviceState): Promise<Device[]> {
+  async findByStatus(status: DeviceStatus): Promise<Device[]> {
     const { data, error } = await this.db
       .from('devices')
       .select('*')
-      .eq('state', state);
+      .eq('status', status);
 
     if (error) throw error;
     return data || [];
@@ -70,11 +70,11 @@ export class DeviceRepository {
   /**
    * 여러 상태로 디바이스 목록 조회
    */
-  async findByStates(states: DeviceState[]): Promise<Device[]> {
+  async findByStatuses(statuses: DeviceStatus[]): Promise<Device[]> {
     const { data, error } = await this.db
       .from('devices')
       .select('*')
-      .in('state', states);
+      .in('status', statuses);
 
     if (error) throw error;
     return data || [];
@@ -86,7 +86,7 @@ export class DeviceRepository {
   private static readonly DEFAULT_LIMIT = 100;
   
   async findAll(options?: { limit?: number; offset?: number }): Promise<Device[]> {
-    let query = this.db.from('devices').select('*').order('name');
+    let query = this.db.from('devices').select('*').order('device_number');
 
     // Use range() when offset is provided, limit() otherwise
     // Don't mix both to avoid .range() overriding .limit()
@@ -104,17 +104,17 @@ export class DeviceRepository {
   }
 
   /**
-   * IDLE 상태 디바이스 조회 (작업 할당용)
+   * online 상태 디바이스 조회 (작업 할당용)
    */
-  async findIdleDevices(nodeId?: string, limit?: number): Promise<Device[]> {
+  async findOnlineDevices(pcId?: string, limit?: number): Promise<Device[]> {
     let query = this.db
       .from('devices')
       .select('*')
-      .eq('state', 'IDLE')
-      .order('last_seen', { ascending: false });
+      .eq('status', 'online')
+      .order('last_heartbeat', { ascending: false });
 
-    if (nodeId) {
-      query = query.eq('node_id', nodeId);
+    if (pcId) {
+      query = query.eq('pc_id', pcId);
     }
     if (limit) {
       query = query.limit(limit);
@@ -147,18 +147,18 @@ export class DeviceRepository {
    * 디바이스 상태 업데이트
    * Uses atomic DB-side increment for error_count to avoid race conditions
    */
-  async updateState(
-    id: string, 
-    state: DeviceState, 
+  async updateStatus(
+    id: string,
+    status: DeviceStatus,
     extra?: Partial<DeviceUpdate>
   ): Promise<void> {
-    // For IDLE/RUNNING states, reset error count with direct update
-    if (state === 'IDLE' || state === 'RUNNING') {
+    // For online/busy states, reset error count with direct update
+    if (status === 'online' || status === 'busy') {
       const { error } = await this.db
         .from('devices')
         .update({
-          state,
-          last_seen: new Date().toISOString(),
+          status,
+          last_heartbeat: new Date().toISOString(),
           error_count: 0,
           ...extra,
         })
@@ -168,53 +168,30 @@ export class DeviceRepository {
       return;
     }
 
-    // For ERROR state, use atomic increment and conditional state change
-    if (state === 'ERROR') {
-      // Use RPC for atomic increment with conditional quarantine
-      // Fallback: Single atomic UPDATE with CASE expression via raw SQL if RPC not available
+    // For error status, use atomic increment
+    if (status === 'error') {
       try {
-        const { error } = await this.db.rpc('update_device_state_with_error', {
+        const { error } = await this.db.rpc('update_device_status_with_error', {
           p_device_id: id,
           p_last_error: extra?.last_error || null,
         });
-        
+
         if (error) {
-          // Fallback to atomic raw SQL if RPC doesn't exist
-          if (error.code === '42883') { // function does not exist
-            // Atomic UPDATE: increment error_count and conditionally set state in one query
-            const { error: updateError } = await this.db.rpc('exec_sql', {
-              query: `
-                UPDATE devices SET 
-                  error_count = COALESCE(error_count, 0) + 1, 
-                  state = CASE WHEN COALESCE(error_count, 0) + 1 >= 3 THEN 'QUARANTINE' ELSE 'ERROR' END,
-                  last_seen = NOW(),
-                  last_error = $1
-                WHERE id = $2
-              `,
-              params: [extra?.last_error ?? null, id]
-            }).catch(async () => {
-              // If exec_sql RPC doesn't exist, use direct atomic update via SQL function
-              // This is a last resort fallback using Supabase's built-in capabilities
-              const { error: fallbackError } = await this.db
-                .from('devices')
-                .update({
-                  state: 'ERROR', // Will be corrected by trigger or next check
-                  last_seen: new Date().toISOString(),
-                  last_error: extra?.last_error,
-                })
-                .eq('id', id);
-              
-              // After base update, do atomic increment via raw query
-              if (!fallbackError) {
-                await this.db.rpc('increment_device_error_count', { device_id: id }).catch(() => {
-                  // If RPC not available, log warning - atomic increment not possible without DB function
-                  console.warn(`[DeviceRepository] Atomic error increment not available for device ${id}`);
-                });
-              }
-              return { error: fallbackError };
-            });
-            
-            if (updateError) throw updateError;
+          if (error.code === '42883') {
+            const { error: incrementError } = await this.db.rpc('increment_device_error_count', { device_id: id });
+
+            if (incrementError) {
+              console.error(`[DeviceRepository] Failed to atomically increment error_count for device ${id}:`, incrementError.message);
+              throw new Error(`Atomic error increment failed: ${incrementError.message}.`);
+            }
+
+            await this.db
+              .from('devices')
+              .update({
+                last_error: extra?.last_error,
+                last_error_at: new Date().toISOString(),
+              })
+              .eq('id', id);
           } else {
             throw error;
           }
@@ -225,12 +202,12 @@ export class DeviceRepository {
       return;
     }
 
-    // For other states, direct update
+    // For offline and other states, direct update
     const { error } = await this.db
       .from('devices')
       .update({
-        state,
-        last_seen: new Date().toISOString(),
+        status,
+        last_heartbeat: new Date().toISOString(),
         ...extra,
       })
       .eq('id', id);
@@ -253,12 +230,12 @@ export class DeviceRepository {
   /**
    * 배치 상태 업데이트
    */
-  async updateManyStates(ids: string[], state: DeviceState): Promise<void> {
+  async updateManyStatuses(ids: string[], status: DeviceStatus): Promise<void> {
     const { error } = await this.db
       .from('devices')
-      .update({ 
-        state, 
-        last_seen: new Date().toISOString() 
+      .update({
+        status,
+        last_heartbeat: new Date().toISOString()
       })
       .in('id', ids);
 
@@ -282,16 +259,16 @@ export class DeviceRepository {
   }
 
   /**
-   * 노드의 모든 디바이스 연결 해제
+   * PC의 모든 디바이스 연결 해제
    */
-  async disconnectByNode(nodeId: string): Promise<void> {
+  async disconnectByPc(pcId: string): Promise<void> {
     const { error } = await this.db
       .from('devices')
-      .update({ 
-        state: 'DISCONNECTED',
-        last_seen: new Date().toISOString(),
+      .update({
+        status: 'offline',
+        last_heartbeat: new Date().toISOString(),
       })
-      .eq('node_id', nodeId);
+      .eq('pc_id', pcId);
 
     if (error) throw error;
   }
@@ -306,25 +283,23 @@ export class DeviceRepository {
   async getStats(): Promise<DeviceStats> {
     const { data, error } = await this.db
       .from('devices')
-      .select('state');
+      .select('status');
 
     if (error) throw error;
 
     const stats: DeviceStats = {
       total: 0,
-      DISCONNECTED: 0,
-      IDLE: 0,
-      QUEUED: 0,
-      RUNNING: 0,
-      ERROR: 0,
-      QUARANTINE: 0,
+      online: 0,
+      offline: 0,
+      busy: 0,
+      error: 0,
     };
 
     (data || []).forEach((d) => {
       stats.total++;
-      const state = d.state as DeviceState;
-      if (state in stats) {
-        stats[state]++;
+      const status = d.status as DeviceStatus;
+      if (status in stats) {
+        stats[status]++;
       }
     });
 
@@ -332,19 +307,19 @@ export class DeviceRepository {
   }
 
   /**
-   * 노드별 디바이스 수
+   * PC별 디바이스 수
    */
-  async countByNode(): Promise<Record<string, number>> {
+  async countByPc(): Promise<Record<string, number>> {
     const { data, error } = await this.db
       .from('devices')
-      .select('node_id');
+      .select('pc_id');
 
     if (error) throw error;
 
     const counts: Record<string, number> = {};
     (data || []).forEach((d) => {
-      const nodeId = d.node_id || 'unknown';
-      counts[nodeId] = (counts[nodeId] || 0) + 1;
+      const pcId = d.pc_id || 'unassigned';
+      counts[pcId] = (counts[pcId] || 0) + 1;
     });
 
     return counts;
@@ -357,7 +332,7 @@ export class DeviceRepository {
   /**
    * 디바이스 상태 레코드 upsert
    */
-  async upsertState(state: Partial<DeviceStateRecord> & { device_id: string }): Promise<void> {
+  async upsertDeviceState(state: Partial<DeviceStateRecord> & { device_id: string }): Promise<void> {
     const { error } = await this.db
       .from('device_states')
       .upsert({
@@ -371,7 +346,7 @@ export class DeviceRepository {
   /**
    * 디바이스 상태 레코드 조회
    */
-  async getState(deviceId: string): Promise<DeviceStateRecord | null> {
+  async getDeviceState(deviceId: string): Promise<DeviceStateRecord | null> {
     const { data, error } = await this.db
       .from('device_states')
       .select('*')
@@ -388,7 +363,7 @@ export class DeviceRepository {
   /**
    * 모든 디바이스 상태 조회
    */
-  async getAllStates(): Promise<DeviceStateRecord[]> {
+  async getAllDeviceStates(): Promise<DeviceStateRecord[]> {
     const { data, error } = await this.db
       .from('device_states')
       .select('*');

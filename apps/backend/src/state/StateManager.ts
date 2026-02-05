@@ -34,12 +34,12 @@ export interface NodeState {
 }
 
 /**
- * 디바이스 상태 (snake_case - @doai/shared DeviceStateData 호환)
+ * 디바이스 상태 (snake_case - DB status 값 기준: online|offline|busy|error)
  */
 export interface DeviceState {
   device_id: string;
-  state: 'DISCONNECTED' | 'IDLE' | 'RUNNING' | 'COMPLETED' | 'ERROR' | 'QUARANTINE';
-  node_id: string;
+  status: 'online' | 'offline' | 'busy' | 'error';
+  pc_id: string;
   workflow_id?: string;
   current_step?: string;
   progress?: number;
@@ -194,8 +194,8 @@ export class StateManager extends EventEmitter {
     for (const deviceId of deviceIds) {
       const deviceState: DeviceState = {
         device_id: deviceId,
-        state: 'IDLE',
-        node_id: nodeId,
+        status: 'online',
+        pc_id: nodeId,
         last_heartbeat: now,
       };
       pipeline.hset(KEYS.DEVICE(deviceId), this.flattenForRedis(deviceState));
@@ -265,10 +265,10 @@ export class StateManager extends EventEmitter {
     pipeline.hset(KEYS.NODE(nodeId), 'status', 'offline');
     pipeline.zrem(KEYS.HEARTBEAT_SORTED, nodeId);
 
-    // 해당 노드의 디바이스들 DISCONNECTED 처리
+    // 해당 노드의 디바이스들 offline 처리
     const deviceIds = await this.redis.smembers(KEYS.NODE_DEVICES(nodeId));
     for (const deviceId of deviceIds) {
-      pipeline.hset(KEYS.DEVICE(deviceId), 'state', 'DISCONNECTED');
+      pipeline.hset(KEYS.DEVICE(deviceId), 'status', 'offline');
     }
 
     await pipeline.exec();
@@ -323,15 +323,15 @@ export class StateManager extends EventEmitter {
       const now = Date.now();
       const initialState: DeviceState = {
         device_id: deviceId,
-        state: 'IDLE',
-        node_id: updates.node_id ?? 'unknown',
+        status: 'online',
+        pc_id: updates.pc_id ?? 'unknown',
         last_heartbeat: now,
         ...updates,
       };
       await this.redis.hset(KEYS.DEVICE(deviceId), this.flattenForRedis(initialState));
       await this.redis.sadd(KEYS.ALL_DEVICES, deviceId);
-      if (updates.node_id) {
-        await this.redis.sadd(KEYS.NODE_DEVICES(updates.node_id), deviceId);
+      if (updates.pc_id) {
+        await this.redis.sadd(KEYS.NODE_DEVICES(updates.pc_id), deviceId);
       }
     } else {
       const updatedFields = this.flattenForRedis(updates);
@@ -386,9 +386,9 @@ export class StateManager extends EventEmitter {
   }
 
   /**
-   * IDLE 상태 디바이스 조회
+   * online 상태 디바이스 조회 (작업 할당 가능)
    */
-  async getIdleDevices(nodeId?: string): Promise<DeviceState[]> {
+  async getOnlineDevices(nodeId?: string): Promise<DeviceState[]> {
     let deviceIds: string[];
 
     if (nodeId) {
@@ -401,7 +401,7 @@ export class StateManager extends EventEmitter {
 
     for (const deviceId of deviceIds) {
       const state = await this.getDeviceState(deviceId);
-      if (state && state.state === 'IDLE') {
+      if (state && state.status === 'online') {
         devices.push(state);
       }
     }
@@ -526,8 +526,8 @@ export class StateManager extends EventEmitter {
   private parseDeviceState(data: Record<string, string>): DeviceState {
     return {
       device_id: data.device_id,
-      state: data.state as DeviceState['state'],
-      node_id: data.node_id,
+      status: data.status as DeviceState['status'],
+      pc_id: data.pc_id,
       workflow_id: data.workflow_id || undefined,
       current_step: data.current_step || undefined,
       progress: data.progress ? parseInt(data.progress, 10) : undefined,

@@ -93,7 +93,7 @@ export function JobPostingForm({ onJobCreated }: JobPostingFormProps) {
       const { data: devices, error: deviceError } = await supabase
         .from('devices')
         .select('id, serial_number')
-        .eq('group_id', targetGroup);
+        .eq('pc_id', targetGroup);
 
       if (deviceError) throw deviceError;
 

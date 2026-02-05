@@ -16,9 +16,8 @@ export interface DeviceAnalytics {
   id: string;
   serial_number: string;
   pc_id: string;
-  status: 'idle' | 'busy' | 'offline';
-  health_status: 'healthy' | 'zombie' | 'offline';
-  last_seen_at: string;
+  status: 'online' | 'offline' | 'busy' | 'error';
+  last_heartbeat: string | null;
   today_completed_count: number;
   today_failed_count: number;
   recent_error_log: string | null;
@@ -122,18 +121,28 @@ export async function GET(request: NextRequest) {
 
       // Get current running job
       const runningAssignment = deviceAssignments.find(a => a.status === 'running');
+      // Supabase join may return jobs as object or array depending on relationship type
+      // Use unknown cast to handle both cases safely
+      const runningJobData = runningAssignment?.jobs as unknown;
+      const runningJobTitle = Array.isArray(runningJobData)
+        ? (runningJobData[0] as { title?: string })?.title
+        : (runningJobData as { title?: string } | null)?.title;
       const currentJob = runningAssignment ? {
         job_id: runningAssignment.job_id,
-        title: (runningAssignment.jobs as Record<string, string> | null)?.title || 'Unknown',
+        title: runningJobTitle || 'Unknown',
         progress_pct: runningAssignment.progress_pct || 0,
         started_at: runningAssignment.started_at || runningAssignment.assigned_at
       } : null;
 
       // Get next pending job
       const pendingAssignments = deviceAssignments.filter(a => a.status === 'pending');
+      const pendingJobData = pendingAssignments[0]?.jobs as unknown;
+      const pendingJobTitle = Array.isArray(pendingJobData)
+        ? (pendingJobData[0] as { title?: string })?.title
+        : (pendingJobData as { title?: string } | null)?.title;
       const nextPending = pendingAssignments.length > 0 ? {
         job_id: pendingAssignments[0].job_id,
-        title: (pendingAssignments[0].jobs as Record<string, string> | null)?.title || 'Unknown',
+        title: pendingJobTitle || 'Unknown',
         assigned_at: pendingAssignments[0].assigned_at
       } : null;
 
@@ -142,8 +151,7 @@ export async function GET(request: NextRequest) {
         serial_number: device.serial_number,
         pc_id: device.pc_id,
         status: device.status,
-        health_status: device.health_status || 'offline',
-        last_seen_at: device.last_seen_at,
+        last_heartbeat: device.last_heartbeat,
         today_completed_count: todayCompleted,
         today_failed_count: todayFailed,
         recent_error_log: recentError,

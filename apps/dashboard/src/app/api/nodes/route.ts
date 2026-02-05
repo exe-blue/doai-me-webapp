@@ -15,7 +15,7 @@ export async function GET(_request: NextRequest) {
       // nodes 테이블이 없는 경우, 디바이스 기반으로 노드 정보 생성
       if (error.code === "42P01") {
         // 테이블 없음
-        const { data: devices, error: devicesError } = await supabase.from("devices").select("node_id, status");
+        const { data: devices, error: devicesError } = await supabase.from("devices").select("pc_id, status");
         
         if (devicesError) {
           console.error("[API] Failed to fetch devices:", devicesError.message);
@@ -33,12 +33,12 @@ export async function GET(_request: NextRequest) {
         > = {};
 
         for (const device of devices || []) {
-          const nodeId = device.node_id || "node-default";
+          const nodeId = device.pc_id || "node-default";
           if (!nodeStats[nodeId]) {
             nodeStats[nodeId] = { device_count: 0, online_devices: 0, busy_devices: 0 };
           }
           nodeStats[nodeId].device_count++;
-          if (device.status === "online" || device.status === "idle") {
+          if (device.status === "online") {
             nodeStats[nodeId].online_devices++;
           }
           if (device.status === "busy") {

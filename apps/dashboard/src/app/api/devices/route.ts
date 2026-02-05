@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     const supabase = getSupabase();
     const { searchParams } = new URL(request.url);
 
-    const status = searchParams.get('status'); // idle, busy, offline
+    const status = searchParams.get('status'); // online, busy, offline, error
     const pcId = searchParams.get('pc_id'); // Filter by PC code (P01, P02)
     const limit = parseInt(searchParams.get('limit') || '500');
 
@@ -50,9 +50,10 @@ export async function GET(request: NextRequest) {
     // Calculate stats
     const stats = {
       total: devices?.length || 0,
-      idle: devices?.filter(d => d.status === 'idle').length || 0,
+      online: devices?.filter(d => d.status === 'online').length || 0,
       busy: devices?.filter(d => d.status === 'busy').length || 0,
       offline: devices?.filter(d => d.status === 'offline').length || 0,
+      error: devices?.filter(d => d.status === 'error').length || 0,
     };
 
     return NextResponse.json({
@@ -160,7 +161,7 @@ export async function PATCH(request: NextRequest) {
     let query = supabase.from('devices').update({
       status,
       ...updates,
-      last_seen_at: new Date().toISOString(),
+      last_heartbeat: new Date().toISOString(),
     });
 
     if (device_id) {

@@ -30,7 +30,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       const { data: devices, error: devicesError } = await supabase
         .from("devices")
         .select("*")
-        .eq("node_id", id);
+        .eq("pc_id", id);
 
       if (devicesError) {
         console.error("[API] Failed to fetch devices:", devicesError.message);
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       }
 
       const online = devices.filter(
-        (d) => d.status === "online" || d.status === "idle"
+        (d) => d.status === "online"
       ).length;
       const busy = devices.filter((d) => d.status === "busy").length;
 

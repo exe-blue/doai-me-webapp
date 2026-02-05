@@ -31,8 +31,8 @@ export interface DeviceStatusEvent {
 
 export interface DeviceStatus {
   id: string;
-  state: 'DISCONNECTED' | 'IDLE' | 'RUNNING' | 'COMPLETED' | 'ERROR' | 'QUARANTINE';
-  battery?: number;
+  status: 'online' | 'offline' | 'busy' | 'error';
+  battery_level?: number;
   screen_on?: boolean;
   current_workflow?: string;
   current_step?: string;
@@ -97,7 +97,7 @@ export function registerDeviceHandlers(
       await stateManager.updateNodeState(node_id, {
         status: 'online',
         device_count: devices.length,
-        active_jobs: devices.filter(d => d.state === 'RUNNING').length,
+        active_jobs: devices.filter(d => d.status === 'busy').length,
         cpu: system?.cpu,
         memory: system?.memory,
         last_seen: Date.now(),
@@ -106,8 +106,8 @@ export function registerDeviceHandlers(
       // 각 디바이스 상태 업데이트
       for (const device of devices) {
         await stateManager.updateDeviceState(device.id, {
-          state: device.state,
-          node_id,
+          status: device.status,
+          pc_id: node_id,
           workflow_id: device.current_workflow,
           current_step: device.current_step,
           progress: device.progress,

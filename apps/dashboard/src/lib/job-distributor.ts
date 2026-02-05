@@ -62,8 +62,8 @@ export async function getIdleDevices(supabase?: SupabaseClient): Promise<Device[
   const { data: devices, error } = await client
     .from('devices')
     .select('id, serial_number, pc_id')
-    .eq('status', 'idle')
-    .not('last_seen_at', 'is', null);
+    .eq('status', 'online')
+    .not('last_heartbeat', 'is', null);
 
   if (error) {
     console.error('[JobDistributor] Failed to fetch idle devices:', error);

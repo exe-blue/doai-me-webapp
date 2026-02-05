@@ -134,8 +134,8 @@ export default function NodesPage() {
     if (device.status === 'offline') return 'offline';
     if (device.status === 'busy') return 'running'; // Running (working)
     // Check heartbeat freshness (1 minute threshold)
-    if (device.last_seen_at) {
-      const lastSeen = new Date(device.last_seen_at);
+    if (device.last_heartbeat) {
+      const lastSeen = new Date(device.last_heartbeat);
       const diffMs = Date.now() - lastSeen.getTime();
       if (diffMs > 60000) return 'error';
     }
@@ -230,8 +230,8 @@ export default function NodesPage() {
     const currentTime = Date.now();
     const error = validDevices.filter(d => {
       if (d.status === 'offline') return false;
-      if (d.last_seen_at) {
-        const lastSeen = new Date(d.last_seen_at);
+      if (d.last_heartbeat) {
+        const lastSeen = new Date(d.last_heartbeat);
         const diffMs = currentTime - lastSeen.getTime();
         return diffMs > 60000;
       }

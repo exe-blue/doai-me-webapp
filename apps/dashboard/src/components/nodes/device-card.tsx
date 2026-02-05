@@ -20,9 +20,11 @@ function getDeviceHealth(device: Device): DeviceHealthStatus {
   if (device.status === 'offline') return 'offline';
   if (device.status === 'busy') return 'running';
 
+  if (device.status === 'error') return 'error';
+
   // Check heartbeat freshness (1 minute threshold)
-  if (device.last_seen_at) {
-    const lastSeen = new Date(device.last_seen_at);
+  if (device.last_heartbeat) {
+    const lastSeen = new Date(device.last_heartbeat);
     const now = new Date();
     const diffMs = now.getTime() - lastSeen.getTime();
     const diffMinutes = diffMs / (1000 * 60);
@@ -83,8 +85,8 @@ export function DeviceCard({ device, onClick, isSelected, isMaster }: DeviceCard
   const deviceName = device.pc_id || 'UNKNOWN';
   // Serial: show first 4 chars
   const serialShort = device.serial_number?.slice(0, 4)?.toLowerCase() || '----';
-  // IP validation - check both ip (socket) and ip_address (DB) fields
-  const ipValue = device.ip || device.ip_address;
+  // IP validation
+  const ipValue = device.ip_address;
   const hasValidIp = ipValue && ipValue !== '-' && ipValue !== '';
 
   const handleClick = () => {
