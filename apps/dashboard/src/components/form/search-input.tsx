@@ -63,6 +63,13 @@ export function SearchInput({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const handleSelect = useCallback((suggestion: string) => {
+    onChange(suggestion);
+    onSelect?.(suggestion);
+    setIsOpen(false);
+    setSelectedIndex(-1);
+  }, [onChange, onSelect]);
+
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (!isOpen || suggestions.length === 0) return;
 
@@ -87,14 +94,7 @@ export function SearchInput({
         setIsOpen(false);
         break;
     }
-  }, [isOpen, suggestions, selectedIndex]);
-
-  const handleSelect = (suggestion: string) => {
-    onChange(suggestion);
-    onSelect?.(suggestion);
-    setIsOpen(false);
-    setSelectedIndex(-1);
-  };
+  }, [isOpen, suggestions, selectedIndex, handleSelect]);
 
   const handleClear = () => {
     onChange('');

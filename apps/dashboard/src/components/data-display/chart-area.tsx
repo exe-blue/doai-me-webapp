@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useId } from 'react';
 import {
   Area,
   AreaChart as RechartsAreaChart,
@@ -44,7 +44,7 @@ export function ChartArea({
   dataKey = 'value',
   className,
 }: ChartAreaProps) {
-  const gradientId = useMemo(() => `gradient-${Math.random().toString(36).substr(2, 9)}`, []);
+  const gradientId = `gradient-${useId()}`;
 
   const chart = (
     <ResponsiveContainer width="100%" height={height}>

@@ -234,6 +234,6 @@ export function useSocket(options: SocketHookOptions = {}) {
     sendCommand,
     broadcastCommand,
     onCommandResult,
-    socket: socketRef.current
+    getSocket: () => socketRef.current
   };
 }

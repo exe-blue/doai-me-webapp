@@ -156,16 +156,12 @@ export const JobCard = memo(function JobCard({
   const runningDevices = job.stats?.running || 0;
   
   // 디바이스 배지 생성
-  const deviceBadges = useMemo(() => {
-    if (progress?.deviceSerial) {
-      return [progress.deviceSerial];
-    }
-    if (runningDevices > 0) {
-      // 실제 디바이스 정보가 있으면 여기서 처리
-      return [`${runningDevices}대`];
-    }
-    return [];
-  }, [progress?.deviceSerial, runningDevices]);
+  const deviceSerial = progress?.deviceSerial;
+  const deviceBadges = deviceSerial
+    ? [deviceSerial]
+    : runningDevices > 0
+      ? [`${runningDevices}대`]
+      : [];
 
   // 상태 배지 렌더링
   const renderStatusBadge = () => {

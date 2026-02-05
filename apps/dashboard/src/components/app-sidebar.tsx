@@ -24,7 +24,7 @@ import {
   ChevronDown,
   ChevronRight,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   Collapsible,
   CollapsibleContent,
@@ -100,15 +100,18 @@ interface NavItemProps {
 
 function NavItem({ item }: NavItemProps) {
   const pathname = usePathname();
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(() =>
+    item.children?.some((child) => pathname.startsWith(child.href)) ?? false
+  );
+  const [lastPathname, setLastPathname] = useState(pathname);
 
-  // 현재 경로가 자식 메뉴에 포함되면 열림 상태로 시작
-  useEffect(() => {
+  // 현재 경로가 자식 메뉴에 포함되면 열림 상태로 업데이트
+  if (pathname !== lastPathname) {
+    setLastPathname(pathname);
     if (item.children) {
-      const shouldOpen = item.children.some((child) => pathname.startsWith(child.href));
-      setIsOpen(shouldOpen);
+      setIsOpen(item.children.some((child) => pathname.startsWith(child.href)));
     }
-  }, [pathname, item.children]);
+  }
 
   const isActive = item.href
     ? pathname === item.href

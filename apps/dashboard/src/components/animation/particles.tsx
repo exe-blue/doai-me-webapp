@@ -56,7 +56,7 @@ export function Particles({
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    setIsClient(true);
+    setIsClient(true); // eslint-disable-line react-hooks/set-state-in-effect -- needed for SSR hydration
   }, []);
 
   const hexToRgb = (hex: string) => {
@@ -156,6 +156,8 @@ export function Particles({
     return remapped > 0 ? remapped : 0;
   };
 
+  const animateRef = useRef<() => void>(() => {});
+
   const animate = useCallback(() => {
     clearContext();
     circles.current.forEach((circle, i) => {
@@ -205,8 +207,12 @@ export function Particles({
         );
       }
     });
-    window.requestAnimationFrame(animate);
+    window.requestAnimationFrame(() => animateRef.current());
   }, [clearContext, circleParams, drawCircle, ease, staticity, vx, vy]);
+
+  useEffect(() => {
+    animateRef.current = animate;
+  }, [animate]);
 
   useEffect(() => {
     if (canvasRef.current) {

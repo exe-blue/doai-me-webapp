@@ -8,7 +8,7 @@ import { ChevronLeft, ChevronRight, ChevronDown, type LucideIcon } from 'lucide-
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 export interface NavigationItem {
   label: string;
@@ -32,10 +32,22 @@ interface AppSidebarProps {
 export function AppSidebar({ navigation, logo, footer }: AppSidebarProps) {
   const { isCollapsed, toggle } = useSidebar();
   const pathname = usePathname();
-  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(() => {
+    const initial = new Set<string>();
+    navigation.forEach(group => {
+      group.items.forEach(item => {
+        if (item.children?.some(child => pathname.startsWith(child.href))) {
+          initial.add(item.label);
+        }
+      });
+    });
+    return initial;
+  });
+  const [lastPathname, setLastPathname] = useState(pathname);
 
   // 현재 경로에 맞는 메뉴 자동 확장
-  useEffect(() => {
+  if (pathname !== lastPathname) {
+    setLastPathname(pathname);
     const newExpanded = new Set<string>();
     navigation.forEach(group => {
       group.items.forEach(item => {
@@ -45,7 +57,7 @@ export function AppSidebar({ navigation, logo, footer }: AppSidebarProps) {
       });
     });
     setExpandedItems(newExpanded);
-  }, [pathname, navigation]);
+  }
 
   const toggleExpanded = (label: string) => {
     setExpandedItems(prev => {

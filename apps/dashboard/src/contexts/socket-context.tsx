@@ -21,7 +21,7 @@ interface CommandResult {
 interface SocketContextValue {
   isConnected: boolean;
   devices: Device[];
-  socket: Socket | null;
+  getSocket: () => Socket | null;
   startStream: (deviceId: string, onFrame: (frame: StreamFrame) => void) => void;
   stopStream: (deviceId: string) => void;
   sendCommand: (deviceId: string, command: string, params?: Record<string, number | string>) => void;

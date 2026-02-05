@@ -124,7 +124,7 @@ export async function GET(request: NextRequest) {
       const runningAssignment = deviceAssignments.find(a => a.status === 'running');
       const currentJob = runningAssignment ? {
         job_id: runningAssignment.job_id,
-        title: (runningAssignment.jobs as any)?.title || 'Unknown',
+        title: (runningAssignment.jobs as Record<string, string> | null)?.title || 'Unknown',
         progress_pct: runningAssignment.progress_pct || 0,
         started_at: runningAssignment.started_at || runningAssignment.assigned_at
       } : null;
@@ -133,7 +133,7 @@ export async function GET(request: NextRequest) {
       const pendingAssignments = deviceAssignments.filter(a => a.status === 'pending');
       const nextPending = pendingAssignments.length > 0 ? {
         job_id: pendingAssignments[0].job_id,
-        title: (pendingAssignments[0].jobs as any)?.title || 'Unknown',
+        title: (pendingAssignments[0].jobs as Record<string, string> | null)?.title || 'Unknown',
         assigned_at: pendingAssignments[0].assigned_at
       } : null;
 

@@ -224,11 +224,12 @@ export default function NodesPage() {
     const working = validDevices.filter(d => d.status === 'busy').length;
     const offline = validDevices.filter(d => d.status === 'offline').length;
     // Error: stale heartbeat (over 1 minute)
+    const currentTime = Date.now(); // eslint-disable-line react-hooks/purity
     const error = validDevices.filter(d => {
       if (d.status === 'offline') return false;
       if (d.last_seen_at) {
         const lastSeen = new Date(d.last_seen_at);
-        const diffMs = Date.now() - lastSeen.getTime();
+        const diffMs = currentTime - lastSeen.getTime();
         return diffMs > 60000;
       }
       return false;

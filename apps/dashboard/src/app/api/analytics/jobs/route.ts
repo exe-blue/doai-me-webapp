@@ -116,7 +116,7 @@ export async function GET(request: NextRequest) {
 
       const runningDevices = running.map(a => ({
         device_id: a.device_id,
-        serial_number: (a.devices as any)?.serial_number || 'Unknown',
+        serial_number: (a.devices as Record<string, string> | null)?.serial_number || 'Unknown',
         progress_pct: a.progress_pct || 0
       }));
 
