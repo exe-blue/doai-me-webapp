@@ -271,7 +271,7 @@ export class SocketClient extends EventEmitter {
 
     // 연결된 디바이스만 필터링
     const connectedDevices = this.deviceManager.getConnectedDevices();
-    const connectedIds = new Set(connectedDevices.map(d => d.serial));
+    const connectedIds = new Set(connectedDevices); // getConnectedDevices returns string[]
     const validDeviceIds = device_ids.filter(id => connectedIds.has(id));
 
     // 연결 안 된 디바이스는 즉시 에러 보고
@@ -457,7 +457,6 @@ export class SocketClient extends EventEmitter {
         id: d.serial,
         state: this.getDeviceState(d),
         battery: d.battery,
-        screen_on: d.screen_on,
       })),
       system: {
         cpu: await this.getSystemCpu(),
@@ -472,14 +471,17 @@ export class SocketClient extends EventEmitter {
    * 디바이스 상태 결정
    */
   private getDeviceState(device: ManagedDevice): string {
-    if (device.state !== 'device') {
+    if (device.state === 'DISCONNECTED') {
       return 'DISCONNECTED';
     }
-    if (this.deviceManager.isQuarantined(device.serial)) {
+    if (device.state === 'QUARANTINE') {
       return 'QUARANTINE';
     }
+    if (device.state === 'ERROR') {
+      return 'ERROR';
+    }
     // 실행 중인 워크플로우 확인
-    for (const [jobId, workflow] of this.activeWorkflows) {
+    for (const [_jobId, workflow] of this.activeWorkflows) {
       if (workflow.deviceIds.includes(device.serial)) {
         return 'RUNNING';
       }

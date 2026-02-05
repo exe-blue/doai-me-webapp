@@ -29,18 +29,21 @@ const SheetOverlay: React.FC<
 );
 SheetOverlay.displayName = SheetPrimitive.Overlay.displayName;
 
-// 시트 방향별 스타일 variants
+/**
+ * Sheet Variants - NeoBrutalist 스타일
+ * 두꺼운 테두리, 그림자
+ */
 const sheetVariants = cva(
-  "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out fixed z-50 gap-4 p-6 shadow-lg transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-500",
+  "bg-background fixed z-50 gap-4 p-6 transition ease-in-out border-2 border-foreground shadow-[8px_8px_0px_0px] shadow-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:duration-500",
   {
     variants: {
       side: {
-        top: "data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top inset-x-0 top-0 border-b",
+        top: "data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top inset-x-0 top-0",
         bottom:
-          "data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom inset-x-0 bottom-0 border-t",
-        left: "data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left inset-y-0 left-0 h-full w-3/4 border-r sm:max-w-sm",
+          "data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom inset-x-0 bottom-0",
+        left: "data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left inset-y-0 left-0 h-full w-3/4 sm:max-w-sm",
         right:
-          "data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right inset-y-0 right-0 h-full w-3/4 border-l sm:max-w-sm",
+          "data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right inset-y-0 right-0 h-full w-3/4 sm:max-w-sm",
       },
     },
     defaultVariants: {
@@ -53,7 +56,9 @@ interface SheetContentProps
   extends React.ComponentPropsWithoutRef<typeof SheetPrimitive.Content>,
     VariantProps<typeof sheetVariants> {}
 
-// 시트 콘텐츠 컴포넌트
+/**
+ * SheetContent - NeoBrutalist 스타일 시트 콘텐츠
+ */
 const SheetContent: React.FC<SheetContentProps> = ({
   side = "right",
   className,
@@ -66,7 +71,7 @@ const SheetContent: React.FC<SheetContentProps> = ({
       className={cn(sheetVariants({ side }), className)}
       {...props}
     >
-      <SheetPrimitive.Close className="ring-offset-background focus:ring-ring data-[state=open]:bg-secondary absolute top-4 right-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-none disabled:pointer-events-none">
+      <SheetPrimitive.Close className="absolute top-4 right-4 p-1 border-2 border-foreground hover:bg-primary hover:text-primary-foreground transition-colors disabled:pointer-events-none">
         <X className="h-4 w-4" />
         <span className="sr-only">닫기</span>
       </SheetPrimitive.Close>

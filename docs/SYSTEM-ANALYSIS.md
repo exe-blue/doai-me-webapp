@@ -198,8 +198,8 @@ object SecureConfigManager {
     "supabase_url": {
       "type": "string",
       "format": "uri",
-      "description": "Supabase 프로젝트 URL (공개 엔드포인트)"
-    },
+      "description": "Supabase API URL (공개 URL). Mobile Bot은 환경변수 SUPABASE_URL을 우선 확인하고, 없을 경우 이 값 사용"
+    }
     "target_url": {
       "type": "string",
       "format": "uri",

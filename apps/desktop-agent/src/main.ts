@@ -5,20 +5,28 @@
  * - Socket.IO 클라이언트로 Backend와 통신
  * - 워크플로우 실행
  * - 시스템 트레이
+ * - 자동 업데이트
+ * - 디바이스 자동 복구
  */
 
 import { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage } from 'electron';
 import path from 'path';
+import os from 'os';
 import { SocketClient } from './socket/SocketClient';
-import { DeviceManager } from './device/DeviceManager';
+import { DeviceManager, getDeviceManager } from './device/DeviceManager';
+import { getAdbController } from './device/AdbController';
 import { WorkflowRunner } from './workflow/WorkflowRunner';
+import { AutoUpdater, getAutoUpdater } from './updater/AutoUpdater';
+import { DeviceRecovery } from './recovery/DeviceRecovery';
+import { NodeRecovery, getNodeRecovery, SavedState } from './recovery/NodeRecovery';
+import { logger } from './utils/logger';
 
 // ============================================
 // 환경 변수
 // ============================================
 
-const NODE_ID = process.env.NODE_ID || `node_${require('os').hostname()}`;
-const SERVER_URL = process.env.SERVER_URL || 'https://api.doai.me';
+const NODE_ID = process.env.NODE_ID || process.env.DOAIME_NODE_ID || `node_${os.hostname()}`;
+const SERVER_URL = process.env.SERVER_URL || process.env.DOAIME_SERVER_URL || 'https://api.doai.me';
 const IS_DEV = process.env.NODE_ENV === 'development';
 
 // ============================================
@@ -30,6 +38,9 @@ let tray: Tray | null = null;
 let socketClient: SocketClient | null = null;
 let deviceManager: DeviceManager | null = null;
 let workflowRunner: WorkflowRunner | null = null;
+let autoUpdater: AutoUpdater | null = null;
+let deviceRecovery: DeviceRecovery | null = null;
+let nodeRecovery: NodeRecovery | null = null;
 let isAppQuitting = false;
 
 // ============================================
@@ -128,21 +139,77 @@ function updateTrayMenu(status: 'connected' | 'disconnected' | 'running' | 'erro
 }
 
 // ============================================
-// Socket.IO 클라이언트 시작
+// 에이전트 시작
 // ============================================
 
 async function startAgent(): Promise<void> {
-  console.log(`[Main] Starting Desktop Agent...`);
-  console.log(`[Main] Node ID: ${NODE_ID}`);
-  console.log(`[Main] Server: ${SERVER_URL}`);
+  logger.info('Starting Desktop Agent', { nodeId: NODE_ID, serverUrl: SERVER_URL });
+
+  // 자동 업데이트 초기화 - only if mainWindow is available
+  if (mainWindow) {
+    autoUpdater = getAutoUpdater(mainWindow);
+    autoUpdater.init();
+
+    autoUpdater.on('update-pending', (info) => {
+      logger.info('Update pending', info);
+      // 서버에 업데이트 대기 알림
+      if (socketClient?.connected) {
+        socketClient.emit('NODE_UPDATE_PENDING', info);
+      }
+    });
+  } else {
+    logger.warn('AutoUpdater not initialized: mainWindow is not available');
+  }
 
   // 디바이스 매니저 초기화
-  deviceManager = new DeviceManager();
+  deviceManager = getDeviceManager();
   await deviceManager.initialize();
-  await deviceManager.startMonitoring();
+  deviceManager.startMonitoring();
 
   // 워크플로우 러너 초기화
   workflowRunner = new WorkflowRunner(NODE_ID);
+
+  // 디바이스 복구 모니터 초기화
+  const adb = getAdbController();
+  deviceRecovery = new DeviceRecovery(adb, null, {
+    maxReconnectAttempts: 3,
+    checkIntervalMs: 30000, // 30초
+  });
+
+  // 초기 디바이스 등록
+  for (const device of deviceManager.getAllDevices()) {
+    deviceRecovery.registerDevice(device.serial, device.state);
+  }
+
+  // 디바이스 복구 이벤트 핸들러
+  deviceRecovery.on('device:disconnected', (deviceId: string) => {
+    logger.warn('Device disconnected (recovery failed)', { deviceId });
+    if (socketClient?.connected) {
+      socketClient.emit('DEVICE_STATUS', {
+        device_id: deviceId,
+        state: 'DISCONNECTED',
+        reason: 'Recovery failed after max attempts',
+      });
+    }
+    sendToRenderer('device:disconnected', { deviceId });
+  });
+
+  deviceRecovery.on('device:reconnected', (deviceId: string) => {
+    logger.info('Device reconnected', { deviceId });
+    if (socketClient?.connected) {
+      socketClient.emit('DEVICE_STATUS', {
+        device_id: deviceId,
+        state: 'IDLE',
+        reason: 'Auto-reconnected',
+      });
+    }
+    sendToRenderer('device:reconnected', { deviceId });
+  });
+
+  deviceRecovery.start();
+
+  // 노드 복구 초기화
+  nodeRecovery = getNodeRecovery();
 
   // Socket.IO 클라이언트 초기화
   socketClient = new SocketClient(
@@ -154,27 +221,41 @@ async function startAgent(): Promise<void> {
     workflowRunner
   );
 
-  // 이벤트 핸들러
-  socketClient.on('connected', () => {
-    console.log('[Main] Connected to server');
+  // Socket 이벤트 핸들러
+  socketClient.on('connected', async () => {
+    logger.info('Connected to server');
     updateTrayMenu('connected');
     sendToRenderer('agent:connected');
+
+    // 이전 상태 복구 시도
+    if (nodeRecovery) {
+      await nodeRecovery.recover(socketClient!);
+    }
   });
 
   socketClient.on('disconnected', (reason: string) => {
-    console.log(`[Main] Disconnected: ${reason}`);
+    logger.warn('Disconnected from server', { reason });
     updateTrayMenu('disconnected');
     sendToRenderer('agent:disconnected', { reason });
   });
 
   socketClient.on('error', (error: Error) => {
-    console.error('[Main] Socket error:', error.message);
+    logger.error('Socket error', { error: error.message });
     updateTrayMenu('error');
     sendToRenderer('agent:error', { error: error.message });
   });
 
   // 연결 시작
   socketClient.connect();
+
+  // 상태 자동 백업 시작
+  nodeRecovery.startAutoBackup(() => ({
+    nodeId: NODE_ID,
+    runningWorkflows: workflowRunner?.getRunningWorkflows?.() || [],
+    deviceStates: deviceManager?.getAllStates() || {},
+  }));
+
+  logger.info('Desktop Agent started successfully');
 }
 
 // ============================================
@@ -219,7 +300,7 @@ function sendToRenderer(channel: string, data?: unknown): void {
 // ============================================
 
 app.on('ready', async () => {
-  console.log('[Main] App ready');
+  logger.info('App ready');
 
   createWindow();
   createTray();
@@ -245,20 +326,61 @@ app.on('activate', () => {
   }
 });
 
-app.on('before-quit', async () => {
-  console.log('[Main] App quitting...');
+app.on('before-quit', async (event) => {
+  if (isAppQuitting) return;
   
-  if (socketClient) {
-    socketClient.disconnect();
+  event.preventDefault();
+  isAppQuitting = true;
+
+  logger.info('App quitting, saving state...');
+
+  try {
+    // 상태 저장
+    if (nodeRecovery) {
+      const state: Omit<SavedState, 'timestamp' | 'version'> = {
+        nodeId: NODE_ID,
+        runningWorkflows: workflowRunner?.getRunningWorkflows?.() || [],
+        deviceStates: deviceManager?.getAllStates() || {},
+      };
+      await nodeRecovery.saveBeforeQuit(state);
+    }
+
+    // 복구 모니터 중지
+    if (deviceRecovery) {
+      deviceRecovery.stop();
+    }
+
+    // 자동 업데이트 중지
+    if (autoUpdater) {
+      autoUpdater.stop();
+    }
+
+    // 자동 백업 중지
+    if (nodeRecovery) {
+      nodeRecovery.stopAutoBackup();
+    }
+
+    // Socket 연결 해제
+    if (socketClient) {
+      socketClient.disconnect();
+    }
+
+    // 디바이스 모니터링 중지
+    if (deviceManager) {
+      deviceManager.stop();
+    }
+
+    // 워크플로우 정리
+    if (workflowRunner) {
+      await workflowRunner.cleanup();
+    }
+
+    logger.info('Cleanup completed, exiting');
+  } catch (error) {
+    logger.error('Error during cleanup', { error: (error as Error).message });
   }
-  
-  if (deviceManager) {
-    await deviceManager.stop();
-  }
-  
-  if (workflowRunner) {
-    await workflowRunner.cleanup();
-  }
+
+  app.exit(0);
 });
 
 // ============================================
@@ -266,9 +388,9 @@ app.on('before-quit', async () => {
 // ============================================
 
 process.on('uncaughtException', (error) => {
-  console.error('[Main] Uncaught exception:', error);
+  logger.error('Uncaught exception', { error: error.message, stack: error.stack });
 });
 
 process.on('unhandledRejection', (reason) => {
-  console.error('[Main] Unhandled rejection:', reason);
+  logger.error('Unhandled rejection', { reason: String(reason) });
 });

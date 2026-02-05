@@ -1,0 +1,176 @@
+# DoAi.Me Desktop Agent - Electron Builder 설정
+# https://www.electron.build/configuration/configuration
+
+appId: me.doai.agent
+productName: DoAi.Me Agent
+copyright: Copyright © 2024 DoAi Inc.
+
+# 빌드 디렉토리 설정
+directories:
+  output: dist
+  buildResources: build
+
+# 포함할 파일
+files:
+  - "src/**/*"
+  - "build/**/*"
+  - "node_modules/**/*"
+  - "package.json"
+  - "!**/*.ts"
+  - "!**/*.map"
+
+# 추가 리소스 (설치 경로에 복사)
+extraResources:
+  - from: "resources/apks"
+    to: "apks"
+    filter:
+      - "**/*"
+  - from: "resources/scripts"
+    to: "scripts"
+    filter:
+      - "**/*"
+  - from: "resources/config"
+    to: "config"
+    filter:
+      - "**/*"
+  - from: "resources/icons"
+    to: "icons"
+    filter:
+      - "**/*"
+
+# ============================================
+# Windows 설정
+# ============================================
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: resources/icons/icon.ico
+  artifactName: "${productName}-Setup-${version}.${ext}"
+  publisherName: "DoAi Inc."
+  signAndEditExecutable: false
+  requestedExecutionLevel: asInvoker
+
+# NSIS 인스톨러 설정
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  installerIcon: resources/icons/icon.ico
+  uninstallerIcon: resources/icons/icon.ico
+  installerHeaderIcon: resources/icons/icon.ico
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: "DoAi.Me Agent"
+  runAfterFinish: true
+  perMachine: false
+  allowElevation: true
+  # Note: The following assets need to be created before build:
+  # - installerSidebar: 164x314 BMP image for installer sidebar
+  # - uninstallerSidebar: 164x314 BMP image for uninstaller sidebar
+  # - license: LICENSE.txt file at project root
+  # - installer.nsh: Custom NSIS script at build/installer.nsh (optional)
+  # Uncomment these lines once the assets are created:
+  # installerSidebar: resources/icons/installerSidebar.bmp
+  # uninstallerSidebar: resources/icons/installerSidebar.bmp
+  # license: LICENSE.txt
+  # include: build/installer.nsh
+  deleteAppDataOnUninstall: false
+
+# ============================================
+# macOS 설정
+# ============================================
+mac:
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+    - target: zip
+      arch: [x64, arm64]
+  icon: resources/icons/icon.icns
+  category: public.app-category.utilities
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  artifactName: "${productName}-${version}-${arch}.${ext}"
+
+dmg:
+  contents:
+    - x: 130
+      y: 220
+    - x: 410
+      y: 220
+      type: link
+      path: /Applications
+  window:
+    width: 540
+    height: 380
+  iconSize: 80
+  backgroundColor: "#ffffff"
+
+# ============================================
+# Linux 설정
+# ============================================
+linux:
+  target:
+    - target: AppImage
+      arch: [x64]
+    - target: deb
+      arch: [x64]
+  icon: resources/icons
+  category: Utility
+  maintainer: support@doai.me
+  artifactName: "${productName}-${version}-${arch}.${ext}"
+  synopsis: "DoAi.Me Device Control Agent"
+  description: "Desktop agent for controlling Android devices"
+
+deb:
+  depends:
+    - gconf2
+    - gconf-service
+    - libnotify4
+    - libappindicator1
+    - libxtst6
+    - libnss3
+    - android-tools-adb
+
+appImage:
+  artifactName: "${productName}-${version}.${ext}"
+
+# ============================================
+# 자동 업데이트 설정
+# ============================================
+publish:
+  - provider: generic
+    url: https://releases.doai.me/agent
+    channel: latest
+  - provider: github
+    owner: doai-me
+    repo: doai-agent-releases
+    releaseType: release
+
+# 업데이트 체크 URL (electron-updater가 사용)
+# latest.yml 파일이 이 URL에 있어야 함
+
+# ============================================
+# 추가 설정
+# ============================================
+
+# asar 아카이브 설정
+asar: true
+asarUnpack:
+  - "**/*.node"
+  - "**/node_modules/sharp/**"
+  - "**/node_modules/@serialport/**"
+
+# 압축 설정
+compression: maximum
+
+# 빌드 버전 자동 증가 (CI/CD용)
+buildVersion: ${env.BUILD_NUMBER}
+
+# 프로토콜 핸들러 (deep link)
+protocols:
+  - name: DoAi.Me Agent
+    schemes:
+      - doaime
+      - doai-agent

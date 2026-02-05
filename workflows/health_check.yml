@@ -1,0 +1,111 @@
+# 디바이스 상태 체크 워크플로우
+# DoAi.Me Workflow Engine v1
+
+id: health_check
+name: "디바이스 상태 체크"
+description: "배터리, 화면 상태 등 기본 정보 수집"
+version: 1
+timeout: 30000  # 30초
+category: system
+tags:
+  - health
+  - diagnostic
+  - status
+
+steps:
+  # 1. 배터리 상태 조회
+  - id: get_battery
+    name: "배터리 상태"
+    action: adb
+    command: "shell dumpsys battery | grep -E 'level|status|health|temperature'"
+    timeout: 5000
+    on_error: continue
+
+  # 2. 화면 상태 조회
+  - id: get_screen
+    name: "화면 상태"
+    action: adb
+    command: "shell dumpsys display | grep -E 'mScreenState|mScreenOnFully'"
+    timeout: 5000
+    on_error: continue
+
+  # 3. 메모리 상태 조회
+  - id: get_memory
+    name: "메모리 상태"
+    action: adb
+    command: "shell cat /proc/meminfo | head -5"
+    timeout: 5000
+    on_error: continue
+
+  # 4. CPU 상태 조회
+  - id: get_cpu
+    name: "CPU 상태"
+    action: adb
+    command: "shell cat /proc/stat | head -1"
+    timeout: 5000
+    on_error: continue
+
+  # 5. 디스크 공간 조회
+  - id: get_storage
+    name: "저장 공간"
+    action: adb
+    command: "shell df /data | tail -1"
+    timeout: 5000
+    on_error: continue
+
+  # 6. 네트워크 연결 상태
+  - id: get_network
+    name: "네트워크 상태"
+    action: adb
+    command: "shell dumpsys connectivity | grep -E 'NetworkInfo|type:'"
+    timeout: 5000
+    on_error: continue
+
+  # 7. WiFi 정보
+  - id: get_wifi
+    name: "WiFi 정보"
+    action: adb
+    command: "shell dumpsys wifi | grep -E 'Wi-Fi is|mWifiInfo'"
+    timeout: 5000
+    on_error: continue
+
+  # 8. 실행 중인 앱 확인
+  - id: get_running_apps
+    name: "실행 중인 앱"
+    action: adb
+    command: "shell dumpsys activity activities | grep -E 'mResumedActivity|mFocusedApp'"
+    timeout: 5000
+    on_error: continue
+
+  # 9. 디바이스 정보 (모델)
+  - id: get_device_model
+    name: "디바이스 모델"
+    action: adb
+    command: "shell getprop ro.product.model"
+    timeout: 5000
+    on_error: continue
+  
+  # 9b. 디바이스 정보 (Android 버전)
+  # Note: Chained && in ADB shell commands run in a single shell session.
+  # Split into separate steps for clearer output and individual error handling.
+  - id: get_device_version
+    name: "Android 버전"
+    action: adb
+    command: "shell getprop ro.build.version.release"
+    timeout: 5000
+    on_error: continue
+
+  # 10. 시스템 업타임
+  - id: get_uptime
+    name: "시스템 가동 시간"
+    action: adb
+    command: "shell cat /proc/uptime"
+    timeout: 5000
+    on_error: continue
+
+  # 11. 완료 보고
+  - id: report_health
+    name: "상태 보고"
+    action: system
+    script: "report_completion()"
+    timeout: 3000

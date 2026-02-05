@@ -1,0 +1,126 @@
+# 일일 초기화 워크플로우
+# DoAi.Me Workflow Engine v1
+
+id: daily_reset
+name: "일일 초기화"
+description: "앱 캐시 정리 및 시스템 최적화"
+version: 1
+timeout: 120000  # 2분
+category: maintenance
+tags:
+  - maintenance
+  - reset
+  - cleanup
+
+steps:
+  # 1. 화면 켜기
+  - id: wake_screen
+    name: "화면 켜기"
+    action: adb
+    command: "shell input keyevent KEYCODE_WAKEUP"
+    timeout: 3000
+    on_error: continue
+
+  # 2. 유튜브 강제 종료
+  - id: force_stop_youtube
+    name: "유튜브 강제 종료"
+    action: adb
+    command: "shell am force-stop com.google.android.youtube"
+    timeout: 5000
+    on_error: continue
+
+  # 3. 유튜브 캐시 삭제
+  # Note: 'pm clear' clears both cache AND data (deletes user login/preferences)
+  # Use 'rm -rf' to clear only cache files if you want to preserve user data
+  - id: clear_youtube_cache
+    name: "유튜브 캐시 삭제"
+    action: adb
+    command: "shell run-as com.google.android.youtube rm -rf /data/data/com.google.android.youtube/cache/* 2>/dev/null || pm clear com.google.android.youtube"
+    timeout: 10000
+    on_error: continue
+
+  # 4. Play Store 강제 종료
+  - id: force_stop_playstore
+    name: "Play Store 강제 종료"
+    action: adb
+    command: "shell am force-stop com.android.vending"
+    timeout: 5000
+    on_error: continue
+
+  # 5. 크롬 강제 종료
+  - id: force_stop_chrome
+    name: "Chrome 강제 종료"
+    action: adb
+    command: "shell am force-stop com.android.chrome"
+    timeout: 5000
+    on_error: continue
+
+  # 6. 크롬 캐시 삭제
+  # Note: 'pm clear' clears both cache AND data. Consider cache-only clearing to preserve user data.
+  - id: clear_chrome_cache
+    name: "Chrome 캐시 삭제"
+    action: adb
+    command: "shell run-as com.android.chrome rm -rf /data/data/com.android.chrome/cache/* 2>/dev/null || pm clear com.android.chrome"
+    timeout: 10000
+    on_error: continue
+
+  # 7. 임시 파일 정리
+  - id: cleanup_temp
+    name: "임시 파일 정리"
+    action: adb
+    command: "shell rm -rf /data/local/tmp/*"
+    timeout: 10000
+    on_error: continue
+
+  # 8. 스크린샷 폴더 정리
+  - id: cleanup_screenshots
+    name: "스크린샷 정리"
+    action: adb
+    command: "shell rm -rf /sdcard/Pictures/Screenshots/*"
+    timeout: 5000
+    on_error: continue
+
+  # 9. 에러 로그 정리
+  - id: cleanup_error_logs
+    name: "에러 로그 정리"
+    action: adb
+    command: "shell rm -f /sdcard/error_*.png"
+    timeout: 5000
+    on_error: continue
+
+  # 10. 메모리 정리 (low memory killer 트리거)
+  - id: memory_cleanup
+    name: "메모리 정리"
+    action: adb
+    command: "shell am kill-all"
+    timeout: 10000
+    on_error: continue
+
+  # 11. 잠시 대기
+  - id: wait_cleanup
+    name: "정리 대기"
+    action: wait
+    duration: 2000
+
+  # 12. 홈 화면으로
+  - id: go_home
+    name: "홈 화면으로"
+    action: adb
+    command: "shell input keyevent KEYCODE_HOME"
+    timeout: 3000
+    on_error: continue
+
+  # 13. 화면 끄기
+  - id: screen_off
+    name: "화면 끄기"
+    action: adb
+    command: "shell input keyevent KEYCODE_SLEEP"
+    timeout: 3000
+    on_error: continue
+
+  # 14. 완료 보고
+  - id: report_reset
+    name: "초기화 완료 보고"
+    action: system
+    script: "report_completion()"
+    timeout: 3000

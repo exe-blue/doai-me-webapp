@@ -14,7 +14,7 @@
 import { Worker, Job, Queue } from 'bullmq';
 import Redis from 'ioredis';
 import { Server as SocketIOServer, Socket } from 'socket.io';
-import { EventEmitter } from 'events';
+import { EventEmitter } from 'node:events';
 
 // ============================================
 // 타입 정의

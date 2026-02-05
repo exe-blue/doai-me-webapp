@@ -1,5 +1,5 @@
 /**
- * PC Worker - Worker v5.1
+ * PC Worker v5.2 - DoAi.me Device Farm (Secure)
  *
  * Main worker process that:
  * - Listens for jobs from Supabase
@@ -15,13 +15,16 @@ const EvidenceUploader = require('./evidence-uploader');
 
 // Configuration
 const CONFIG = {
-  supabaseUrl: process.env.SUPABASE_URL || '',
-  supabaseKey: process.env.SUPABASE_KEY || '',
+  supabaseUrl: process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  // SERVICE_ROLE_KEY: 서버 전용 (RLS 우회) - 디바이스에 전송 금지!
+  supabaseKey: process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || '',
+  // ANON_KEY: 모바일 봇용 (RLS 적용) - 디바이스에 안전하게 전송 가능
+  supabaseAnonKey: process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
   workerId: process.env.WORKER_ID || 'worker-1',
   deviceSerial: process.env.DEVICE_SERIAL || 'AUTO', // AUTO = auto-detect single device
   botScriptPath: process.env.BOT_SCRIPT_PATH || '../mobile-agent/bot.js',
-  pollInterval: parseInt(process.env.POLL_INTERVAL) || 5000, // 5 seconds
-  maxConcurrentJobs: parseInt(process.env.MAX_CONCURRENT_JOBS) || 1
+  pollInterval: Number.parseInt(process.env.POLL_INTERVAL) || 5000, // 5 seconds
+  maxConcurrentJobs: Number.parseInt(process.env.MAX_CONCURRENT_JOBS) || 1
 };
 
 class PCWorker {
@@ -31,6 +34,7 @@ class PCWorker {
     this.uploader = new EvidenceUploader(config.supabaseUrl, config.supabaseKey);
     this.activeJobs = new Map(); // jobId -> { device, startTime }
     this.isRunning = false;
+    this.syncInterval = null; // Store interval ID for cleanup
   }
 
   /**
@@ -38,13 +42,19 @@ class PCWorker {
    */
   async start() {
     console.log('╔════════════════════════════════════════════════════════════╗');
-    console.log('║  PC Worker v5.1 - DoAi.me Device Farm                     ║');
+    console.log('║  PC Worker v5.2 - DoAi.me Device Farm (Secure)            ║');
     console.log('╚════════════════════════════════════════════════════════════╝');
     console.log('');
     console.log(`Worker ID: ${this.config.workerId}`);
     console.log(`Supabase URL: ${this.config.supabaseUrl}`);
     console.log(`Bot Script: ${this.config.botScriptPath}`);
     console.log(`Poll Interval: ${this.config.pollInterval}ms`);
+    console.log('');
+
+    // 보안 검증: 필수 키 확인
+    console.log('[Security] Environment Validation:');
+    console.log(`  SERVICE_ROLE_KEY: ${this.config.supabaseKey ? '✓ Loaded (server-only)' : '✗ MISSING'}`);
+    console.log(`  ANON_KEY: ${this.config.supabaseAnonKey ? '✓ Loaded (device-safe)' : '⚠️ MISSING - devices cannot call Supabase'}`);
     console.log('');
 
     // Detect and initialize devices
@@ -54,7 +64,8 @@ class PCWorker {
     await this.scanAndSync();
 
     // Schedule periodic telemetry sync (every 5 minutes)
-    setInterval(() => {
+    // Store interval ID for cleanup in stop()
+    this.syncInterval = setInterval(() => {
       this.scanAndSync().catch(error => {
         console.error('[Telemetry] Sync failed:', error.message);
       });
@@ -74,6 +85,13 @@ class PCWorker {
   async stop() {
     console.log('🛑 Stopping worker...');
     this.isRunning = false;
+    
+    // Clear the telemetry sync interval to prevent continued executions and leaks
+    if (this.syncInterval) {
+      clearInterval(this.syncInterval);
+      this.syncInterval = null;
+      console.log('[Telemetry] Sync interval cleared');
+    }
   }
 
   /**
@@ -242,9 +260,15 @@ class PCWorker {
     this.activeJobs.set(jobId, { device, startTime: Date.now() });
 
     try {
-      // Step 1: Claim job
+      // Step 1: Claim job (with atomic conditional update to prevent race conditions)
       console.log('[1/7] Claiming job...');
-      await this.claimJob(assignmentId, device.serial);
+      const claimResult = await this.claimJob(assignmentId, device.serial);
+      
+      // Check if we actually claimed the job (another worker might have claimed it first)
+      if (!claimResult.claimed) {
+        console.log('[1/7] Job was claimed by another worker, skipping...');
+        return;  // Exit early without marking as failed
+      }
 
       // Step 2: Deploy script (hash-based)
       console.log('[2/7] Deploying script...');
@@ -267,8 +291,10 @@ class PCWorker {
         prob_like: assignment.jobs.prob_like,
         prob_comment: assignment.jobs.prob_comment,
         prob_subscribe: assignment.jobs.prob_playlist,
+        // 보안: ANON_KEY만 전송 (RLS 적용됨), SERVICE_ROLE_KEY 절대 전송 금지!
         supabase_url: this.config.supabaseUrl,
-        supabase_key: this.config.supabaseKey
+        supabase_anon_key: this.config.supabaseAnonKey
+        // ⚠️ supabase_key (SERVICE_ROLE_KEY) 제거됨 - 보안 취약점 수정
       };
 
       await device.adb.deployJobConfig(jobParams);
@@ -314,32 +340,52 @@ class PCWorker {
     } finally {
       // Mark device as idle
       device.status = 'idle';
+
+      // 삭제 전에 startTime 추출
+      const jobInfo = this.activeJobs.get(jobId);
+      const elapsed = jobInfo?.startTime
+        ? ((Date.now() - jobInfo.startTime) / 1000).toFixed(0)
+        : 'N/A';
+
       this.activeJobs.delete(jobId);
 
-      const elapsed = ((Date.now() - this.activeJobs.get(jobId)?.startTime) / 1000).toFixed(0);
       console.log(`📊 Total time: ${elapsed}s`);
       console.log('');
     }
   }
 
   /**
-   * Claim job (update assignment)
+   * Claim job (update assignment) with atomic conditional update
+   * Uses .eq('status', 'pending') to prevent race conditions where multiple workers claim the same job
+   * @returns {Object} { success: boolean, claimed: boolean } - success indicates no DB error, claimed indicates job was actually claimed
    */
   async claimJob(assignmentId, deviceSerial) {
-    const { error } = await this.supabase
+    // Atomic conditional update: only update if status is still 'pending'
+    // This prevents race conditions where multiple workers try to claim the same job
+    const { data, error } = await this.supabase
       .from('job_assignments')
       .update({
         device_id: deviceSerial,
         status: 'running',
         started_at: new Date().toISOString()
       })
-      .eq('id', assignmentId);
+      .eq('id', assignmentId)
+      .eq('status', 'pending')  // Only claim if still pending (atomic check)
+      .select();  // Return the updated row to verify claim succeeded
 
     if (error) {
       throw error;
     }
 
+    // Check if the update actually affected a row
+    // If data is empty, another worker already claimed this job
+    if (!data || data.length === 0) {
+      console.log(`[Claim] ⚠️ Job ${assignmentId} already claimed by another worker`);
+      return { success: true, claimed: false };
+    }
+
     console.log(`[Claim] ✅ Job claimed by ${deviceSerial}`);
+    return { success: true, claimed: true };
   }
 
   /**
@@ -420,13 +466,19 @@ class PCWorker {
 // =============================================
 
 async function main() {
-  // Validate environment
-  if (!CONFIG.supabaseUrl || !CONFIG.supabaseKey) {
-    console.error('❌ SUPABASE_URL and SUPABASE_KEY environment variables are required');
+  // Validate environment - both SERVICE_ROLE_KEY and ANON_KEY are required
+  if (!CONFIG.supabaseUrl || !CONFIG.supabaseKey || !CONFIG.supabaseAnonKey) {
+    console.error('❌ Required environment variables are missing');
+    console.error('');
+    console.error('Required variables:');
+    console.error('  SUPABASE_URL - Your Supabase project URL');
+    console.error('  SUPABASE_SERVICE_ROLE_KEY - Server-side key with RLS bypass (DO NOT expose to clients)');
+    console.error('  SUPABASE_ANON_KEY - Client-side key with RLS enforcement (safe for devices)');
     console.error('');
     console.error('Example:');
     console.error('  export SUPABASE_URL="https://xxx.supabase.co"');
-    console.error('  export SUPABASE_KEY="your-anon-key"');
+    console.error('  export SUPABASE_SERVICE_ROLE_KEY="your-service-role-key"');
+    console.error('  export SUPABASE_ANON_KEY="your-anon-key"');
     console.error('  node worker.js');
     process.exit(1);
   }

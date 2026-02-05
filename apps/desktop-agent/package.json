@@ -1,0 +1,132 @@
+{
+  "name": "doai-agent",
+  "version": "1.0.0",
+  "description": "DOAI Device Control Agent",
+  "main": "dist/main.js",
+  "scripts": {
+    "start": "electron .",
+    "start:dev": "cross-env NODE_ENV=development electron .",
+    "start:prod": "cross-env NODE_ENV=production electron .",
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "prebuild:win": "tsc",
+    "build:win": "electron-builder --win",
+    "prebuild:mac": "tsc",
+    "build:mac": "electron-builder --mac",
+    "prebuild:linux": "tsc",
+    "build:linux": "electron-builder --linux",
+    "build:dir": "tsc && electron-builder --dir",
+    "dist": "tsc && electron-builder",
+    "dist:win": "tsc && electron-builder --win",
+    "dist:mac": "tsc && electron-builder --mac",
+    "dist:linux": "tsc && electron-builder --linux",
+    "release": "tsc && electron-builder --publish always",
+    "release:win": "tsc && electron-builder --win --publish always",
+    "release:mac": "tsc && electron-builder --mac --publish always",
+    "clean": "rimraf dist build",
+    "lint": "eslint src --ext .ts"
+  },
+  "build": {
+    "appId": "com.doai.agent",
+    "productName": "DOAI Agent",
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "doai-me",
+        "repo": "doai-agent-releases",
+        "releaseType": "release"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64", "ia32"]
+        }
+      ],
+      "icon": "resources/icon.ico",
+      "publisherName": "DOAI Inc.",
+      "signAndEditExecutable": false
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "icon": "resources/icon.icns",
+      "category": "public.app-category.utilities",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "notarize": false
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "icon": "resources/icon.png",
+      "category": "Utility"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "DOAI Agent",
+      "runAfterFinish": true,
+      "perMachine": false
+    },
+    "dmg": {
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    },
+    "files": [
+      "dist/**/*.js",
+      "dist/**/*.js.map",
+      "src/preload.js",
+      "src/renderer/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      "resources/**"
+    ],
+    "directories": {
+      "buildResources": "build",
+      "output": "dist"
+    }
+  },
+  "dependencies": {
+    "socket.io-client": "^4.7.4",
+    "systeminformation": "^5.21.22",
+    "dotenv": "^16.4.1",
+    "electron-updater": "^6.3.9",
+    "electron-log": "^5.1.1",
+    "bullmq": "^5.0.0",
+    "ioredis": "^5.3.2"
+  },
+  "devDependencies": {
+    "electron": "28.2.0",
+    "electron-builder": "^24.13.2",
+    "cross-env": "^7.0.3",
+    "typescript": "^5.3.3",
+    "@types/node": "^20.11.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/doai-me/doai-agent-releases.git"
+  },
+  "author": "DOAI Inc. <support@doai.me>",
+  "license": "MIT"
+}

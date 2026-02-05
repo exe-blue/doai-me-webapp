@@ -1,84 +1,301 @@
-// =============================================
+// ============================================
 // DoAi.Me 공통 타입 정의
 // Backend와 Frontend가 공유하는 "언어(Type)"
-// =============================================
+// ============================================
 
-// -----------------------------------------
-// Device 관련 타입
-// -----------------------------------------
+// ============================================
+// 공통 타입
+// ============================================
 
-/** 디바이스 상태 */
-export type DeviceStatus = 'idle' | 'busy' | 'offline';
+export type UUID = string;
+export type ISODateString = string;
 
-/** 디바이스 건강 상태 */
-export type DeviceHealthStatus = 'healthy' | 'zombie' | 'offline';
+// ============================================
+// 비디오 관련
+// ============================================
 
-/** 디바이스 정보 (DB: devices 테이블) */
+export interface Video {
+  id: UUID;
+  youtube_id: string;
+  title: string;
+  channel_id: UUID | null;
+  channel_name: string;
+  thumbnail_url: string;
+  duration_seconds: number;
+  view_count: number;
+  published_at: ISODateString;
+  category: string | null;
+  tags: string[];
+  status: "active" | "paused" | "archived";
+  priority: number;
+  target_watch_seconds: number;
+  total_executions: number;
+  total_watch_time: number;
+  search_keyword?: string | null;
+  created_at: ISODateString;
+  updated_at: ISODateString;
+}
+
+export interface Channel {
+  id: UUID;
+  youtube_id: string;
+  name: string;
+  handle: string | null;
+  thumbnail_url: string;
+  subscriber_count: number;
+  video_count: number;
+  auto_collect: boolean;
+  last_collected_at: ISODateString | null;
+  status: "active" | "paused";
+  created_at: ISODateString;
+}
+
+export interface Keyword {
+  id: UUID;
+  keyword: string;
+  category: string | null;
+  auto_collect: boolean;
+  max_results: number;
+  last_collected_at: ISODateString | null;
+  video_count: number;
+  status: "active" | "paused";
+  created_at: ISODateString;
+}
+
+// ============================================
+// 디바이스 관련
+// ============================================
+
+export type DeviceStatus = "online" | "offline" | "busy" | "error" | "maintenance" | "idle";
+
+export type DeviceHealthStatus = "healthy" | "zombie" | "offline";
+
 export interface Device {
-  id: string;                        // UUID PRIMARY KEY
-  serial_number: string;             // UNIQUE
-  pc_id: string;                     // PC 식별자
-  group_id: string;                  // 그룹 ID
-  status: DeviceStatus;              // 현재 상태
-  last_seen_at: string;              // 마지막 확인 시각
-  created_at: string;                // 생성 시각
-  
-  // Heartbeat 관련 (optional)
+  id: UUID;
+  device_id: string; // S9-001 형식
+  serial_number: string; // ADB serial
+  node_id: string;
+  name: string;
+  status: DeviceStatus;
+  battery_level: number;
+  temperature: number;
+  ip_address: string;
+  last_seen_at: ISODateString;
+  current_task_id: UUID | null;
+  total_tasks: number;
+  success_rate: number;
+  error_count: number;
+  uptime_seconds: number;
+  created_at: ISODateString;
+
+  // Legacy fields for backward compatibility
+  pc_id?: string;
+  group_id?: string;
   last_heartbeat_at?: string | null;
   last_job_activity_at?: string | null;
   adb_connected?: boolean;
   consecutive_failures?: number;
   health_status?: DeviceHealthStatus;
-  
-  // Scrcpy 관련
   scrcpy_running?: boolean;
   scrcpy_pid?: number | null;
-  
-  // 네트워크 정보
   ip?: string;
-  ip_address?: string;
-  
-  // Fixed Inventory System
   slotNum?: number;
   boardId?: string;
   slotId?: string;
   connection_info?: DeviceConnectionInfo;
 }
 
-/** 디바이스 연결 정보 */
 export interface DeviceConnectionInfo {
   pcCode?: string;
   slotNum?: number;
   adbConnected?: boolean;
 }
 
-// -----------------------------------------
-// Job 관련 타입
-// -----------------------------------------
+export type IssueType =
+  | "app_crash"
+  | "network_error"
+  | "adb_disconnect"
+  | "low_battery"
+  | "high_temperature"
+  | "memory_full"
+  | "screen_freeze"
+  | "unknown";
 
-/** 작업 스크립트 타입 */
-export type JobScriptType = 'youtube_watch' | 'youtube_search' | 'custom';
+export type IssueSeverity = "critical" | "high" | "medium" | "low";
+export type IssueStatus = "open" | "in_progress" | "resolved" | "ignored";
 
-/** 작업 정보 (DB: jobs 테이블) */
+export interface DeviceIssue {
+  id: UUID;
+  device_id: UUID;
+  type: IssueType;
+  severity: IssueSeverity;
+  status: IssueStatus;
+  message: string;
+  details: Record<string, unknown>;
+  auto_recoverable: boolean;
+  recovery_attempts: number;
+  resolved_at: ISODateString | null;
+  resolved_by: string | null;
+  created_at: ISODateString;
+}
+
+// ============================================
+// 작업 실행 관련
+// ============================================
+
+export type ExecutionStatus =
+  | "pending"
+  | "queued"
+  | "assigned"
+  | "running"
+  | "completed"
+  | "failed"
+  | "cancelled"
+  | "timeout";
+
+export interface VideoExecution {
+  id: UUID;
+  video_id: UUID;
+  device_id: UUID | null;
+  node_id: string | null;
+  schedule_id: UUID | null;
+  status: ExecutionStatus;
+  priority: number;
+  target_watch_seconds: number;
+  actual_watch_seconds: number | null;
+  progress: number; // 0-100
+  started_at: ISODateString | null;
+  completed_at: ISODateString | null;
+  error_message: string | null;
+  error_code: string | null;
+  retry_count: number;
+  metadata: ExecutionMetadata;
+  created_at: ISODateString;
+}
+
+export interface ExecutionMetadata {
+  ip_address?: string;
+  user_agent?: string;
+  resolution?: string;
+  playback_quality?: string;
+  buffering_count?: number;
+  ads_skipped?: number;
+  screenshot_url?: string;
+}
+
+// ============================================
+// 스케줄 관련
+// ============================================
+
+export type ScheduleType = "once" | "interval" | "cron";
+export type ScheduleStatus = "active" | "paused" | "completed";
+
+export interface Schedule {
+  id: UUID;
+  name: string;
+  type: ScheduleType;
+  config: ScheduleConfig;
+  video_ids: UUID[];
+  video_count: number;
+  status: ScheduleStatus;
+  last_run_at: ISODateString | null;
+  next_run_at: ISODateString | null;
+  total_runs: number;
+  created_at: ISODateString;
+}
+
+export interface ScheduleConfig {
+  // once
+  run_at?: ISODateString;
+  // interval
+  interval_minutes?: number;
+  // cron
+  cron_expression?: string;
+  // 공통
+  timezone?: string;
+  max_concurrent?: number;
+  devices_per_video?: number;
+}
+
+// ============================================
+// 노드 관련
+// ============================================
+
+export type NodeStatus = "online" | "offline" | "degraded";
+
+export interface Node {
+  id: string; // node-1, node-2, ...
+  name: string;
+  status: NodeStatus;
+  ip_address: string;
+  device_count: number;
+  online_devices: number;
+  busy_devices: number;
+  active_tasks: number;
+  cpu_usage: number;
+  memory_usage: number;
+  last_heartbeat: ISODateString;
+  version: string;
+}
+
+// ============================================
+// 리포트 관련
+// ============================================
+
+export interface DailyReport {
+  date: string; // YYYY-MM-DD
+  total_tasks: number;
+  completed_tasks: number;
+  failed_tasks: number;
+  cancelled_tasks: number;
+  total_watch_time: number;
+  avg_watch_time: number;
+  unique_videos: number;
+  active_devices: number;
+  error_rate: number;
+  tasks_per_hour: number[];
+}
+
+// ============================================
+// 시스템 로그
+// ============================================
+
+export type LogLevel = "error" | "warn" | "info" | "debug";
+export type LogSource = "api" | "worker" | "device" | "database" | "network" | "scheduler";
+
+export interface SystemLog {
+  id: UUID;
+  timestamp: ISODateString;
+  level: LogLevel;
+  source: LogSource;
+  component: string;
+  message: string;
+  details?: Record<string, unknown>;
+  stack_trace?: string;
+  node_id?: string;
+  device_id?: string;
+  request_id?: string;
+}
+
+// ============================================
+// Legacy: Job 관련 타입 (하위 호환성)
+// ============================================
+
+export type JobScriptType = "youtube_watch" | "youtube_search" | "custom";
+
 export interface Job {
-  id: string;                        // UUID
-  title: string;                     // 작업 제목
-  keyword?: string | null;           // 검색어 (NULL이면 URL 직접 진입)
-  target_url: string;                // 목표 URL
-  video_url?: string | null;         // 호환성 alias
-  
-  // 시청 설정
-  duration_sec?: number;             // 시청 시간(초)
-  duration_min_pct?: number;         // 최소 시청 비율
-  duration_max_pct?: number;         // 최대 시청 비율
-  
-  // 행동 확률
-  prob_like?: number;                // 좋아요 확률
-  prob_comment?: number;             // 댓글 확률
-  prob_playlist?: number;            // 저장 확률
-  like_probability?: number;         // 호환성 alias
-  
-  // 메타 정보
+  id: string;
+  title: string;
+  keyword?: string | null;
+  target_url: string;
+  video_url?: string | null;
+  duration_sec?: number;
+  duration_min_pct?: number;
+  duration_max_pct?: number;
+  prob_like?: number;
+  prob_comment?: number;
+  prob_playlist?: number;
+  like_probability?: number;
   script_type?: JobScriptType;
   target_group?: string | null;
   base_reward?: number;
@@ -88,50 +305,33 @@ export interface Job {
   updated_at?: string;
 }
 
-// -----------------------------------------
-// Job Assignment 관련 타입
-// -----------------------------------------
+export type JobAssignmentStatus =
+  | "pending"
+  | "paused"
+  | "running"
+  | "completed"
+  | "failed"
+  | "cancelled";
 
-/** 작업 할당 상태 */
-export type JobAssignmentStatus = 
-  | 'pending' 
-  | 'paused' 
-  | 'running' 
-  | 'completed' 
-  | 'failed' 
-  | 'cancelled';
-
-/** 작업 할당 정보 (DB: job_assignments 테이블) */
 export interface JobAssignment {
-  id: string;                        // UUID
+  id: string;
   job_id: string;
-  device_id: string;                 // FK to devices.id
-  device_serial?: string;            // 정보성
+  device_id: string;
+  device_serial?: string;
   status: JobAssignmentStatus;
   progress_pct: number;
-  
-  // 실행 결과
   final_duration_sec?: number;
   did_like?: boolean;
   did_comment?: boolean;
   did_playlist?: boolean;
   error_log?: string;
-  
-  // 타임스탬프
   assigned_at: string;
   created_at: string;
   started_at?: string;
   completed_at?: string;
-  
-  // Join된 정보
   jobs?: Job;
 }
 
-// -----------------------------------------
-// Salary 관련 타입
-// -----------------------------------------
-
-/** 급여 로그 (DB: salary_logs 테이블) */
 export interface SalaryLog {
   id: string;
   assignment_id: string;
@@ -142,22 +342,20 @@ export interface SalaryLog {
   created_at: string;
 }
 
-// -----------------------------------------
+// ============================================
 // Scrcpy 관련 타입
-// -----------------------------------------
+// ============================================
 
-/** Scrcpy 명령 타입 */
-export type ScrcpyCommandType = 
-  | 'start' 
-  | 'stop' 
-  | 'tap' 
-  | 'swipe' 
-  | 'text' 
-  | 'key' 
-  | 'back' 
-  | 'home';
+export type ScrcpyCommandType =
+  | "start"
+  | "stop"
+  | "tap"
+  | "swipe"
+  | "text"
+  | "key"
+  | "back"
+  | "home";
 
-/** Scrcpy 명령 */
 export interface ScrcpyCommand {
   type: ScrcpyCommandType;
   x?: number;
@@ -168,18 +366,16 @@ export interface ScrcpyCommand {
   keycode?: number;
 }
 
-// -----------------------------------------
+// ============================================
 // Worker 관련 타입
-// -----------------------------------------
+// ============================================
 
-/** Worker Heartbeat 데이터 */
 export interface WorkerHeartbeat {
   pcId: string;
   devices: WorkerDeviceInfo[];
   timestamp?: number;
 }
 
-/** Worker에서 보내는 디바이스 정보 */
 export interface WorkerDeviceInfo {
   serialNumber: string;
   status: DeviceStatus;
@@ -190,21 +386,24 @@ export interface WorkerDeviceInfo {
   currentJob?: string;
 }
 
-// -----------------------------------------
+// ============================================
 // API Response 타입
-// -----------------------------------------
+// ============================================
 
-/** 기본 API 응답 */
 export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
-  error?: string;
+  error?: {
+    code: string;
+    message: string;
+  };
   message?: string;
 }
 
-/** 페이지네이션 응답 */
-export interface PaginatedResponse<T> extends ApiResponse<T[]> {
+export interface PaginatedResponse<T> {
+  items: T[];
   total: number;
   page: number;
-  limit: number;
+  pageSize: number;
+  totalPages: number;
 }

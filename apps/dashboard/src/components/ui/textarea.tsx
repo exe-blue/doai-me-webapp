@@ -2,14 +2,21 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
+/**
+ * Textarea - NeoBrutalist 스타일 텍스트영역
+ * 두꺼운 테두리, 그림자
+ */
 function Textarea({ className, ...props }: React.ComponentProps<"textarea">) {
   return (
     <textarea
       data-slot="textarea"
       className={cn(
-        "placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input min-h-[80px] w-full min-w-0 rounded-md border bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none resize-none disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
-        "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
-        "aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
+        "flex min-h-[100px] w-full bg-background text-foreground px-3 py-2 text-sm",
+        "border-2 border-foreground shadow-[4px_4px_0px_0px] shadow-foreground",
+        "placeholder:text-muted-foreground",
+        "focus:outline-none focus:translate-x-[2px] focus:translate-y-[2px] focus:shadow-[2px_2px_0px_0px]",
+        "disabled:cursor-not-allowed disabled:opacity-50",
+        "resize-none transition-all duration-200",
         className
       )}
       {...props}

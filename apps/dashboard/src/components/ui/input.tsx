@@ -2,15 +2,23 @@ import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
+/**
+ * Input - NeoBrutalist 스타일 입력 필드
+ * 두꺼운 테두리, 그림자, 포커스 시 그림자 변화
+ */
 function Input({ className, type, ...props }: React.ComponentProps<"input">) {
   return (
     <input
       type={type}
       data-slot="input"
       className={cn(
-        "file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input h-9 w-full min-w-0 rounded-md border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
-        "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
-        "aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
+        "flex h-10 w-full bg-background text-foreground px-3 py-2 text-sm",
+        "border-2 border-foreground shadow-[4px_4px_0px_0px] shadow-foreground",
+        "placeholder:text-muted-foreground",
+        "focus:outline-none focus:translate-x-[2px] focus:translate-y-[2px] focus:shadow-[2px_2px_0px_0px]",
+        "disabled:cursor-not-allowed disabled:opacity-50",
+        "file:border-0 file:bg-transparent file:text-sm file:font-medium",
+        "transition-all duration-200",
         className
       )}
       {...props}

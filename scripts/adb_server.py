@@ -85,7 +85,7 @@ def get_connected_devices():
     
     # 출력 파싱 (model, device id 등 추출)
     lines = output.split('\n')[1:]  # 첫 줄(List of devices...) 제외
-    for line in lines:
+    for line in lines:    for line in lines:
         if line.strip():
             parts = line.split()
             status = parts[1] if len(parts) > 1 else "unknown"

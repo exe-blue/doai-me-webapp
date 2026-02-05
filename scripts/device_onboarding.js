@@ -126,15 +126,14 @@ async function grantScreenshotPermission(serial) {
     await new Promise(resolve => setTimeout(resolve, 10000));
     
     // 테스트 스크린샷 파일 확인
-    const result = runAdb(serial, ['shell', 'ls', '/sdcard/test_screenshot_permission.png', '2>/dev/null']);
+    const result = runAdb(serial, ['shell', 'ls', '/sdcard/test_screenshot_permission.png']);
     if (result && result.includes('test_screenshot_permission.png')) {
         console.log('      ✅ 스크린샷 권한 부여 완료');
         return true;
     } else {
         console.log('      ⚠️ 스크린샷 권한 부여 실패 (수동 허용 필요)');
         return false;
-    }
-}
+    }}
 
 /**
  * 단일 기기 온보딩 수행

@@ -129,10 +129,10 @@ export type DeviceState =
   | 'ERROR'
   | 'QUARANTINE';
 
-export type NodeStatus = 'online' | 'offline';
+export type LegacyNodeStatus = 'online' | 'offline';
 
 export interface NodeState {
-  status: NodeStatus;
+  status: LegacyNodeStatus;
   device_count: number;
   active_jobs?: number;
   cpu?: number;

@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';">
+  <title>DoAi Desktop Agent</title>
+  <style>
+    :root {
+      --bg-primary: #1a1a2e;
+      --bg-secondary: #16213e;
+      --bg-card: #1f2937;
+      --text-primary: #f8fafc;
+      --text-secondary: #94a3b8;
+      --accent: #3b82f6;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --error: #ef4444;
+      --border: #334155;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      overflow: hidden;
+    }
+
+    .app {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      -webkit-app-region: drag;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo {
+      width: 32px;
+      height: 32px;
+      background: var(--accent);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 14px;
+    }
+
+    .title {
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .node-id {
+      font-size: 12px;
+      color: var(--text-secondary);
+      background: var(--bg-card);
+      padding: 4px 8px;
+      border-radius: 4px;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      -webkit-app-region: no-drag;
+    }
+
+    /* Status Badge */
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 16px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .status-badge.connected {
+      background: rgba(34, 197, 94, 0.15);
+      color: var(--success);
+    }
+
+    .status-badge.disconnected {
+      background: rgba(239, 68, 68, 0.15);
+      color: var(--error);
+    }
+
+    .status-badge.connecting {
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--warning);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .status-dot.pulse {
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    /* Main Content */
+    .main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: auto 1fr;
+      gap: 12px;
+      padding: 12px;
+      overflow: hidden;
+    }
+
+    /* Stats Cards */
+    .stats-row {
+      grid-column: span 2;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+
+    .stat-card {
+      background: var(--bg-card);
+      border-radius: 8px;
+      padding: 16px;
+      border: 1px solid var(--border);
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-bottom: 4px;
+    }
+
+    .stat-value {
+      font-size: 24px;
+      font-weight: 700;
+    }
+
+    .stat-value.online { color: var(--success); }
+    .stat-value.busy { color: var(--warning); }
+    .stat-value.error { color: var(--error); }
+
+    /* Device List */
+    .panel {
+      background: var(--bg-card);
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .panel-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .panel-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+    }
+
+    /* Device Item */
+    .device-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      border-radius: 6px;
+      margin-bottom: 4px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .device-item:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .device-icon {
+      width: 36px;
+      height: 36px;
+      background: var(--bg-secondary);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .device-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .device-name {
+      font-size: 13px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .device-serial {
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+
+    .device-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .battery {
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+
+    /* Log Panel */
+    .log-list {
+      font-family: 'SF Mono', Monaco, monospace;
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
+    .log-entry {
+      padding: 4px 8px;
+      border-radius: 4px;
+      margin-bottom: 2px;
+      display: flex;
+      gap: 8px;
+    }
+
+    .log-entry:hover {
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .log-time {
+      color: var(--text-secondary);
+      flex-shrink: 0;
+    }
+
+    .log-level {
+      width: 40px;
+      flex-shrink: 0;
+      font-weight: 600;
+    }
+
+    .log-level.error { color: var(--error); }
+    .log-level.warn { color: var(--warning); }
+    .log-level.info { color: var(--accent); }
+    .log-level.debug { color: var(--text-secondary); }
+
+    .log-message {
+      flex: 1;
+      word-break: break-all;
+    }
+
+    /* Footer */
+    .footer {
+      padding: 8px 16px;
+      background: var(--bg-secondary);
+      border-top: 1px solid var(--border);
+      font-size: 11px;
+      color: var(--text-secondary);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 3px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+
+    /* Empty State */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--text-secondary);
+      text-align: center;
+      padding: 24px;
+    }
+
+    .empty-state-icon {
+      font-size: 48px;
+      margin-bottom: 12px;
+      opacity: 0.5;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <div class="logo">D</div>
+        <span class="title">DoAi Desktop Agent</span>
+        <span class="node-id" id="nodeId">NODE-1</span>
+      </div>
+      <div class="header-right">
+        <div class="status-badge connecting" id="serverStatus">
+          <span class="status-dot pulse"></span>
+          <span id="serverStatusText">연결 중...</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main">
+      <!-- Stats Row -->
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-label">연결된 디바이스</div>
+          <div class="stat-value" id="totalDevices">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">온라인</div>
+          <div class="stat-value online" id="onlineDevices">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">작업 중</div>
+          <div class="stat-value busy" id="busyDevices">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">오류</div>
+          <div class="stat-value error" id="errorDevices">0</div>
+        </div>
+      </div>
+
+      <!-- Device List Panel -->
+      <div class="panel">
+        <div class="panel-header">
+          <span>📱 디바이스 목록</span>
+          <span id="deviceCount">0개</span>
+        </div>
+        <div class="panel-content" id="deviceList">
+          <div class="empty-state">
+            <div class="empty-state-icon">📱</div>
+            <div>연결된 디바이스가 없습니다</div>
+            <div style="font-size: 11px; margin-top: 8px;">ADB로 디바이스를 연결해주세요</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Log Panel -->
+      <div class="panel">
+        <div class="panel-header">
+          <span>📋 로그</span>
+          <span id="logCount">0개</span>
+        </div>
+        <div class="panel-content log-list" id="logList">
+          <div class="empty-state">
+            <div class="empty-state-icon">📋</div>
+            <div>로그가 없습니다</div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <span>DoAi.Me v1.0.0</span>
+      <span id="lastUpdate">마지막 업데이트: -</span>
+    </footer>
+  </div>
+
+  <script>
+    // ============================================
+    // State
+    // ============================================
+    const state = {
+      nodeId: 'NODE-1',
+      serverConnected: false,
+      devices: [],
+      logs: [],
+      maxLogs: 200,
+    };
+
+    // ============================================
+    // DOM Elements
+    // ============================================
+    const elements = {
+      nodeId: document.getElementById('nodeId'),
+      serverStatus: document.getElementById('serverStatus'),
+      serverStatusText: document.getElementById('serverStatusText'),
+      totalDevices: document.getElementById('totalDevices'),
+      onlineDevices: document.getElementById('onlineDevices'),
+      busyDevices: document.getElementById('busyDevices'),
+      errorDevices: document.getElementById('errorDevices'),
+      deviceCount: document.getElementById('deviceCount'),
+      deviceList: document.getElementById('deviceList'),
+      logCount: document.getElementById('logCount'),
+      logList: document.getElementById('logList'),
+      lastUpdate: document.getElementById('lastUpdate'),
+    };
+
+    // ============================================
+    // API (from preload.js)
+    // ============================================
+    const api = window.api || {
+      getConfig: () => Promise.resolve({ nodeId: 'DEV-NODE' }),
+      getDevices: () => Promise.resolve([]),
+      getLogs: () => Promise.resolve([]),
+      onDeviceUpdate: () => {},
+      onLogEntry: () => {},
+      onServerStatus: () => {},
+    };
+
+    // ============================================
+    // Render Functions
+    // ============================================
+    function updateServerStatus(connected, message) {
+      state.serverConnected = connected;
+      
+      elements.serverStatus.className = 'status-badge ' + 
+        (connected ? 'connected' : message === '연결 중...' ? 'connecting' : 'disconnected');
+      elements.serverStatusText.textContent = message || (connected ? '연결됨' : '연결 끊김');
+      
+      const dot = elements.serverStatus.querySelector('.status-dot');
+      dot.className = 'status-dot' + (message === '연결 중...' ? ' pulse' : '');
+    }
+
+    function updateStats() {
+      const devices = state.devices;
+      const total = devices.length;
+      const online = devices.filter(d => d.status === 'online' || d.status === 'idle').length;
+      const busy = devices.filter(d => d.status === 'busy' || d.status === 'running').length;
+      const error = devices.filter(d => d.status === 'error' || d.status === 'offline').length;
+
+      elements.totalDevices.textContent = total;
+      elements.onlineDevices.textContent = online;
+      elements.busyDevices.textContent = busy;
+      elements.errorDevices.textContent = error;
+      elements.deviceCount.textContent = `${total}개`;
+    }
+
+    function renderDevices() {
+      if (state.devices.length === 0) {
+        elements.deviceList.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">📱</div>
+            <div>연결된 디바이스가 없습니다</div>
+            <div style="font-size: 11px; margin-top: 8px;">ADB로 디바이스를 연결해주세요</div>
+          </div>
+        `;
+        return;
+      }
+
+      elements.deviceList.innerHTML = state.devices.map(device => {
+        const statusColor = {
+          online: 'var(--success)',
+          idle: 'var(--success)',
+          busy: 'var(--warning)',
+          running: 'var(--warning)',
+          error: 'var(--error)',
+          offline: 'var(--text-secondary)',
+        }[device.status] || 'var(--text-secondary)';
+
+        return `
+          <div class="device-item" data-id="${device.id}">
+            <div class="device-icon">📱</div>
+            <div class="device-info">
+              <div class="device-name">${device.name || device.id}</div>
+              <div class="device-serial">${device.serial || device.id}</div>
+            </div>
+            <div class="device-status">
+              <span class="battery">🔋 ${device.battery || 0}%</span>
+              <span class="status-dot" style="background: ${statusColor}"></span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function addLog(log) {
+      state.logs.unshift(log);
+      if (state.logs.length > state.maxLogs) {
+        state.logs.pop();
+      }
+      renderLogs();
+    }
+
+    function renderLogs() {
+      if (state.logs.length === 0) {
+        elements.logList.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">📋</div>
+            <div>로그가 없습니다</div>
+          </div>
+        `;
+        return;
+      }
+
+      elements.logCount.textContent = `${state.logs.length}개`;
+      elements.logList.innerHTML = state.logs.map(log => `
+        <div class="log-entry">
+          <span class="log-time">${formatTime(log.timestamp)}</span>
+          <span class="log-level ${log.level}">${log.level.toUpperCase()}</span>
+          <span class="log-message">${escapeHtml(log.message)}</span>
+        </div>
+      `).join('');
+    }
+
+    // ============================================
+    // Utility Functions
+    // ============================================
+    function formatTime(timestamp) {
+      const date = new Date(timestamp);
+      return date.toLocaleTimeString('ko-KR', { hour12: false });
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function updateLastUpdate() {
+      elements.lastUpdate.textContent = `마지막 업데이트: ${formatTime(Date.now())}`;
+    }
+
+    // ============================================
+    // Initialize
+    // ============================================
+    async function init() {
+      try {
+        // Config 가져오기
+        const config = await api.getConfig();
+        state.nodeId = config.nodeId || 'NODE-1';
+        elements.nodeId.textContent = state.nodeId;
+
+        // 이벤트 리스너 등록
+        if (api.onServerStatus) {
+          api.onServerStatus((event, { connected, message }) => {
+            updateServerStatus(connected, message);
+          });
+        }
+
+        if (api.onDeviceUpdate) {
+          api.onDeviceUpdate((event, devices) => {
+            state.devices = devices;
+            updateStats();
+            renderDevices();
+            updateLastUpdate();
+          });
+        }
+
+        if (api.onLogEntry) {
+          api.onLogEntry((event, log) => {
+            addLog(log);
+          });
+        }
+
+        // 초기 데이터 로드
+        const devices = await api.getDevices();
+        state.devices = devices || [];
+        updateStats();
+        renderDevices();
+
+        const logs = await api.getLogs();
+        state.logs = logs || [];
+        renderLogs();
+
+        // 시작 로그
+        addLog({
+          timestamp: Date.now(),
+          level: 'info',
+          message: 'Desktop Agent UI 초기화 완료'
+        });
+
+        updateLastUpdate();
+
+      } catch (err) {
+        console.error('Init error:', err);
+        addLog({
+          timestamp: Date.now(),
+          level: 'error',
+          message: `초기화 오류: ${err.message}`
+        });
+      }
+    }
+
+    // Start
+    init();
+  </script>
+</body>
+</html>

@@ -1,0 +1,166 @@
+# 유튜브 영상 시청 워크플로우
+# DoAi.Me Workflow Engine v1
+
+id: youtube_watch
+name: "유튜브 영상 시청"
+description: "키워드 검색 후 첫 번째 영상 시청"
+version: 1
+timeout: 300000  # 5분
+category: youtube
+tags:
+  - youtube
+  - video
+  - watch
+
+params:
+  - name: keyword
+    type: string
+    required: true
+    description: "검색 키워드"
+  - name: watch_duration
+    type: number
+    default: 60
+    description: "시청 시간 (초)"
+
+retry_policy:
+  default_attempts: 2
+  default_delay: 2000
+  backoff: exponential
+
+steps:
+  # 1. 화면 켜기
+  - id: wake_screen
+    name: "화면 켜기"
+    action: adb
+    command: "shell input keyevent KEYCODE_WAKEUP"
+    timeout: 5000
+    on_error: continue
+
+  # 2. 잠금 해제 (스와이프)
+  - id: unlock_screen
+    name: "잠금 해제"
+    action: adb
+    command: "shell input swipe 540 1800 540 800 300"
+    timeout: 3000
+    on_error: continue
+
+  # 3. 유튜브 앱 실행
+  - id: launch_youtube
+    name: "유튜브 앱 실행"
+    action: adb
+    command: "shell am start -n com.google.android.youtube/.HomeActivity"
+    timeout: 10000
+    retry:
+      attempts: 2
+      delay: 3000
+
+  # 4. 앱 로딩 대기
+  - id: wait_launch
+    name: "앱 로딩 대기"
+    action: wait
+    duration: 3000
+
+  # 5. 검색 및 재생 (AutoX.js)
+  - id: search_and_play
+    name: "검색 및 재생"
+    action: autox
+    script: |
+      // 검색 버튼 찾기 (여러 선택자 시도)
+      var searchBtn = id("com.google.android.youtube:id/menu_item_1").findOne(3000) ||
+                      desc("Search").findOne(2000) ||
+                      className("ImageView").desc("Search").findOne(2000);
+      
+      if (!searchBtn) {
+        throw new Error("Search button not found");
+      }
+      searchBtn.click();
+      sleep(1000);
+      
+      // 검색 입력창
+      var input = className("EditText").findOne(3000) ||
+                  id("com.google.android.youtube:id/search_edit_text").findOne(2000);
+      
+      if (!input) {
+        throw new Error("Search input not found");
+      }
+      input.setText("{{keyword}}");
+      sleep(500);
+      
+      // 검색 실행 (엔터)
+      KeyEvent("enter");
+      sleep(3000);
+      
+      // 첫 번째 영상 클릭
+      var video = id("com.google.android.youtube:id/video_info_view").findOne(8000) ||
+                  id("com.google.android.youtube:id/thumbnail").findOne(5000) ||
+                  className("android.view.ViewGroup").clickable(true).findOne(5000);
+      
+      if (!video) {
+        throw new Error("Video not found in search results");
+      }
+      
+      // 상위 클릭 가능 요소 찾기
+      var clickTarget = video;
+      while (clickTarget && !clickTarget.clickable()) {
+        clickTarget = clickTarget.parent();
+      }
+      
+      if (clickTarget) {
+        clickTarget.click();
+      } else {
+        video.click();
+      }
+      
+      "search_complete";
+    timeout: 30000
+    retry:
+      attempts: 3
+      delay: 2000
+      backoff: exponential
+    on_error: fail
+
+  # 6. 영상 로딩 대기
+  - id: wait_video_load
+    name: "영상 로딩 대기"
+    action: wait
+    duration: 2000
+
+  # 7. 영상 시청
+  # Note: duration expects milliseconds. Multiply watch_duration (seconds) by 1000.
+  # The template interpolation happens before type conversion, so we need to compute
+  # the value correctly. Using a numeric expression instead of string concatenation.
+  - id: watch_video
+    name: "영상 시청"
+    action: wait
+    # Duration in ms: watch_duration is in seconds, multiply by 1000
+    # Using |number filter to ensure numeric conversion after interpolation
+    duration: "{{watch_duration|default:60}}000"
+
+  # 8. 앱 종료
+  - id: close_app
+    name: "앱 종료"
+    action: adb
+    command: "shell am force-stop com.google.android.youtube"
+    timeout: 5000
+    on_error: continue
+
+  # 9. 완료 보고
+  - id: report_completion
+    name: "완료 보고"
+    action: system
+    script: "report_completion()"
+    timeout: 3000
+
+# 에러 발생 시 실행
+on_error:
+  - id: error_screenshot
+    name: "에러 스크린샷"
+    action: adb
+    command: "shell screencap -p /sdcard/error_{{device_id}}_{{timestamp}}.png"
+    on_error: continue
+    
+  - id: error_close_app
+    name: "앱 강제 종료"
+    action: adb
+    command: "shell am force-stop com.google.android.youtube"
+    on_error: continue

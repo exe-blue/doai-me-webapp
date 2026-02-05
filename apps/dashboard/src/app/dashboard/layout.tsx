@@ -5,27 +5,89 @@ import { SidebarProvider } from '@/components/layout/sidebar-context';
 import { AppSidebar, type NavigationGroup } from '@/components/layout/app-sidebar';
 import { Header } from '@/components/layout/header';
 import {
-  LayoutDashboard,
-  Monitor,
-  PlayCircle,
-  PlusCircle,
+  Home,
+  Play,
+  Video,
+  Users,
+  Search,
+  ListTodo,
+  Clock,
+  Activity,
+  Calendar,
+  Smartphone,
+  LayoutGrid,
+  AlertTriangle,
+  BarChart3,
+  FileText,
+  CheckCircle,
+  ScrollText,
   Settings,
 } from 'lucide-react';
 import Link from 'next/link';
 
 const navigation: NavigationGroup[] = [
   {
-    title: '메뉴',
     items: [
-      { label: '대시보드', href: '/dashboard', icon: LayoutDashboard },
-      { label: '기기관리', href: '/dashboard/nodes', icon: Monitor },
-      { label: '작업관리', href: '/dashboard/jobs', icon: PlayCircle },
-      { label: '작업등록', href: '/dashboard/register', icon: PlusCircle },
+      { label: '홈', href: '/dashboard', icon: Home },
     ],
   },
   {
-    title: '시스템',
     items: [
+      {
+        label: '콘텐츠',
+        href: '/dashboard/videos',
+        icon: Play,
+        children: [
+          { label: '영상 목록', href: '/dashboard/videos', icon: Video },
+          { label: '채널 목록', href: '/dashboard/channels', icon: Users },
+          { label: '키워드', href: '/dashboard/keywords', icon: Search },
+        ],
+      },
+    ],
+  },
+  {
+    items: [
+      {
+        label: '작업',
+        href: '/dashboard/queue',
+        icon: ListTodo,
+        children: [
+          { label: '대기열', href: '/dashboard/queue', icon: Clock },
+          { label: '진행 중', href: '/dashboard/running', icon: Activity },
+          { label: '스케줄러', href: '/dashboard/schedules', icon: Calendar },
+        ],
+      },
+    ],
+  },
+  {
+    items: [
+      {
+        label: '디바이스',
+        href: '/dashboard/devices',
+        icon: Smartphone,
+        children: [
+          { label: '전체 현황', href: '/dashboard/devices', icon: LayoutGrid },
+          { label: '문제 기기', href: '/dashboard/devices/issues', icon: AlertTriangle },
+        ],
+      },
+    ],
+  },
+  {
+    items: [
+      {
+        label: '리포트',
+        href: '/dashboard/reports/daily',
+        icon: BarChart3,
+        children: [
+          { label: '일일 리포트', href: '/dashboard/reports/daily', icon: FileText },
+          { label: '완료 내역', href: '/dashboard/reports/history', icon: CheckCircle },
+        ],
+      },
+    ],
+  },
+  {
+    items: [
+      { label: '로그', href: '/dashboard/logs', icon: ScrollText },
       { label: '설정', href: '/dashboard/settings', icon: Settings },
     ],
   },

@@ -173,13 +173,16 @@ async function executeWorkflowForDevice(job, workflow, deviceId, params) {
     params,
     variables: {},
     startedAt: Date.now(),
-    currentStep: 0,
+    currentStep: null, // Will be set to actual step ID during execution
   };
   
   try {
     // Step 순차 실행
     while (currentStepIndex < totalSteps) {
       const step = workflow.steps[currentStepIndex];
+      
+      // Update context.currentStep to actual step ID for error reporting
+      context.currentStep = step.id;
       
       // 디바이스 상태 업데이트
       const progress = Math.round((currentStepIndex / totalSteps) * 100);
@@ -319,10 +322,11 @@ async function executeStep(step, context) {
         case 'adb':
           return await executeAdbCommand(deviceId, resolvedParams.command, step.timeout);
           
-        case 'wait':
+        case 'wait': {
           const duration = parseInt(resolvedParams.duration) || 1000;
           await sleep(duration * 1000);
           return { waited: duration };
+        }
           
         case 'system':
           return await executeSystemAction(deviceId, resolvedParams, context);
@@ -476,17 +480,21 @@ async function startWorker() {
     lastSeen: Date.now(),
   });
   
-  // Heartbeat 시작
-  setInterval(async () => {
-    const queueStats = await queueService.getQueueStats(queueService.QUEUES.WORKFLOW(NODE_ID));
-    
-    await redisService.setNodeState(NODE_ID, {
-      status: 'online',
-      activeJobs: queueStats?.active || 0,
-      lastSeen: Date.now(),
-      cpu: process.cpuUsage().user / 1000000,
-      memory: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
-    });
+  // Heartbeat 시작 - capture interval ID for cleanup
+  const heartbeatIntervalId = setInterval(async () => {
+    try {
+      const queueStats = await queueService.getQueueStats(queueService.QUEUES.WORKFLOW(NODE_ID));
+      
+      await redisService.setNodeState(NODE_ID, {
+        status: 'online',
+        activeJobs: queueStats?.active || 0,
+        lastSeen: Date.now(),
+        cpu: process.cpuUsage().user / 1000000,
+        memory: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+      });
+    } catch (error) {
+      console.error('[Worker] Heartbeat error:', error.message);
+    }
   }, 10000);
   
   console.log(`[Worker] Worker started successfully`);
@@ -494,6 +502,8 @@ async function startWorker() {
   // Graceful shutdown
   process.on('SIGTERM', async () => {
     console.log('[Worker] SIGTERM received, shutting down...');
+    // Clear heartbeat interval before disconnecting
+    clearInterval(heartbeatIntervalId);
     await queueService.shutdown();
     await redisService.disconnect();
     process.exit(0);

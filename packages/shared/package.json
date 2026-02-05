@@ -1,7 +1,7 @@
 {
   "name": "@doai/shared",
   "version": "1.0.0",
-  "description": "DoAi.Me 공통 타입 및 상수 정의",
+  "description": "DoAi.Me 공통 타입, API 스펙, Socket 이벤트 정의",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -15,6 +15,21 @@
       "import": "./dist/types.js",
       "require": "./dist/types.js"
     },
+    "./api": {
+      "types": "./dist/api.d.ts",
+      "import": "./dist/api.js",
+      "require": "./dist/api.js"
+    },
+    "./socket": {
+      "types": "./dist/socket.d.ts",
+      "import": "./dist/socket.js",
+      "require": "./dist/socket.js"
+    },
+    "./queue": {
+      "types": "./dist/queue.d.ts",
+      "import": "./dist/queue.js",
+      "require": "./dist/queue.js"
+    },
     "./constants": {
       "types": "./dist/constants.d.ts",
       "import": "./dist/constants.js",
@@ -23,9 +38,12 @@
   },
   "scripts": {
     "build": "tsc",
-    "dev": "tsc --watch"
+    "dev": "tsc --watch",
+    "clean": "rimraf dist",
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
+    "rimraf": "^5.0.0",
     "typescript": "^5.0.0"
   },
   "files": [
