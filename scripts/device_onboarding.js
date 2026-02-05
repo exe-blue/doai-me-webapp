@@ -133,7 +133,8 @@ async function grantScreenshotPermission(serial) {
     } else {
         console.log('      ⚠️ 스크린샷 권한 부여 실패 (수동 허용 필요)');
         return false;
-    }}
+    }
+}
 
 /**
  * 단일 기기 온보딩 수행

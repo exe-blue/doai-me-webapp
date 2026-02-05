@@ -59,7 +59,7 @@ export class WorkflowEngine {
     workflowId: string,
     context: Omit<ExecutionContext, 'workflowId'>
   ): Promise<WorkflowResult> {
-    const workflow = this.parser.loadById(workflowId);
+    const workflow = await this.parser.loadByIdAsync(workflowId);
     
     if (!workflow) {
       throw new Error(`Workflow not found: ${workflowId}`);
@@ -106,15 +106,15 @@ export class WorkflowEngine {
   /**
    * 사용 가능한 워크플로우 목록
    */
-  listWorkflows(): Map<string, WorkflowDefinition> {
-    return this.parser.loadAll();
+  async listWorkflows(): Promise<Map<string, WorkflowDefinition>> {
+    return this.parser.loadAllAsync();
   }
 
   /**
    * 워크플로우 로드
    */
-  loadWorkflow(id: string): WorkflowDefinition | null {
-    return this.parser.loadById(id);
+  async loadWorkflow(id: string): Promise<WorkflowDefinition | null> {
+    return this.parser.loadByIdAsync(id);
   }
 
   /**

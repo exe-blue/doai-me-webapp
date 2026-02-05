@@ -203,6 +203,18 @@ CREATE INDEX IF NOT EXISTS idx_schedules_active ON schedules(is_active) WHERE is
 CREATE INDEX IF NOT EXISTS idx_schedules_next_run ON schedules(next_run_at);
 CREATE INDEX IF NOT EXISTS idx_schedules_type ON schedules(schedule_type);
 
+-- Unique constraint on name for conflict resolution
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint 
+    WHERE conname = 'schedules_name_unique' 
+    AND conrelid = 'schedules'::regclass
+  ) THEN
+    ALTER TABLE schedules ADD CONSTRAINT schedules_name_unique UNIQUE (name);
+  END IF;
+END $$;
+
 -- ============================================
 -- 5. daily_stats 테이블 (일일 통계)
 -- ============================================
@@ -527,21 +539,6 @@ SELECT
 FROM daily_stats ds
 WHERE ds.date = CURRENT_DATE;
 
--- 대시보드 요약 뷰
-CREATE OR REPLACE VIEW dashboard_summary AS
-SELECT
-  (SELECT COUNT(*) FROM videos WHERE status = 'active') as active_videos,
-  (SELECT COUNT(*) FROM videos WHERE status = 'completed') as completed_videos,
-  (SELECT SUM(completed_views) FROM videos) as total_views,
-  (SELECT COUNT(*) FROM keywords WHERE is_active = true) as active_keywords,
-  (SELECT COUNT(*) FROM schedules WHERE is_active = true) as active_schedules,
-  (SELECT COUNT(*) FROM nodes WHERE status = 'online') as online_nodes,
-  (SELECT COUNT(*) FROM devices WHERE state = 'IDLE') as idle_devices,
-  (SELECT COUNT(*) FROM devices WHERE state = 'RUNNING') as running_devices,
-  (SELECT COUNT(*) FROM devices WHERE state IN ('ERROR', 'QUARANTINE')) as problem_devices,
-  (SELECT total_completed FROM daily_stats WHERE date = CURRENT_DATE) as today_completed,
-  (SELECT total_failed FROM daily_stats WHERE date = CURRENT_DATE) as today_failed;
-
 -- ============================================
 -- 10. RLS 정책
 -- ============================================
@@ -634,7 +631,7 @@ INSERT INTO schedules (name, description, cron_expression, schedule_type, is_act
   ('오전 시청', '오전 9시~12시 영상 시청', '0 9 * * *', 'video_batch', false),
   ('오후 시청', '오후 14시~18시 영상 시청', '0 14 * * *', 'video_batch', false),
   ('저녁 시청', '저녁 19시~22시 영상 시청', '0 19 * * *', 'video_batch', false)
-ON CONFLICT DO NOTHING;
+ON CONFLICT (name) DO NOTHING;
 
 -- ============================================
 -- 13. 키워드 자동 추출 (DB 트리거)
@@ -695,4 +692,3 @@ COMMENT ON COLUMN videos.search_keyword IS '검색용 키워드 (해시태그 �
 -- 뷰 권한
 GRANT SELECT ON content_overview TO anon, authenticated;
 GRANT SELECT ON today_stats TO anon, authenticated;
-GRANT SELECT ON dashboard_summary TO anon, authenticated;

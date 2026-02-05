@@ -6,6 +6,7 @@
 
 import * as yaml from 'yaml';
 import * as fs from 'fs';
+import * as fsPromises from 'fs/promises';
 import * as path from 'path';
 import { 
   WorkflowDefinition, 
@@ -112,7 +113,8 @@ export class WorkflowParser {
   }
 
   /**
-   * 워크플로우 ID로 로드
+   * 워크플로우 ID로 로드 (동기)
+   * @deprecated Use loadByIdAsync for non-blocking file operations
    */
   loadById(id: string): WorkflowDefinition | null {
     const possibleFiles = [`${id}.yml`, `${id}.yaml`];
@@ -126,6 +128,77 @@ export class WorkflowParser {
 
     // 모든 파일에서 ID 검색
     const all = this.loadAll();
+    return all.get(id) || null;
+  }
+
+  /**
+   * 파일에서 워크플로우 로드 (비동기)
+   */
+  async loadFromFileAsync(filename: string): Promise<WorkflowDefinition> {
+    const filePath = path.isAbsolute(filename) 
+      ? filename 
+      : path.join(this.workflowDir, filename);
+
+    try {
+      await fsPromises.access(filePath);
+    } catch {
+      throw new WorkflowValidationError(
+        `워크플로우 파일을 찾을 수 없습니다: ${filePath}`,
+        'file',
+        filename
+      );
+    }
+
+    const content = await fsPromises.readFile(filePath, 'utf-8');
+    return this.parse(content);
+  }
+
+  /**
+   * 디렉토리의 모든 워크플로우 로드 (비동기)
+   */
+  async loadAllAsync(): Promise<Map<string, WorkflowDefinition>> {
+    const workflows = new Map<string, WorkflowDefinition>();
+
+    try {
+      await fsPromises.access(this.workflowDir);
+    } catch {
+      console.warn(`워크플로우 디렉토리가 없습니다: ${this.workflowDir}`);
+      return workflows;
+    }
+
+    const entries = await fsPromises.readdir(this.workflowDir);
+    const files = entries.filter(f => f.endsWith('.yml') || f.endsWith('.yaml'));
+
+    for (const file of files) {
+      try {
+        const workflow = await this.loadFromFileAsync(file);
+        workflows.set(workflow.id, workflow);
+      } catch (e) {
+        console.error(`워크플로우 로드 실패: ${file}`, e);
+      }
+    }
+
+    return workflows;
+  }
+
+  /**
+   * 워크플로우 ID로 로드 (비동기)
+   */
+  async loadByIdAsync(id: string): Promise<WorkflowDefinition | null> {
+    const possibleFiles = [`${id}.yml`, `${id}.yaml`];
+
+    for (const file of possibleFiles) {
+      const filePath = path.join(this.workflowDir, file);
+      try {
+        await fsPromises.access(filePath);
+        return await this.loadFromFileAsync(file);
+      } catch {
+        // File doesn't exist, try next
+      }
+    }
+
+    // 모든 파일에서 ID 검색
+    const all = await this.loadAllAsync();
     return all.get(id) || null;
   }
 
@@ -381,6 +454,8 @@ export class WorkflowParser {
       );
     }
 
+    // Use then_steps/else_steps to avoid thenable conflict
+    // (Objects with 'then' property can be mistakenly treated as Promises)
     return {
       id: raw.id as string,
       name: raw.name as string | undefined,
@@ -390,8 +465,8 @@ export class WorkflowParser {
       scriptFile: raw.scriptFile as string | undefined,
       duration,
       condition: raw.condition as string | undefined,
-      then: thenSteps,
-      else: elseSteps,
+      then_steps: thenSteps,
+      else_steps: elseSteps,
       count: raw.count as number | undefined,
       body: bodySteps,
       systemCommand: raw.systemCommand as string | undefined,

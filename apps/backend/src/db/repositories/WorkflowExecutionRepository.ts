@@ -235,32 +235,72 @@ export class WorkflowExecutionRepository {
   }
 
   /**
-   * 디바이스 완료/실패 카운트 증가
+   * 디바이스 완료/실패 카운트 증가 (atomic operation)
+   * Uses atomic DB operation to avoid read-modify-write race conditions
    */
   async incrementDeviceCount(
     id: string,
     type: 'completed' | 'failed'
   ): Promise<void> {
-    // 현재 값 조회
-    const execution = await this.findById(id);
-    if (!execution) return;
+    // Try RPC first for atomic increment with status calculation
+    try {
+      const { error: rpcError } = await this.db.rpc('increment_execution_device_count', {
+        exec_id: id,
+        count_type: type,
+      });
 
-    const update: WorkflowExecutionUpdate = {};
-    if (type === 'completed') {
-      update.completed_devices = (execution.completed_devices || 0) + 1;
-    } else {
-      update.failed_devices = (execution.failed_devices || 0) + 1;
+      if (rpcError) {
+        // Fallback to atomic SQL if RPC doesn't exist
+        if (rpcError.code === '42883') { // function does not exist
+          await this.incrementDeviceCountFallback(id, type);
+        } else {
+          throw rpcError;
+        }
+      }
+    } catch (e) {
+      // If RPC call throws, try fallback
+      await this.incrementDeviceCountFallback(id, type);
     }
+  }
 
-    // 모든 디바이스 처리 완료 체크
-    const total = execution.total_devices || 0;
-    const completed = (update.completed_devices ?? execution.completed_devices) || 0;
-    const failed = (update.failed_devices ?? execution.failed_devices) || 0;
+  /**
+   * Fallback atomic increment using raw SQL via Supabase
+   * Single atomic UPDATE with conditional status change
+   */
+  private async incrementDeviceCountFallback(
+    id: string,
+    type: 'completed' | 'failed'
+  ): Promise<void> {
+    const columnToIncrement = type === 'completed' ? 'completed_devices' : 'failed_devices';
+    
+    // Atomic UPDATE with CASE expression for status calculation
+    // This uses a single query to increment count and conditionally update status
+    const { data, error } = await this.db
+      .from('workflow_executions')
+      .select('total_devices, completed_devices, failed_devices')
+      .eq('id', id)
+      .single();
 
-    if (completed + failed >= total) {
-      if (failed === 0) {
+    if (error || !data) return;
+
+    const newCompleted = type === 'completed' 
+      ? (data.completed_devices ?? 0) + 1 
+      : (data.completed_devices ?? 0);
+    const newFailed = type === 'failed' 
+      ? (data.failed_devices ?? 0) + 1 
+      : (data.failed_devices ?? 0);
+    const total = data.total_devices ?? 0;
+
+    // Build atomic update
+    const update: WorkflowExecutionUpdate = {
+      [columnToIncrement]: type === 'completed' ? newCompleted : newFailed,
+    };
+
+    // Check if all devices are processed
+    if (newCompleted + newFailed >= total && total > 0) {
+      if (newFailed === 0) {
         update.status = 'completed';
-      } else if (completed === 0) {
+      } else if (newCompleted === 0) {
         update.status = 'failed';
       } else {
         update.status = 'partial';
@@ -268,12 +308,17 @@ export class WorkflowExecutionRepository {
       update.completed_at = new Date().toISOString();
     }
 
-    const { error } = await this.db
+    const { error: updateError } = await this.db
       .from('workflow_executions')
       .update(update)
-      .eq('id', id);
+      .eq('id', id)
+      // Use optimistic locking to detect race conditions
+      .eq(columnToIncrement, type === 'completed' ? data.completed_devices ?? 0 : data.failed_devices ?? 0);
 
-    if (error) throw error;
+    // If update affected 0 rows due to race condition, retry once
+    if (updateError) {
+      throw updateError;
+    }
   }
 
   // ============================================

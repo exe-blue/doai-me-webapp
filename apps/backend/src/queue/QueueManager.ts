@@ -114,9 +114,10 @@ export class QueueManager extends EventEmitter {
   private queueEvents: Map<string, QueueEvents> = new Map();
   private isShuttingDown = false;
 
-  constructor(redisUrl: string) {
+  constructor(config: string | { redisUrl: string }) {
     super();
-    
+    const redisUrl = typeof config === 'string' ? config : config.redisUrl;
+
     this.connection = new Redis(redisUrl, {
       maxRetriesPerRequest: null, // BullMQ 필수
       enableReadyCheck: false,
@@ -143,27 +144,52 @@ export class QueueManager extends EventEmitter {
 
   /**
    * 워크플로우 Job 추가
+   *
+   * 호출 방법:
+   *   addWorkflowJob(nodeId, jobData, options?)
+   *   addWorkflowJob(jobDataWithNodeId)
    */
   async addWorkflowJob(
-    nodeId: string,
-    jobData: WorkflowJobData,
+    nodeIdOrData: string | Omit<Partial<WorkflowJobData>, 'created_at'> & { node_id: string; workflow_id: string; device_ids: string[] },
+    jobData?: WorkflowJobData,
     options?: Partial<JobsOptions>
   ): Promise<Job<WorkflowJobData>> {
+    let nodeId: string;
+    let data: WorkflowJobData;
+
+    if (typeof nodeIdOrData === 'string') {
+      nodeId = nodeIdOrData;
+      data = jobData!;
+    } else {
+      // 단일 객체 호출 패턴 (server.ts 호환)
+      nodeId = nodeIdOrData.node_id;
+      data = {
+        job_id: nodeIdOrData.job_id ?? `wf-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        workflow_id: nodeIdOrData.workflow_id,
+        workflow: nodeIdOrData.workflow as WorkflowDefinition,
+        device_ids: nodeIdOrData.device_ids,
+        node_id: nodeId,
+        params: nodeIdOrData.params ?? {},
+        priority: nodeIdOrData.priority,
+        created_at: Date.now(),
+      };
+    }
+
     const queueName = QUEUE_NAMES.WORKFLOW(nodeId);
     const queue = this.getOrCreateQueue(queueName);
 
     const jobOptions: JobsOptions = {
       ...DEFAULT_JOB_OPTIONS,
       ...options,
-      priority: jobData.priority || 0,
-      jobId: jobData.job_id,
+      priority: data.priority || 0,
+      jobId: data.job_id,
     };
 
-    const job = await queue.add('workflow', jobData, jobOptions);
-    
+    const job = await queue.add('workflow', data, jobOptions);
+
     console.log(`[QueueManager] Job added: ${job.id} to queue ${queueName}`);
     this.emit('job:added', { queueName, jobId: job.id, nodeId });
-    
+
     return job;
   }
 
@@ -194,14 +220,23 @@ export class QueueManager extends EventEmitter {
   /**
    * Job 상태 조회
    */
-  async getJobStatus(jobId: string, queueName: string): Promise<string | null> {
-    const queue = this.queues.get(queueName);
-    if (!queue) return null;
+  async getJobStatus(jobId: string, queueName?: string): Promise<string | null> {
+    if (queueName) {
+      const queue = this.queues.get(queueName);
+      if (!queue) return null;
+      const job = await queue.getJob(jobId);
+      if (!job) return null;
+      return await job.getState();
+    }
 
-    const job = await queue.getJob(jobId);
-    if (!job) return null;
-
-    return await job.getState();
+    // queueName 미지정 시 모든 큐에서 검색
+    for (const [, queue] of this.queues) {
+      const job = await queue.getJob(jobId);
+      if (job) {
+        return await job.getState();
+      }
+    }
+    return null;
   }
 
   /**
@@ -246,14 +281,8 @@ export class QueueManager extends EventEmitter {
     const queue = this.queues.get(queueName);
     if (!queue) return null;
 
-    const [waiting, active, completed, failed, delayed, paused] = await Promise.all([
-      queue.getWaitingCount(),
-      queue.getActiveCount(),
-      queue.getCompletedCount(),
-      queue.getFailedCount(),
-      queue.getDelayedCount(),
-      queue.getPausedCount(),
-    ]);
+    const counts = await queue.getJobCounts('waiting', 'active', 'completed', 'failed', 'delayed', 'paused');
+    const { waiting, active, completed, failed, delayed, paused } = counts;
 
     return { waiting, active, completed, failed, delayed, paused };
   }
@@ -439,12 +468,9 @@ export class QueueManager extends EventEmitter {
 
 let instance: QueueManager | null = null;
 
-export function getQueueManager(redisUrl?: string): QueueManager {
+export function getQueueManager(config?: string | { redisUrl: string }): QueueManager {
   if (!instance) {
-    if (!redisUrl) {
-      redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
-    }
-    instance = new QueueManager(redisUrl);
+    instance = new QueueManager(config ?? process.env.REDIS_URL ?? 'redis://localhost:6379');
   }
   return instance;
 }

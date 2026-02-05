@@ -233,10 +233,12 @@ export class AdbController {
 
   /**
    * 디바이스 배터리 정보
+   * Note: Uses separate ADB call without pipe to avoid sanitizeInput rejection
    */
   async getBatteryLevel(deviceId: string): Promise<number> {
     try {
-      const output = await this.execute(deviceId, 'shell dumpsys battery | grep level');
+      const output = await this.execute(deviceId, 'shell dumpsys battery');
+      // Filter for level line in JavaScript instead of using shell pipe
       const match = output.match(/level:\s*(\d+)/);
       return match ? parseInt(match[1], 10) : -1;
     } catch {
@@ -246,11 +248,13 @@ export class AdbController {
 
   /**
    * 화면 상태 확인
+   * Note: Uses separate ADB call without pipe to avoid sanitizeInput rejection
    */
   async isScreenOn(deviceId: string): Promise<boolean> {
     try {
-      const output = await this.execute(deviceId, 'shell dumpsys display | grep mScreenState');
-      return output.includes('ON');
+      const output = await this.execute(deviceId, 'shell dumpsys display');
+      // Filter for mScreenState in JavaScript instead of using shell pipe
+      return output.includes('mScreenState=ON');
     } catch {
       return false;
     }
@@ -272,12 +276,14 @@ export class AdbController {
 
   /**
    * 스크린샷 캡처
+   * Note: Uses single quotes for localPath to pass sanitizeInput validation
    */
   async screenshot(deviceId: string, localPath: string): Promise<void> {
     const remotePath = '/sdcard/screenshot.png';
     
     await this.execute(deviceId, `shell screencap -p ${remotePath}`);
-    await this.execute(deviceId, `pull ${remotePath} "${localPath}"`);
+    // Use single quotes instead of double quotes to satisfy sanitizeInput
+    await this.execute(deviceId, `pull ${remotePath} '${localPath}'`);
     await this.execute(deviceId, `shell rm ${remotePath}`);
   }
 
@@ -311,10 +317,26 @@ export class AdbController {
 
 // 싱글톤
 let instance: AdbController | null = null;
+let storedOptions: AdbOptions | undefined = undefined;
+
+function areOptionsEqual(a?: AdbOptions, b?: AdbOptions): boolean {
+  if (!a && !b) return true;
+  if (!a || !b) return false;
+  return a.adbPath === b.adbPath && a.timeout === b.timeout;
+}
 
 export function getAdbController(options?: AdbOptions): AdbController {
-  if (!instance) {
+  // If options differ from stored options, recreate the singleton
+  if (instance && options && !areOptionsEqual(options, storedOptions)) {
+    logger.info('Recreating AdbController singleton due to options change', {
+      oldOptions: storedOptions,
+      newOptions: options,
+    });
     instance = new AdbController(options);
+    storedOptions = options;
+  } else if (!instance) {
+    instance = new AdbController(options);
+    storedOptions = options;
   }
   return instance;
 }

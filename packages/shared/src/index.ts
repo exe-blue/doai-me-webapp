@@ -4,6 +4,7 @@
 
 // 타입 정의
 export * from "./types";
+export * from "./device.types";
 
 // API 스펙
 export * from "./api";

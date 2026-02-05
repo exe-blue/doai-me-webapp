@@ -95,9 +95,21 @@ const socketServer = new SocketServer(
 
 // Redis 인스턴스 (메트릭 수집/알림용)
 const monitorRedis = new Redis(REDIS_URL, { maxRetriesPerRequest: null });
+monitorRedis.on('error', (err) => {
+  console.error('[Redis Monitor] Error:', err);
+});
+monitorRedis.on('reconnecting', () => {
+  console.info('[Redis Monitor] Reconnecting...');
+});
 
 // Redis Subscriber (Pub/Sub용 별도 연결)
 const subscriberRedis = new Redis(REDIS_URL, { maxRetriesPerRequest: null });
+subscriberRedis.on('error', (err) => {
+  console.error('[Redis Subscriber] Error:', err);
+});
+subscriberRedis.on('reconnecting', () => {
+  console.info('[Redis Subscriber] Reconnecting...');
+});
 
 // 메트릭 수집기 (1분마다 수집)
 const metricsCollector = new MetricsCollector(monitorRedis);
@@ -1000,9 +1012,27 @@ app.post('/api/executions', async (req, res) => {
  */
 app.patch('/api/executions/:id', async (req, res) => {
   try {
+    // 허용된 필드만 업데이트 (allowlist)
+    const ALLOWED_FIELDS = ['status', 'actual_watch_duration_sec', 'progress', 'last_viewed_at'] as const;
+    const updateData: Record<string, unknown> = {};
+    
+    for (const field of ALLOWED_FIELDS) {
+      if (req.body[field] !== undefined) {
+        updateData[field] = req.body[field];
+      }
+    }
+    
+    // 허용된 필드가 없으면 요청 거부
+    if (Object.keys(updateData).length === 0) {
+      res.status(400).json({ 
+        error: 'No valid fields to update. Allowed fields: ' + ALLOWED_FIELDS.join(', ') 
+      });
+      return;
+    }
+
     const { data, error } = await supabase
       .from('video_executions')
-      .update(req.body)
+      .update(updateData)
       .eq('id', req.params.id)
       .select()
       .single();
@@ -1010,13 +1040,13 @@ app.patch('/api/executions/:id', async (req, res) => {
     if (error) throw error;
 
     // 완료/실패 시 daily_stats 업데이트
-    if (req.body.status === 'completed' || req.body.status === 'failed') {
+    if (updateData.status === 'completed' || updateData.status === 'failed') {
       const today = new Date().toISOString().split('T')[0];
       await supabase.rpc('update_daily_stats', {
         p_date: today,
-        p_completed: req.body.status === 'completed' ? 1 : 0,
-        p_failed: req.body.status === 'failed' ? 1 : 0,
-        p_watch_time: req.body.actual_watch_duration_sec || 0,
+        p_completed: updateData.status === 'completed' ? 1 : 0,
+        p_failed: updateData.status === 'failed' ? 1 : 0,
+        p_watch_time: (updateData.actual_watch_duration_sec as number) || 0,
         p_video_id: data.video_id,
       });
 
@@ -1024,12 +1054,503 @@ app.patch('/api/executions/:id', async (req, res) => {
       if (data.video_id) {
         await supabase.rpc('increment_video_views', {
           p_video_id: data.video_id,
-          p_success: req.body.status === 'completed',
+          p_success: updateData.status === 'completed',
         });
       }
     }
 
     res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// ========== PCs (노드 PC) API ==========
+
+/**
+ * GET /api/pcs
+ * PC 목록 조회
+ */
+app.get('/api/pcs', async (req, res) => {
+  const { status } = req.query;
+
+  try {
+    let query = supabase
+      .from('pcs')
+      .select('*')
+      .order('pc_number', { ascending: true });
+
+    if (status && status !== 'all') {
+      query = query.eq('status', status);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    res.json({ pcs: data || [] });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+/**
+ * GET /api/pcs/summary
+ * PC별 디바이스 현황 요약
+ */
+app.get('/api/pcs/summary', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('pc_device_summary')
+      .select('*');
+
+    if (error) throw error;
+    res.json({ summary: data || [] });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+/**
+ * GET /api/pcs/:id
+ * PC 상세 조회
+ */
+app.get('/api/pcs/:id', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('pcs')
+      .select('*')
+      .eq('id', req.params.id)
+      .single();
+
+    if (error) throw error;
+    res.json(data);
+  } catch (error) {
+    res.status(404).json({ error: 'PC not found' });
+  }
+});
+
+/**
+ * POST /api/pcs
+ * PC 추가 (pc_number 자동 생성)
+ */
+app.post('/api/pcs', async (req, res) => {
+  const { id, label, location, hostname, ip_address, max_devices = 20, metadata = {} } = req.body;
+
+  if (!id) {
+    return res.status(400).json({ error: 'PC ID is required' });
+  }
+
+  try {
+    // PC 번호 자동 생성
+    const { data: pcNumberResult, error: pcNumberError } = await supabase.rpc('generate_pc_number');
+    if (pcNumberError) throw pcNumberError;
+
+    const { data, error } = await supabase
+      .from('pcs')
+      .insert({
+        id,
+        pc_number: pcNumberResult,
+        label: label || pcNumberResult,
+        location,
+        hostname,
+        ip_address,
+        max_devices,
+        device_capacity: max_devices,
+        status: 'offline',
+        metadata,
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+/**
+ * PATCH /api/pcs/:id
+ * PC 수정
+ */
+app.patch('/api/pcs/:id', async (req, res) => {
+  try {
+    const allowedFields = ['label', 'location', 'hostname', 'ip_address', 'max_devices', 'status', 'metadata'];
+    const updates: Record<string, unknown> = {};
+
+    for (const field of allowedFields) {
+      if (req.body[field] !== undefined) {
+        updates[field] = req.body[field];
+      }
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ error: 'No valid fields to update' });
+    }
+
+    const { data, error } = await supabase
+      .from('pcs')
+      .update(updates)
+      .eq('id', req.params.id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+/**
+ * DELETE /api/pcs/:id
+ * PC 삭제
+ */
+app.delete('/api/pcs/:id', async (req, res) => {
+  try {
+    // 먼저 해당 PC에 연결된 디바이스 확인
+    const { data: devices } = await supabase
+      .from('devices')
+      .select('id')
+      .eq('pc_id', req.params.id);
+
+    if (devices && devices.length > 0) {
+      return res.status(400).json({ 
+        error: `Cannot delete PC with assigned devices. ${devices.length} device(s) are currently assigned.` 
+      });
+    }
+
+    const { error } = await supabase
+      .from('pcs')
+      .delete()
+      .eq('id', req.params.id);
+
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// ========== Devices (디바이스) 관리 API ==========
+
+/**
+ * GET /api/devices/by-code/:code
+ * 관리번호로 디바이스 조회 (PC01-001)
+ */
+app.get('/api/devices/by-code/:code', async (req, res) => {
+  try {
+    const { data, error } = await supabase.rpc('get_device_by_management_code', {
+      p_code: req.params.code.toUpperCase(),
+    });
+
+    if (error) throw error;
+    if (!data || data.length === 0) {
+      return res.status(404).json({ error: 'Device not found' });
+    }
+
+    res.json(data[0]);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+/**
+ * GET /api/devices/by-serial/:serial
+ * 시리얼 번호로 디바이스 조회
+ */
+app.get('/api/devices/by-serial/:serial', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('devices')
+      .select(`
+        *,
+        pcs:pc_id (
+          id,
+          pc_number,
+          label
+        )
+      `)
+      .or(`id.eq.${req.params.serial},serial_number.eq.${req.params.serial}`)
+      .single();
+
+    if (error) throw error;
+    res.json(data);
+  } catch (error) {
+    res.status(404).json({ error: 'Device not found' });
+  }
+});
+
+/**
+ * GET /api/devices/by-ip/:ip
+ * IP 주소로 디바이스 조회
+ */
+app.get('/api/devices/by-ip/:ip', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('devices')
+      .select(`
+        *,
+        pcs:pc_id (
+          id,
+          pc_number,
+          label
+        )
+      `)
+      .eq('ip_address', req.params.ip)
+      .single();
+
+    if (error) throw error;
+    res.json(data);
+  } catch (error) {
+    res.status(404).json({ error: 'Device not found' });
+  }
+});
+
+/**
+ * GET /api/devices/unassigned
+ * PC에 배정되지 않은 디바이스 목록
+ */
+app.get('/api/devices/unassigned', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('devices')
+      .select('*')
+      .is('pc_id', null)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    res.json({ devices: data || [] });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+/**
+ * POST /api/devices/register
+ * 새 디바이스 등록 (device_number 자동 할당)
+ */
+app.post('/api/devices/register', async (req, res) => {
+  const { 
+    serial_number, 
+    name, 
+    model, 
+    android_version, 
+    ip_address, 
+    pc_id,
+    connection_type = 'usb',
+    usb_port,
+    metadata = {} 
+  } = req.body;
+
+  if (!serial_number) {
+    return res.status(400).json({ error: 'serial_number is required' });
+  }
+
+  try {
+    // 디바이스 번호 자동 생성
+    const { data: deviceNumber, error: numError } = await supabase.rpc('generate_device_number', {
+      target_pc_id: pc_id || null,
+    });
+    if (numError) throw numError;
+
+    const { data, error } = await supabase
+      .from('devices')
+      .upsert({
+        id: serial_number,
+        serial_number,
+        name: name || `Device ${deviceNumber}`,
+        model,
+        android_version,
+        ip_address,
+        pc_id,
+        device_number: deviceNumber,
+        connection_type,
+        usb_port,
+        state: 'DISCONNECTED',
+        metadata,
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+/**
+ * POST /api/devices/bulk-register
+ * 여러 디바이스 일괄 등록
+ */
+app.post('/api/devices/bulk-register', async (req, res) => {
+  const { devices: deviceList, pc_id } = req.body;
+
+  if (!Array.isArray(deviceList) || deviceList.length === 0) {
+    return res.status(400).json({ error: 'devices array is required' });
+  }
+
+  try {
+    const results = [];
+    const errors = [];
+
+    for (const device of deviceList) {
+      try {
+        // 디바이스 번호 자동 생성
+        const { data: deviceNumber, error: numError } = await supabase.rpc('generate_device_number', {
+          target_pc_id: pc_id || device.pc_id || null,
+        });
+        if (numError) throw numError;
+
+        const { data, error } = await supabase
+          .from('devices')
+          .upsert({
+            id: device.serial_number,
+            serial_number: device.serial_number,
+            name: device.name || `Device ${deviceNumber}`,
+            model: device.model,
+            android_version: device.android_version,
+            ip_address: device.ip_address,
+            pc_id: pc_id || device.pc_id,
+            device_number: deviceNumber,
+            connection_type: device.connection_type || 'usb',
+            usb_port: device.usb_port,
+            state: 'DISCONNECTED',
+            metadata: device.metadata || {},
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+        results.push(data);
+      } catch (err) {
+        errors.push({ serial_number: device.serial_number, error: (err as Error).message });
+      }
+    }
+
+    res.json({
+      success: errors.length === 0,
+      registered: results.length,
+      failed: errors.length,
+      results,
+      errors,
+    });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+/**
+ * POST /api/devices/:id/assign
+ * 디바이스를 PC에 배정
+ */
+app.post('/api/devices/:id/assign', async (req, res) => {
+  const { pc_id, usb_port } = req.body;
+
+  if (!pc_id) {
+    return res.status(400).json({ error: 'pc_id is required' });
+  }
+
+  try {
+    // PC가 존재하는지 확인
+    const { data: pc, error: pcError } = await supabase
+      .from('pcs')
+      .select('id, pc_number, max_devices')
+      .eq('id', pc_id)
+      .single();
+
+    if (pcError || !pc) {
+      return res.status(404).json({ error: 'PC not found' });
+    }
+
+    // 해당 PC에 이미 배정된 디바이스 수 확인
+    const { count } = await supabase
+      .from('devices')
+      .select('id', { count: 'exact', head: true })
+      .eq('pc_id', pc_id);
+
+    if (count && count >= pc.max_devices) {
+      return res.status(400).json({ 
+        error: `PC ${pc.pc_number} has reached max device capacity (${pc.max_devices})` 
+      });
+    }
+
+    // 새 디바이스 번호 생성
+    const { data: deviceNumber, error: numError } = await supabase.rpc('generate_device_number', {
+      target_pc_id: pc_id,
+    });
+    if (numError) throw numError;
+
+    // 디바이스 업데이트
+    const { data, error } = await supabase
+      .from('devices')
+      .update({
+        pc_id,
+        device_number: deviceNumber,
+        usb_port: usb_port || null,
+      })
+      .eq('id', req.params.id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+/**
+ * POST /api/devices/:id/unassign
+ * 디바이스를 PC에서 해제
+ */
+app.post('/api/devices/:id/unassign', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('devices')
+      .update({
+        pc_id: null,
+        device_number: null,
+        usb_port: null,
+      })
+      .eq('id', req.params.id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+/**
+ * GET /api/devices/stats
+ * 디바이스 통계
+ */
+app.get('/api/devices/stats', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('devices')
+      .select('state, pc_id');
+
+    if (error) throw error;
+
+    const stats = {
+      total: data?.length || 0,
+      assigned: data?.filter(d => d.pc_id).length || 0,
+      unassigned: data?.filter(d => !d.pc_id).length || 0,
+      by_state: {
+        idle: data?.filter(d => d.state === 'IDLE').length || 0,
+        running: data?.filter(d => d.state === 'RUNNING').length || 0,
+        error: data?.filter(d => d.state === 'ERROR').length || 0,
+        quarantine: data?.filter(d => d.state === 'QUARANTINE').length || 0,
+        disconnected: data?.filter(d => d.state === 'DISCONNECTED').length || 0,
+      },
+    };
+
+    res.json(stats);
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }

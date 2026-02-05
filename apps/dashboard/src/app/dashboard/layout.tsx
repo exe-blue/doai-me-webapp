@@ -22,6 +22,9 @@ import {
   CheckCircle,
   ScrollText,
   Settings,
+  Server,
+  Cpu,
+  UserPlus,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -62,12 +65,15 @@ const navigation: NavigationGroup[] = [
   {
     items: [
       {
-        label: '디바이스',
+        label: '인프라',
         href: '/dashboard/devices',
-        icon: Smartphone,
+        icon: Server,
         children: [
-          { label: '전체 현황', href: '/dashboard/devices', icon: LayoutGrid },
-          { label: '문제 기기', href: '/dashboard/devices/issues', icon: AlertTriangle },
+          { label: '기기 현황', href: '/dashboard/devices', icon: Smartphone },
+          { label: '기기 이슈', href: '/dashboard/devices/issues', icon: AlertTriangle },
+          { label: '온보딩', href: '/dashboard/onboarding', icon: UserPlus },
+          { label: 'Workers', href: '/dashboard/workers', icon: Cpu },
+          { label: '노드 관리', href: '/dashboard/nodes', icon: LayoutGrid },
         ],
       },
     ],

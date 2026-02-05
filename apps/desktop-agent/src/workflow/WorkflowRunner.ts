@@ -417,8 +417,16 @@ export class WorkflowRunner {
         // 인라인 스크립트인 경우 - 임시 파일 생성
         const tempScriptPath = path.default.join(os.default.tmpdir(), `autox_script_${Date.now()}.js`);
         fs.default.writeFileSync(tempScriptPath, scriptContent || '// empty script');
-        await this.adbController.execute(deviceId, `push "${tempScriptPath}" "${scriptRemotePath}"`);
-        fs.default.unlinkSync(tempScriptPath);
+        try {
+          await this.adbController.execute(deviceId, `push "${tempScriptPath}" "${scriptRemotePath}"`);
+        } finally {
+          // Ensure temp file cleanup even if execute throws
+          try {
+            fs.default.unlinkSync(tempScriptPath);
+          } catch {
+            // Ignore cleanup errors
+          }
+        }
       }
 
       // 4. Intent Broadcast로 AutoX.js 실행
@@ -517,7 +525,8 @@ export class WorkflowRunner {
           deviceId,
           `shell dumpsys activity activities | grep "${packageName}"`
         );
-        return result.length > 0;
+        // Check that the output actually contains the package name, not just any output
+        return result.includes(packageName);
       }
 
       logger.warn('Unknown condition format', { condition });
@@ -604,9 +613,11 @@ export class WorkflowRunner {
    * 정리
    */
   async cleanup(): Promise<void> {
-    // 실행 중인 워크플로우 정리
-    for (const [execId] of this.runningWorkflows) {
+    // 실행 중인 워크플로우에 취소 신호 보내기
+    for (const [execId, running] of this.runningWorkflows) {
       logger.info('Cancelling running workflow', { executionId: execId });
+      // Signal abort to stop the workflow execution loop
+      running.abortController.abort();
     }
     this.runningWorkflows.clear();
     logger.info('WorkflowRunner cleanup completed');

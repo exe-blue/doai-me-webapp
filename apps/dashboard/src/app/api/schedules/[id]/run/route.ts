@@ -53,13 +53,18 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     // 스케줄 업데이트
-    await supabase
+    const { error: updateError } = await supabase
       .from("schedules")
       .update({
         last_run_at: new Date().toISOString(),
         total_runs: schedule.total_runs + 1,
       })
       .eq("id", id);
+
+    if (updateError) {
+      console.error("Failed to update schedule after run:", updateError);
+      return errorResponse("DB_ERROR", "스케줄 업데이트 실패: " + updateError.message, 500);
+    }
 
     return successResponse({ queued: data?.length || 0 });
   } catch (err) {

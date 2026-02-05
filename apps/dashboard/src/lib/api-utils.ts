@@ -66,13 +66,18 @@ export function getQueryParams(request: Request) {
   const rawPageSize = parseInt(searchParams.get("pageSize") || "20", 10);
   const pageSize = Math.min(Math.max(1, rawPageSize || 20), MAX_PAGE_SIZE);
   
+  const rawSortOrder = searchParams.get("sortOrder");
+  const sortOrder: "asc" | "desc" = rawSortOrder === "asc" || rawSortOrder === "desc" 
+    ? rawSortOrder 
+    : "desc";
+  
   return {
     page: Math.max(1, parseInt(searchParams.get("page") || "1", 10) || 1),
     pageSize,
     search: searchParams.get("search") || undefined,
     status: searchParams.get("status") || undefined,
     sortBy: searchParams.get("sortBy") || undefined,
-    sortOrder: (searchParams.get("sortOrder") || "desc") as "asc" | "desc",
+    sortOrder,
     // 추가 파라미터
     nodeId: searchParams.get("nodeId") || undefined,
     deviceId: searchParams.get("deviceId") || undefined,

@@ -1,0 +1,49 @@
+{
+  "name": "@doai/worker-types",
+  "version": "1.0.0",
+  "description": "Type definitions for worker-manager communication",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    },
+    "./events": {
+      "types": "./dist/events.d.ts",
+      "import": "./dist/events.js",
+      "require": "./dist/events.js"
+    },
+    "./worker": {
+      "types": "./dist/worker.d.ts",
+      "import": "./dist/worker.js",
+      "require": "./dist/worker.js"
+    },
+    "./device": {
+      "types": "./dist/device.d.ts",
+      "import": "./dist/device.js",
+      "require": "./dist/device.js"
+    },
+    "./streaming": {
+      "types": "./dist/streaming.d.ts",
+      "import": "./dist/streaming.js",
+      "require": "./dist/streaming.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rimraf dist",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "rimraf": "^5.0.0",
+    "typescript": "^5.3.3"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "license": "MIT"
+}

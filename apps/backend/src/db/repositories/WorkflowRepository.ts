@@ -172,16 +172,73 @@ export class WorkflowRepository {
   }
 
   /**
-   * 워크플로우 버전 증가
+   * 워크플로우 버전 증가 (atomic operation)
+   * Uses atomic DB increment to avoid read-modify-write race conditions
    */
   async incrementVersion(id: string): Promise<number> {
-    const workflow = await this.findById(id);
-    if (!workflow) throw new Error(`Workflow not found: ${id}`);
+    // Try RPC first for atomic increment with RETURNING
+    try {
+      const { data, error: rpcError } = await this.db.rpc('increment_workflow_version', {
+        workflow_id: id,
+      });
 
-    const newVersion = workflow.version + 1;
+      if (rpcError) {
+        // Fallback if RPC doesn't exist
+        if (rpcError.code === '42883') { // function does not exist
+          return await this.incrementVersionFallback(id);
+        }
+        throw rpcError;
+      }
 
-    await this.update(id, { version: newVersion });
-    return newVersion;
+      // RPC returns the new version
+      return data as number;
+    } catch {
+      // If RPC call throws, try fallback
+      return await this.incrementVersionFallback(id);
+    }
+  }
+
+  /**
+   * Fallback atomic increment using Supabase update with select
+   * Note: This has a small race window but is acceptable for version increments
+   */
+  private async incrementVersionFallback(id: string): Promise<number> {
+    // First, get current version
+    const { data: current, error: selectError } = await this.db
+      .from('workflows')
+      .select('version')
+      .eq('id', id)
+      .single();
+
+    if (selectError) {
+      if (selectError.code === 'PGRST116') {
+        throw new Error(`Workflow not found: ${id}`);
+      }
+      throw selectError;
+    }
+
+    const currentVersion = current?.version ?? 0;
+    const newVersion = currentVersion + 1;
+
+    // Update with optimistic locking to detect race conditions
+    const { data, error: updateError } = await this.db
+      .from('workflows')
+      .update({ version: newVersion })
+      .eq('id', id)
+      .eq('version', currentVersion) // Optimistic lock
+      .select('version')
+      .single();
+
+    if (updateError) {
+      // If PGRST116 (no rows), it means race condition occurred
+      if (updateError.code === 'PGRST116') {
+        // Retry once on race condition
+        return await this.incrementVersionFallback(id);
+      }
+      throw updateError;
+    }
+
+    return data?.version ?? newVersion;
   }
 
   // ============================================

@@ -199,12 +199,9 @@ export class MetricsCollector extends EventEmitter {
     };
 
     for (const state of states) {
-      // Sorted Set에서 해당 상태의 디바이스 수 조회
-      // score를 상태 문자열의 해시값으로 사용하거나, 별도 키 사용
-      const count = await this.redis.zcount(
-        REDIS_KEYS.DEVICES_BY_STATE,
-        state,
-        state
+      // 상태별 Sorted Set에서 디바이스 수 조회 (ZCARD는 집합의 전체 멤버 수 반환)
+      const count = await this.redis.zcard(
+        `${REDIS_KEYS.DEVICES_BY_STATE}:${state}`
       ).catch(() => 0);
       
       const key = state.toLowerCase() as keyof typeof result;

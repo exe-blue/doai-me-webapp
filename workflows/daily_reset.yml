@@ -30,12 +30,11 @@ steps:
     on_error: continue
 
   # 3. 유튜브 캐시 삭제
-  # Note: 'pm clear' clears both cache AND data (deletes user login/preferences)
-  # Use 'rm -rf' to clear only cache files if you want to preserve user data
+  # Note: Only clears cache files, preserves user data (login/preferences)
   - id: clear_youtube_cache
     name: "유튜브 캐시 삭제"
     action: adb
-    command: "shell run-as com.google.android.youtube rm -rf /data/data/com.google.android.youtube/cache/* 2>/dev/null || pm clear com.google.android.youtube"
+    command: "shell run-as com.google.android.youtube rm -rf /data/data/com.google.android.youtube/cache/* 2>/dev/null"
     timeout: 10000
     on_error: continue
 
@@ -56,11 +55,11 @@ steps:
     on_error: continue
 
   # 6. 크롬 캐시 삭제
-  # Note: 'pm clear' clears both cache AND data. Consider cache-only clearing to preserve user data.
+  # Note: Only clears cache files, preserves user data (login/preferences)
   - id: clear_chrome_cache
     name: "Chrome 캐시 삭제"
     action: adb
-    command: "shell run-as com.android.chrome rm -rf /data/data/com.android.chrome/cache/* 2>/dev/null || pm clear com.android.chrome"
+    command: "shell run-as com.android.chrome rm -rf /data/data/com.android.chrome/cache/* 2>/dev/null"
     timeout: 10000
     on_error: continue
 

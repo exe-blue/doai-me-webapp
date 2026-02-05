@@ -79,10 +79,18 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     const { id } = await params;
     const supabase = getServerClient();
 
-    const { error } = await supabase.from("keywords").delete().eq("id", id);
+    const { data, error } = await supabase
+      .from("keywords")
+      .delete()
+      .eq("id", id)
+      .select("id");
 
     if (error) {
       return errorResponse("DB_ERROR", error.message, 500);
+    }
+
+    if (!data || data.length === 0) {
+      return errorResponse("NOT_FOUND", "키워드를 찾을 수 없습니다", 404);
     }
 
     return successResponse({ deleted: true });

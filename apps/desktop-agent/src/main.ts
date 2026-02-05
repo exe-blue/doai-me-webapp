@@ -21,6 +21,16 @@ import { DeviceRecovery } from './recovery/DeviceRecovery';
 import { NodeRecovery, getNodeRecovery, SavedState } from './recovery/NodeRecovery';
 import { logger } from './utils/logger';
 
+// Manager components for Worker orchestration
+import {
+  WorkerRegistry,
+  TaskDispatcher,
+  WorkerServer,
+  ScreenStreamProxy,
+  type RegisteredWorker,
+  type TrackedDevice,
+} from './manager';
+
 // ============================================
 // 환경 변수
 // ============================================
@@ -28,6 +38,7 @@ import { logger } from './utils/logger';
 const NODE_ID = process.env.NODE_ID || process.env.DOAIME_NODE_ID || `node_${os.hostname()}`;
 const SERVER_URL = process.env.SERVER_URL || process.env.DOAIME_SERVER_URL || 'https://api.doai.me';
 const IS_DEV = process.env.NODE_ENV === 'development';
+const WORKER_SERVER_PORT = parseInt(process.env.WORKER_SERVER_PORT || '3001', 10);
 
 // ============================================
 // 전역 변수
@@ -42,6 +53,12 @@ let autoUpdater: AutoUpdater | null = null;
 let deviceRecovery: DeviceRecovery | null = null;
 let nodeRecovery: NodeRecovery | null = null;
 let isAppQuitting = false;
+
+// Manager components for Worker orchestration
+let workerRegistry: WorkerRegistry | null = null;
+let taskDispatcher: TaskDispatcher | null = null;
+let workerServer: WorkerServer | null = null;
+let screenStreamProxy: ScreenStreamProxy | null = null;
 
 // ============================================
 // 메인 윈도우
@@ -255,7 +272,142 @@ async function startAgent(): Promise<void> {
     deviceStates: deviceManager?.getAllStates() || {},
   }));
 
+  // ============================================
+  // Manager Components 초기화 (Worker 오케스트레이션)
+  // ============================================
+  
+  await initializeManagerComponents();
+
   logger.info('Desktop Agent started successfully');
+}
+
+// ============================================
+// Manager 컴포넌트 초기화
+// ============================================
+
+async function initializeManagerComponents(): Promise<void> {
+  logger.info('[Manager] Initializing Manager components...', { port: WORKER_SERVER_PORT });
+
+  try {
+    // 1. WorkerRegistry 초기화 - Worker 등록 및 상태 추적
+    workerRegistry = new WorkerRegistry({
+      heartbeatTimeoutMs: 30000,
+      healthCheckIntervalMs: 10000,
+    });
+
+    // Registry 이벤트 핸들러
+    workerRegistry.on('worker:registered', (worker) => {
+      logger.info('[Manager] Worker registered', {
+        workerId: worker.worker_id,
+        workerType: worker.worker_type,
+        deviceCount: worker.devices.length,
+      });
+      sendToRenderer('manager:worker-registered', {
+        workerId: worker.worker_id,
+        workerType: worker.worker_type,
+        devices: worker.devices.map(d => d.deviceId),
+      });
+    });
+
+    workerRegistry.on('worker:unregistered', (workerId, reason) => {
+      logger.info('[Manager] Worker unregistered', { workerId, reason });
+      sendToRenderer('manager:worker-unregistered', { workerId, reason });
+    });
+
+    workerRegistry.on('worker:timeout', (workerId, lastHeartbeat) => {
+      logger.warn('[Manager] Worker heartbeat timeout', { workerId, lastHeartbeat });
+      sendToRenderer('manager:worker-timeout', { workerId });
+    });
+
+    workerRegistry.start();
+
+    // 2. TaskDispatcher 초기화 - Job 분배 및 추적
+    taskDispatcher = new TaskDispatcher(workerRegistry, {
+      defaultTimeoutMs: 300000, // 5분
+      defaultRetry: {
+        maxAttempts: 3,
+        delayMs: 5000,
+      },
+    });
+
+    // Dispatcher 이벤트 핸들러
+    taskDispatcher.on('job:dispatched', (job) => {
+      logger.info('[Manager] Job dispatched', {
+        jobId: job.job_id,
+        jobType: job.job_type,
+        workerId: job.worker_id,
+      });
+      sendToRenderer('manager:job-dispatched', job);
+    });
+
+    taskDispatcher.on('job:progress', (job, progress) => {
+      logger.debug('[Manager] Job progress', {
+        jobId: job.job_id,
+        progress: progress.progress,
+        step: progress.currentStep,
+      });
+      sendToRenderer('manager:job-progress', {
+        jobId: job.job_id,
+        progress: progress.progress,
+        currentStep: progress.currentStep,
+        totalSteps: progress.totalSteps,
+        message: progress.message,
+      });
+    });
+
+    taskDispatcher.on('job:complete', (job) => {
+      logger.info('[Manager] Job completed', {
+        jobId: job.job_id,
+        durationMs: job.duration_ms,
+      });
+      sendToRenderer('manager:job-complete', job);
+    });
+
+    taskDispatcher.on('job:failed', (job) => {
+      logger.error('[Manager] Job failed', {
+        jobId: job.job_id,
+        error: job.error?.message,
+      });
+      sendToRenderer('manager:job-failed', job);
+    });
+
+    // 3. ScreenStreamProxy 초기화 (옵션) - 스크린 스트리밍 프록시
+    screenStreamProxy = new ScreenStreamProxy(workerRegistry);
+
+    // 4. WorkerServer 초기화 및 시작
+    workerServer = new WorkerServer(workerRegistry, taskDispatcher, {
+      port: WORKER_SERVER_PORT,
+      host: '0.0.0.0',
+      pingIntervalMs: 10000,
+      pingTimeoutMs: 5000,
+    });
+
+    workerServer.on('server:started', (port) => {
+      logger.info('[Manager] Worker server started', { port });
+      sendToRenderer('manager:server-started', { port });
+    });
+
+    workerServer.on('server:error', (error) => {
+      logger.error('[Manager] Worker server error', { error: error.message });
+      sendToRenderer('manager:server-error', { error: error.message });
+    });
+
+    workerServer.on('connection:new', (socket) => {
+      logger.debug('[Manager] New worker connection', { socketId: socket.id });
+    });
+
+    await workerServer.start();
+
+    logger.info('[Manager] Manager components initialized successfully', {
+      workerServerPort: WORKER_SERVER_PORT,
+    });
+
+  } catch (error) {
+    logger.error('[Manager] Failed to initialize Manager components', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
 }
 
 // ============================================
@@ -282,6 +434,76 @@ function setupIPC(): void {
   ipcMain.handle('logs:get', () => {
     // TODO: 로그 저장 및 조회 구현
     return [];
+  });
+
+  // ============================================
+  // Manager IPC 핸들러
+  // ============================================
+
+  // Manager 상태 조회
+  ipcMain.handle('manager:getStatus', () => {
+    return {
+      workerServerRunning: workerServer?.isRunning() || false,
+      workerServerPort: workerServer?.getPort() || WORKER_SERVER_PORT,
+      connectedWorkers: workerServer?.getConnectedWorkerCount() || 0,
+      registeredWorkers: workerRegistry?.getWorkers().length || 0,
+      activeJobs: taskDispatcher?.getActiveJobs().length || 0,
+    };
+  });
+
+  // 등록된 Worker 목록 조회
+  ipcMain.handle('manager:getWorkers', () => {
+    if (!workerRegistry) return [];
+    return workerRegistry.getWorkers().map((worker: RegisteredWorker) => ({
+      workerId: worker.worker_id,
+      workerType: worker.worker_type,
+      activeJobs: worker.active_jobs,
+      maxConcurrentJobs: worker.max_concurrent_jobs,
+      lastHeartbeat: worker.last_heartbeat,
+      connectedAt: worker.connected_at,
+      devices: worker.devices.map((d: TrackedDevice) => ({
+        deviceId: d.deviceId,
+        state: d.state,
+        currentJobId: d.currentJobId,
+      })),
+      metrics: worker.metrics,
+    }));
+  });
+
+  // 활성 Job 목록 조회
+  ipcMain.handle('manager:getActiveJobs', () => {
+    if (!taskDispatcher) return [];
+    return taskDispatcher.getActiveJobs().map((job) => ({
+      jobId: job.job_id,
+      jobType: job.job_type,
+      status: job.status,
+      workerId: job.worker_id,
+      deviceIds: job.device_ids,
+      dispatchedAt: job.dispatched_at,
+      progress: job.progress,
+    }));
+  });
+
+  // Job 디스패치 요청
+  ipcMain.handle('manager:dispatchJob', async (_event, jobRequest: {
+    jobId: string;
+    jobType: string;
+    params: Record<string, unknown>;
+    options?: Record<string, unknown>;
+  }) => {
+    if (!taskDispatcher) {
+      throw new Error('TaskDispatcher not initialized');
+    }
+    const { jobId, jobType, params, options } = jobRequest;
+    return await taskDispatcher.dispatchJob(jobId, jobType, params, options);
+  });
+
+  // Job 취소 요청
+  ipcMain.handle('manager:cancelJob', (_event, jobId: string) => {
+    if (!taskDispatcher) {
+      throw new Error('TaskDispatcher not initialized');
+    }
+    return taskDispatcher.cancelJob(jobId);
   });
 }
 
@@ -344,6 +566,19 @@ app.on('before-quit', async (event) => {
       };
       await nodeRecovery.saveBeforeQuit(state);
     }
+
+    // Manager 컴포넌트 정리
+    if (workerServer) {
+      logger.info('[Manager] Stopping worker server...');
+      await workerServer.stop();
+    }
+
+    if (workerRegistry) {
+      logger.info('[Manager] Stopping worker registry...');
+      workerRegistry.stop();
+    }
+
+    // Note: ScreenStreamProxy doesn't have cleanup method - streams are terminated when workers disconnect
 
     // 복구 모니터 중지
     if (deviceRecovery) {

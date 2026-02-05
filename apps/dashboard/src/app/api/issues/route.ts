@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
       sortOrder = "desc",
     } = getQueryParams(request);
 
-    let query = supabase.from("device_issues").select("*, devices(device_id, name)", {
+    let query = supabase.from("device_issues").select("*, devices!inner(device_id, name)", {
       count: "exact",
     });
 

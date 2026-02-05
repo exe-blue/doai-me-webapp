@@ -8,6 +8,11 @@ import {
   extractYouTubeChannelId,
 } from "@/lib/api-utils";
 
+// Escape special characters for LIKE pattern to prevent injection
+function escapeLike(str: string): string {
+  return str.replace(/[\\%_]/g, '\\$&');
+}
+
 // GET /api/channels - 채널 목록 조회
 export async function GET(request: NextRequest) {
   try {
@@ -22,7 +27,8 @@ export async function GET(request: NextRequest) {
       query = query.eq("status", status);
     }
     if (search) {
-      query = query.or(`name.ilike.%${search}%,handle.ilike.%${search}%`);
+      const escapedSearch = escapeLike(search);
+      query = query.or(`name.ilike.%${escapedSearch}%,handle.ilike.%${escapedSearch}%`);
     }
 
     // 정렬

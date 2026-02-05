@@ -90,7 +90,8 @@ Write-Host ""
 # ADB 확인
 $adb = Get-Command adb -ErrorAction SilentlyContinue
 if ($adb) {
-    $adbVersion = (adb version 2>&1 | Select-String "version").ToString()
+    $adbVersionMatch = adb version 2>&1 | Select-String "version"
+    $adbVersion = if ($adbVersionMatch) { $adbVersionMatch.ToString() } else { "unknown version" }
     Write-Success "ADB: $adbVersion"
 } else {
     Write-Error "ADB가 설치되어 있지 않습니다."
@@ -180,7 +181,7 @@ if (-not $SkipDownload) {
         
         if (Test-Path $installerPath) {
             $fileSize = (Get-Item $installerPath).Length / 1MB
-            Write-Success "다운로드 완료 ({0:N2} MB)" -f $fileSize
+            Write-Success ("다운로드 완료 ({0:N2} MB)" -f $fileSize)
         } else {
             Write-Error "다운로드 실패: 파일이 생성되지 않았습니다."
             exit 1

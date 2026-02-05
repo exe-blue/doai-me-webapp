@@ -8,13 +8,32 @@ import log from 'electron-log';
 import { app } from 'electron';
 import * as path from 'path';
 
-// 로그 파일 경로 설정
-const logPath = app?.isPackaged
-  ? path.join(app.getPath('userData'), 'logs')
-  : path.join(process.cwd(), 'logs');
+// 로그 파일 경로 - lazy resolution to avoid accessing app.getPath() before app is ready
+let _logPath: string | null = null;
+
+function getLogPath(): string {
+  if (_logPath === null) {
+    // Check if app is ready before accessing getPath
+    if (app?.isReady()) {
+      _logPath = app.isPackaged
+        ? path.join(app.getPath('userData'), 'logs')
+        : path.join(process.cwd(), 'logs');
+    } else {
+      // Fallback to cwd before app is ready
+      _logPath = path.join(process.cwd(), 'logs');
+      // Re-resolve once app is ready (for packaged app)
+      app?.whenReady().then(() => {
+        _logPath = app.isPackaged
+          ? path.join(app.getPath('userData'), 'logs')
+          : path.join(process.cwd(), 'logs');
+      });
+    }
+  }
+  return _logPath;
+}
 
 // 기본 설정
-log.transports.file.resolvePathFn = () => path.join(logPath, 'main.log');
+log.transports.file.resolvePathFn = () => path.join(getLogPath(), 'main.log');
 log.transports.file.maxSize = 10 * 1024 * 1024; // 10MB
 log.transports.file.format = '[{y}-{m}-{d} {h}:{i}:{s}.{ms}] [{level}] {text}';
 
@@ -75,7 +94,7 @@ export const logger = {
   },
 
   // 로그 파일 경로 반환
-  getLogPath: () => logPath,
+  getLogPath: () => getLogPath(),
 
   // electron-log 인스턴스 직접 접근
   raw: log,

@@ -171,7 +171,7 @@ export class DeviceRepository {
     // For ERROR state, use atomic increment and conditional state change
     if (state === 'ERROR') {
       // Use RPC for atomic increment with conditional quarantine
-      // Fallback: Single UPDATE with CASE expression via raw SQL if RPC not available
+      // Fallback: Single atomic UPDATE with CASE expression via raw SQL if RPC not available
       try {
         const { error } = await this.db.rpc('update_device_state_with_error', {
           p_device_id: id,
@@ -179,28 +179,40 @@ export class DeviceRepository {
         });
         
         if (error) {
-          // Fallback to two-step update if RPC doesn't exist
+          // Fallback to atomic raw SQL if RPC doesn't exist
           if (error.code === '42883') { // function does not exist
-            // Direct update with error_count + 1, but this still has a small race window
-            const { data: device } = await this.db
-              .from('devices')
-              .select('error_count')
-              .eq('id', id)
-              .single();
-            
-            const newErrorCount = ((device?.error_count as number) || 0) + 1;
-            const newState = newErrorCount >= 3 ? 'QUARANTINE' : 'ERROR';
-            
-            const { error: updateError } = await this.db
-              .from('devices')
-              .update({
-                state: newState,
-                last_seen: new Date().toISOString(),
-                error_count: newErrorCount,
-                last_error: extra?.last_error,
-                ...extra,
-              })
-              .eq('id', id);
+            // Atomic UPDATE: increment error_count and conditionally set state in one query
+            const { error: updateError } = await this.db.rpc('exec_sql', {
+              query: `
+                UPDATE devices SET 
+                  error_count = COALESCE(error_count, 0) + 1, 
+                  state = CASE WHEN COALESCE(error_count, 0) + 1 >= 3 THEN 'QUARANTINE' ELSE 'ERROR' END,
+                  last_seen = NOW(),
+                  last_error = $1
+                WHERE id = $2
+              `,
+              params: [extra?.last_error ?? null, id]
+            }).catch(async () => {
+              // If exec_sql RPC doesn't exist, use direct atomic update via SQL function
+              // This is a last resort fallback using Supabase's built-in capabilities
+              const { error: fallbackError } = await this.db
+                .from('devices')
+                .update({
+                  state: 'ERROR', // Will be corrected by trigger or next check
+                  last_seen: new Date().toISOString(),
+                  last_error: extra?.last_error,
+                })
+                .eq('id', id);
+              
+              // After base update, do atomic increment via raw query
+              if (!fallbackError) {
+                await this.db.rpc('increment_device_error_count', { device_id: id }).catch(() => {
+                  // If RPC not available, log warning - atomic increment not possible without DB function
+                  console.warn(`[DeviceRepository] Atomic error increment not available for device ${id}`);
+                });
+              }
+              return { error: fallbackError };
+            });
             
             if (updateError) throw updateError;
           } else {

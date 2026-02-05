@@ -44,7 +44,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       target_watch_seconds: execution.target_watch_seconds,
       actual_watch_seconds: null,
       progress: 0,
-      retry_count: execution.retry_count + 1,
+      retry_count: (execution.retry_count ?? 0) + 1,
       metadata: execution.metadata,
     };
 

@@ -1,21 +1,28 @@
 {
   "compilerOptions": {
     "target": "ES2020",
-    "module": "CommonJS",
-    "moduleResolution": "node",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "lib": ["dom", "dom.iterable", "esnext"],
     "baseUrl": ".",
     "paths": {
       "@doai/shared": ["packages/shared/src/index.ts"],
       "@doai/shared/*": ["packages/shared/src/*"],
       "@doai/ui": ["packages/ui/src/index.ts"],
-      "@doai/ui/*": ["packages/ui/src/*"]
+      "@doai/ui/*": ["packages/ui/src/*"],
+      "@/*": ["apps/dashboard/src/*"],
+      "@packages/ui/*": ["packages/ui/src/*"]
     },
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "strict": true
+    "strict": true,
+    "noEmit": true
   },
   "exclude": [
     "node_modules",
-    "dist"
+    "dist",
+    "_reference",
+    "scripts"
   ]
 }

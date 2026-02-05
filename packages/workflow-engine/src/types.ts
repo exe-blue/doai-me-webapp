@@ -132,12 +132,23 @@ export interface WorkflowStep {
   /** 조건식 */
   condition?: string;
   
-  /** 조건이 참일 때 실행할 스텝 (then_steps preferred over 'then' to avoid reserved word conflicts) */
+  /**
+   * 조건이 참일 때 실행할 스텝
+   * @deprecated Use `then_steps` instead. Objects with 'then' property can be mistakenly 
+   * treated as Promises (thenable), causing unexpected behavior in async contexts.
+   */
   then?: WorkflowStep[];
+  
+  /** 조건이 참일 때 실행할 스텝 (preferred over 'then' to avoid thenable conflicts) */
   then_steps?: WorkflowStep[];
   
-  /** 조건이 거짓일 때 실행할 스텝 (else_steps is an alias) */
+  /**
+   * 조건이 거짓일 때 실행할 스텝
+   * @deprecated Use `else_steps` instead for consistency with `then_steps`.
+   */
   else?: WorkflowStep[];
+  
+  /** 조건이 거짓일 때 실행할 스텝 (preferred over 'else' for consistency) */
   else_steps?: WorkflowStep[];
   
   // === Loop 액션 전용 ===

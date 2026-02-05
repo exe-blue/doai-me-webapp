@@ -46,10 +46,14 @@ export async function GET(request: NextRequest) {
     const uniqueVideos = new Set(data.map((e) => e.video_id)).size;
 
     // 활성 디바이스 수
-    const { count: activeDevices } = await supabase
+    const { count: activeDevices, error: deviceError } = await supabase
       .from("devices")
       .select("*", { count: "exact", head: true })
-      .in("status", ["online", "busy", "idle"]);
+      .in("status", ["IDLE", "RUNNING", "BUSY"]);
+
+    if (deviceError) {
+      return errorResponse("DB_ERROR", deviceError.message, 500);
+    }
 
     // 평균 성공률
     const avgSuccessRate = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;

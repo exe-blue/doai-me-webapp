@@ -108,7 +108,9 @@ const BUILT_IN_FILTERS: Record<string, FilterFunction> = {
     return str.slice(startIdx, endIdx);
   },
   replace: (value, search = '', replacement = '') => {
-    return String(value).replace(new RegExp(search, 'g'), replacement);
+    // Escape regex special characters to prevent ReDoS attacks
+    const escapedSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return String(value).replace(new RegExp(escapedSearch, 'g'), replacement);
   },
   pad: (value, length = '0', char = ' ') => {
     const str = String(value);
@@ -372,12 +374,26 @@ export class TemplateInterpolator {
 
 // 싱글톤 인스턴스
 let instance: TemplateInterpolator | null = null;
+let instanceOptions: { strictMode?: boolean } | undefined = undefined;
 
 export function getTemplateInterpolator(
   options?: { strictMode?: boolean }
 ): TemplateInterpolator {
   if (!instance) {
     instance = new TemplateInterpolator(options);
+    instanceOptions = options;
+  } else if (options !== undefined) {
+    // Check for options mismatch and warn
+    const currentStrictMode = instanceOptions?.strictMode ?? false;
+    const requestedStrictMode = options.strictMode ?? false;
+    
+    if (currentStrictMode !== requestedStrictMode) {
+      console.warn(
+        `TemplateInterpolator singleton already initialized with strictMode=${currentStrictMode}, ` +
+        `but requested strictMode=${requestedStrictMode}. Using existing instance. ` +
+        `Create a new instance directly if different options are needed.`
+      );
+    }
   }
   return instance;
 }

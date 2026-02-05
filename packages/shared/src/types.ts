@@ -151,7 +151,26 @@ export type ExecutionStatus =
   | "completed"
   | "failed"
   | "cancelled"
-  | "timeout";
+  | "timeout"
+  | "partial";
+
+/**
+ * Maps DB execution status to application ExecutionStatus.
+ * Use this when reading from database to ensure type safety.
+ */
+export function mapDbExecutionStatus(dbStatus: string): ExecutionStatus {
+  const validStatuses: ExecutionStatus[] = [
+    "pending", "queued", "assigned", "running", 
+    "completed", "failed", "cancelled", "timeout", "partial"
+  ];
+  
+  if (validStatuses.includes(dbStatus as ExecutionStatus)) {
+    return dbStatus as ExecutionStatus;
+  }
+  
+  console.warn(`Unknown execution status from DB: ${dbStatus}, defaulting to 'pending'`);
+  return "pending";
+}
 
 export interface VideoExecution {
   id: UUID;
@@ -221,7 +240,35 @@ export interface ScheduleConfig {
 // 노드 관련
 // ============================================
 
-export type NodeStatus = "online" | "offline" | "degraded";
+export type NodeStatus = "online" | "offline" | "degraded" | "maintenance" | "starting";
+
+/**
+ * DB node status values (may differ from application layer)
+ */
+export type DbNodeStatus = "online" | "offline" | "degraded" | "maintenance" | "starting" | "unknown";
+
+/**
+ * Maps DB node status to application NodeStatus.
+ * Use this when reading from database to ensure type safety.
+ */
+export function mapDbNodeStatus(dbStatus: string): NodeStatus {
+  const statusMap: Record<string, NodeStatus> = {
+    "online": "online",
+    "offline": "offline",
+    "degraded": "degraded",
+    "maintenance": "maintenance",
+    "starting": "starting",
+    "unknown": "offline", // Map unknown to offline
+  };
+  
+  const mapped = statusMap[dbStatus];
+  if (mapped) {
+    return mapped;
+  }
+  
+  console.warn(`Unknown node status from DB: ${dbStatus}, defaulting to 'offline'`);
+  return "offline";
+}
 
 export interface Node {
   id: string; // node-1, node-2, ...
@@ -260,7 +307,7 @@ export interface DailyReport {
 // 시스템 로그
 // ============================================
 
-export type LogLevel = "error" | "warn" | "info" | "debug";
+export type LogLevel = "fatal" | "error" | "warn" | "info" | "debug";
 export type LogSource = "api" | "worker" | "device" | "database" | "network" | "scheduler";
 
 export interface SystemLog {

@@ -5,6 +5,7 @@
  */
 
 import * as fs from 'fs/promises';
+import { writeFileSync } from 'fs';
 import * as path from 'path';
 import { app } from 'electron';
 import { logger } from '../utils/logger';
@@ -289,8 +290,9 @@ export class NodeRecovery extends EventEmitter {
 
   /**
    * 종료 전 상태 저장 (app.on('before-quit') 에서 호출)
+   * Uses synchronous write to ensure completion before process exits
    */
-  async saveBeforeQuit(state: Omit<SavedState, 'timestamp' | 'version'>): Promise<void> {
+  saveBeforeQuit(state: Omit<SavedState, 'timestamp' | 'version'>): void {
     const fullState: SavedState = {
       ...state,
       timestamp: Date.now(),
@@ -298,9 +300,9 @@ export class NodeRecovery extends EventEmitter {
     };
 
     try {
-      // 동기 방식으로 저장 (종료 시점이라 async/await 불안정)
+      // 동기 방식으로 저장 (종료 시점이라 async writeFile은 중단될 수 있음)
       const content = JSON.stringify(fullState, null, 2);
-      await fs.writeFile(this.stateFilePath, content, 'utf-8');
+      writeFileSync(this.stateFilePath, content, 'utf-8');
       
       logger.info('State saved before quit', {
         runningWorkflows: fullState.runningWorkflows.length,

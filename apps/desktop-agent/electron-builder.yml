@@ -1,9 +1,9 @@
 # DoAi.Me Desktop Agent - Electron Builder 설정
 # https://www.electron.build/configuration/configuration
 
-appId: me.doai.agent
+appId: com.doai.agent
 productName: DoAi.Me Agent
-copyright: Copyright © 2024 DoAi Inc.
+copyright: Copyright © 2026 DoAi Inc.
 
 # 빌드 디렉토리 설정
 directories:

@@ -37,10 +37,11 @@ steps:
     on_error: continue
 
   # 2. 잠금 해제 (스와이프)
+  # Dynamic swipe based on screen size: swipe from bottom (90% height) to top (30% height)
   - id: unlock_screen
     name: "잠금 해제"
     action: adb
-    command: "shell input swipe 540 1800 540 800 300"
+    command: "shell SIZE=$(wm size | cut -d' ' -f3); W=$(echo $SIZE | cut -dx -f1); H=$(echo $SIZE | cut -dx -f2); X=$((W/2)); Y1=$((H*9/10)); Y2=$((H*3/10)); input swipe $X $Y1 $X $Y2 300"
     timeout: 3000
     on_error: continue
 

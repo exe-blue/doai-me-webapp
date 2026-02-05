@@ -20,7 +20,23 @@
     "precommit": "npm run lint:imports",
     "prepare": "husky || true",
     "clean": "npx rimraf node_modules apps/*/node_modules packages/*/node_modules infra/*/node_modules",
-    "sb": "npm run storybook --workspace=@packages/ui"
+    "sb": "npm run storybook --workspace=@packages/ui",
+    
+    "build:types": "npm run build --workspace=packages/worker-types",
+    "build:core": "npm run build --workspace=packages/worker-core",
+    "build:youtube-bot": "npm run build --workspace=apps/youtube-bot",
+    "build:agent": "npm run build --workspace=apps/desktop-agent",
+    "build:workers": "npm run build:types && npm run build:core && npm run build:youtube-bot",
+    
+    "dev:youtube-bot": "npm run dev --workspace=apps/youtube-bot",
+    "start:youtube-bot": "npm run start --workspace=apps/youtube-bot",
+    
+    "typecheck:types": "npm run typecheck --workspace=packages/worker-types",
+    "typecheck:core": "npm run typecheck --workspace=packages/worker-core",
+    "typecheck:youtube-bot": "npm run typecheck --workspace=apps/youtube-bot",
+    "typecheck:workers": "npm run typecheck:types && npm run typecheck:core && npm run typecheck:youtube-bot",
+    
+    "download:minicap": "node scripts/download-minicap.js"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",

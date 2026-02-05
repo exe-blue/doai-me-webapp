@@ -240,6 +240,13 @@ function launchApp(packageName) {
  * @param {string} packageName - 패키지명
  */
 function forceStopApp(packageName) {
+  // Validate package name to prevent command injection
+  // Android package names: letters, digits, underscores, dots; must start with letter
+  var packageNameRegex = /^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)*$/;
+  if (!packageName || !packageNameRegex.test(packageName)) {
+    logError("forceStopApp", "Invalid package name: " + packageName);
+    return;
+  }
   shell("am force-stop " + packageName, true);
   sleep(500);
 }
@@ -298,8 +305,9 @@ function humanTypeText(input, text) {
   input.click();
   sleep(200);
   
+  // Use input() to append characters one at a time (more efficient than setText)
   for (var i = 0; i < text.length; i++) {
-    setText(input.text() + text[i]);
+    input(text[i]);
     randomSleep(50, 150);
   }
 }

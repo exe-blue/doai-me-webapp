@@ -226,9 +226,9 @@ elif [[ -f "$HOME/.bashrc" ]]; then
 fi
 
 if [[ -n "$SHELL_RC" ]]; then
-    # 기존 설정 제거
-    sed -i.bak '/DOAIME_NODE_ID/d' "$SHELL_RC" 2>/dev/null || true
-    sed -i.bak '/DOAIME_SERVER_URL/d' "$SHELL_RC" 2>/dev/null || true
+    # 기존 설정 제거 (portable temp file approach for macOS/Linux compatibility)
+    grep -v 'DOAIME_NODE_ID' "$SHELL_RC" > "$SHELL_RC.tmp" && mv "$SHELL_RC.tmp" "$SHELL_RC"
+    grep -v 'DOAIME_SERVER_URL' "$SHELL_RC" > "$SHELL_RC.tmp" && mv "$SHELL_RC.tmp" "$SHELL_RC"
     
     # 새 설정 추가
     echo "export DOAIME_NODE_ID=\"$NODE_ID\"" >> "$SHELL_RC"
@@ -267,16 +267,33 @@ echo ""
 if [[ "$OS" == "macos" ]]; then
     if [[ -f "$INSTALLER_PATH" ]]; then
         print_info "DMG 마운트 중..."
-        hdiutil attach "$INSTALLER_PATH" -nobrowse -quiet
+        # Parse actual mount point from hdiutil output
+        MOUNT_OUTPUT=$(hdiutil attach "$INSTALLER_PATH" -nobrowse 2>&1)
+        MOUNT_POINT=$(echo "$MOUNT_OUTPUT" | grep -o '/Volumes/[^"]*' | tail -1)
         
-        # Applications 폴더로 복사
-        cp -R "/Volumes/DoAiMe-Agent/DoAiMe-Agent.app" "/Applications/" 2>/dev/null || true
-        
-        hdiutil detach "/Volumes/DoAiMe-Agent" -quiet 2>/dev/null || true
-        print_success "설치 완료: /Applications/DoAiMe-Agent.app"
+        if [[ -n "$MOUNT_POINT" ]]; then
+            # Applications 폴더로 복사
+            cp -R "$MOUNT_POINT/DoAiMe-Agent.app" "/Applications/" 2>/dev/null || true
+            
+            hdiutil detach "$MOUNT_POINT" -quiet 2>/dev/null || true
+            print_success "설치 완료: /Applications/DoAiMe-Agent.app"
+        else
+            print_warning "DMG 마운트 실패. 수동으로 설치해주세요."
+        fi
     fi
 else
     if [[ -f "$INSTALLER_PATH" ]]; then
+        # Download icon if not exists, use fallback otherwise
+        ICON_PATH="$INSTALL_DIR/icon.png"
+        ICON_URL="https://releases.doai.me/agent/assets/icon.png"
+        if [[ ! -f "$ICON_PATH" ]]; then
+            curl -fsSL -o "$ICON_PATH" "$ICON_URL" 2>/dev/null || true
+        fi
+        # Use generic icon if download failed
+        if [[ ! -f "$ICON_PATH" ]]; then
+            ICON_PATH="application-x-executable"
+        fi
+        
         # 데스크탑 파일 생성
         mkdir -p "$HOME/.local/share/applications"
         cat > "$HOME/.local/share/applications/doaime-agent.desktop" << EOF
@@ -284,7 +301,7 @@ else
 Name=DoAi.Me Agent
 Comment=DoAi.Me Device Control Agent
 Exec=$INSTALLER_PATH
-Icon=$INSTALL_DIR/icon.png
+Icon=$ICON_PATH
 Terminal=false
 Type=Application
 Categories=Utility;
@@ -317,7 +334,7 @@ echo "  3. DoAi.Me Agent를 실행하세요"
 echo ""
 
 if [[ "$OS" == "macos" ]]; then
-    echo "    open /Applications/DoAi.Me-Agent.app"
+    echo "    open /Applications/DoAiMe-Agent.app"
 else
     echo "    $INSTALLER_PATH"
 fi

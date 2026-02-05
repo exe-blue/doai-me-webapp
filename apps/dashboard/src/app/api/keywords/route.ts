@@ -63,12 +63,17 @@ export async function POST(request: NextRequest) {
         return errorResponse("INVALID_KEYWORD", "키워드가 비어있습니다", 400);
       }
 
-      // 중복 확인
-      const { data: existing } = await supabase
+      // 중복 확인 - use maybeSingle to properly handle "not found" vs real errors
+      const { data: existing, error: checkError } = await supabase
         .from("keywords")
         .select("id")
         .eq("keyword", keyword)
-        .single();
+        .maybeSingle();
+
+      // Handle real DB errors (not just "not found")
+      if (checkError && checkError.code !== "PGRST116") {
+        return errorResponse("DB_ERROR", checkError.message, 500);
+      }
 
       if (existing) {
         return errorResponse("DUPLICATE", "이미 등록된 키워드입니다", 409);
@@ -108,11 +113,18 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        const { data: existing } = await supabase
+        // use maybeSingle to properly handle "not found" vs real errors
+        const { data: existing, error: checkError } = await supabase
           .from("keywords")
           .select("id")
           .eq("keyword", keyword)
-          .single();
+          .maybeSingle();
+
+        // Handle real DB errors (not just "not found")
+        if (checkError && checkError.code !== "PGRST116") {
+          results.failed.push(keyword);
+          continue;
+        }
 
         if (existing) {
           results.failed.push(keyword);

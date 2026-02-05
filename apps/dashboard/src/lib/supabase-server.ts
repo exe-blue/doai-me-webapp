@@ -13,6 +13,9 @@ export function createServerSupabaseClient(): SupabaseClient {
   }
 
   // Service Role 키가 있으면 사용 (RLS 우회), 없으면 Anon 키 사용
+  if (!supabaseServiceKey) {
+    console.warn('[Supabase] SUPABASE_SERVICE_ROLE_KEY is missing, using SUPABASE_ANON_KEY instead. RLS will apply.');
+  }
   const key = supabaseServiceKey || supabaseAnonKey;
   if (!key) {
     throw new Error("Supabase API 키가 설정되지 않았습니다");

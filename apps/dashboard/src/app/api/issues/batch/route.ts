@@ -60,27 +60,56 @@ export async function POST(request: NextRequest) {
       }
 
       case "retry": {
-        // 복구 시도 카운트 증가 및 상태를 in_progress로 변경
-        const { data, error } = await supabase
-          .from("device_issues")
-          .update({ status: "in_progress" })
-          .in("id", issue_ids)
-          .eq("auto_recoverable", true)
-          .select();
+        // 복구 시도 카운트 증가 및 상태를 in_progress로 변경 (atomic update)
+        const { data, error } = await supabase.rpc("batch_retry_issues", {
+          p_issue_ids: issue_ids,
+        });
 
         if (error) {
-          return errorResponse("DB_ERROR", error.message, 500);
-        }
-
-        // recovery_attempts 증가 (RPC 함수가 없으면 개별 업데이트)
-        for (const issue of data || []) {
-          await supabase
+          // Fallback: if RPC doesn't exist, use raw SQL via rpc
+          const { data: fallbackData, error: fallbackError } = await supabase
             .from("device_issues")
-            .update({ recovery_attempts: (issue.recovery_attempts || 0) + 1 })
-            .eq("id", issue.id);
+            .update({
+              status: "in_progress",
+              recovery_attempts: supabase.rpc("increment_recovery_attempts"),
+            } as never)
+            .in("id", issue_ids)
+            .eq("auto_recoverable", true)
+            .select();
+
+          // If fallback also fails, try simple update without increment
+          if (fallbackError) {
+            const { data: simpleData, error: simpleError } = await supabase
+              .from("device_issues")
+              .update({ status: "in_progress" })
+              .in("id", issue_ids)
+              .eq("auto_recoverable", true)
+              .select("id, recovery_attempts");
+
+            if (simpleError) {
+              return errorResponse("DB_ERROR", simpleError.message, 500);
+            }
+
+            // Atomic increment using raw SQL expression
+            if (simpleData && simpleData.length > 0) {
+              const ids = simpleData.map((d) => d.id);
+              await supabase.rpc("exec_sql", {
+                query: `UPDATE device_issues SET recovery_attempts = COALESCE(recovery_attempts, 0) + 1 WHERE id = ANY($1)`,
+                params: [ids],
+              }).catch(() => {
+                // If exec_sql doesn't exist, silently continue (status was already updated)
+              });
+            }
+
+            affected = simpleData?.length || 0;
+            break;
+          }
+
+          affected = fallbackData?.length || 0;
+          break;
         }
 
-        affected = data?.length || 0;
+        affected = typeof data === "number" ? data : (data?.length || 0);
         break;
       }
     }

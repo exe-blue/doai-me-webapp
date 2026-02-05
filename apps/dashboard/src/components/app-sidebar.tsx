@@ -24,7 +24,7 @@ import {
   ChevronDown,
   ChevronRight,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+깃을커커import { useState, useEffect } from "react";
 import {
   Collapsible,
   CollapsibleContent,

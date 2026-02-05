@@ -59,14 +59,15 @@ export async function POST(request: NextRequest) {
       }
 
       case "prioritize": {
-        if (typeof priority !== "number") {
-          return errorResponse("INVALID_PRIORITY", "priority 값이 필요합니다", 400);
+        if (typeof priority !== "number" || priority < 0 || priority > 100) {
+          return errorResponse("INVALID_PRIORITY", "우선순위는 0-100 사이여야 합니다", 400);
         }
 
         const { data, error } = await supabase
           .from("video_executions")
           .update({ priority })
           .in("id", execution_ids)
+          .in("status", ["queued", "pending"])
           .select();
 
         if (error) {

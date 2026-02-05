@@ -17,7 +17,6 @@ export async function GET(request: NextRequest) {
       status,
       videoId,
       nodeId,
-      sortBy = "created_at",
       sortOrder = "desc",
     } = getQueryParams(request);
 
@@ -66,7 +65,13 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const supabase = getServerClient();
-    const body = await request.json();
+
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return errorResponse("INVALID_JSON", "유효한 JSON 형식이 아닙니다", 400);
+    }
 
     const { video_ids, priority = 50, target_watch_seconds = 60, device_count = 1 } = body;
 

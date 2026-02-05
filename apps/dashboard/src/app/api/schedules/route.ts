@@ -6,6 +6,7 @@ import {
   paginatedResponse,
   getQueryParams,
 } from "@/lib/api-utils";
+import { parseExpression } from "cron-parser";
 
 // GET /api/schedules - 스케줄 목록 조회
 export async function GET(request: NextRequest) {
@@ -79,8 +80,14 @@ export async function POST(request: NextRequest) {
       nextRunAt = new Date(
         Date.now() + config.interval_minutes * 60 * 1000
       ).toISOString();
+    } else if (type === "cron" && config?.cron) {
+      try {
+        const interval = parseExpression(config.cron);
+        nextRunAt = interval.next().toISOString();
+      } catch {
+        return errorResponse("INVALID_CRON", "유효하지 않은 cron 표현식입니다", 400);
+      }
     }
-    // cron의 경우 별도 계산 필요 (추후 구현)
 
     const scheduleData = {
       name,

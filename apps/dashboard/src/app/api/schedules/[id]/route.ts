@@ -37,7 +37,13 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
     const supabase = getServerClient();
-    const body = await request.json();
+    
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return errorResponse("INVALID_JSON", "유효하지 않은 JSON 본문", 400);
+    }
 
     const allowedFields = ["name", "config", "video_ids", "status"];
     const updateData: Record<string, unknown> = {};

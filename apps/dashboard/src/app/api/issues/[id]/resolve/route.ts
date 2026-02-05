@@ -16,7 +16,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     // First, fetch the existing issue to get current details
     const { data: existingIssue, error: fetchError } = await supabase
       .from("device_issues")
-      .select("details")
+      .select("details, status")
       .eq("id", id)
       .single();
 
@@ -25,6 +25,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         return errorResponse("NOT_FOUND", "이슈를 찾을 수 없습니다", 404);
       }
       return errorResponse("DB_ERROR", fetchError.message, 500);
+    }
+
+    // Check if issue is already resolved or ignored
+    if (existingIssue.status === "resolved" || existingIssue.status === "ignored") {
+      return errorResponse("ALREADY_RESOLVED", "이슈가 이미 해결되었습니다", 409);
     }
 
     // Build update object, only include details if resolution_note is provided

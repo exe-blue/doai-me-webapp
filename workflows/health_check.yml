@@ -5,7 +5,7 @@ id: health_check
 name: "디바이스 상태 체크"
 description: "배터리, 화면 상태 등 기본 정보 수집"
 version: 1
-timeout: 30000  # 30초
+timeout: 60000  # 60초 (11 steps에 충분한 시간)
 category: system
 tags:
   - health

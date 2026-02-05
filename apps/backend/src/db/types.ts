@@ -366,46 +366,55 @@ export interface Database {
         Row: Node;
         Insert: NodeInsert;
         Update: NodeUpdate;
+        Relationships: [];
       };
       devices: {
         Row: Device;
         Insert: DeviceInsert;
         Update: DeviceUpdate;
+        Relationships: [];
       };
       device_states: {
         Row: DeviceStateRecord;
         Insert: Partial<DeviceStateRecord> & { device_id: string };
         Update: Partial<DeviceStateRecord>;
+        Relationships: [];
       };
       workflows: {
         Row: Workflow;
         Insert: WorkflowInsert;
         Update: WorkflowUpdate;
+        Relationships: [];
       };
       workflow_executions: {
         Row: WorkflowExecution;
         Insert: WorkflowExecutionInsert;
         Update: WorkflowExecutionUpdate;
+        Relationships: [];
       };
       execution_logs: {
         Row: ExecutionLog;
         Insert: ExecutionLogInsert;
         Update: Partial<ExecutionLog>;
+        Relationships: [];
       };
       settings: {
         Row: Setting;
         Insert: { key: string; value: Json; description?: string };
         Update: { value?: Json; description?: string };
+        Relationships: [];
       };
       alerts: {
         Row: Alert;
         Insert: AlertInsert;
         Update: Partial<Alert>;
+        Relationships: [];
       };
     };
     Views: {
       system_overview: {
         Row: SystemOverview;
+        Relationships: [];
       };
     };
     Functions: {
@@ -414,13 +423,39 @@ export interface Database {
         Returns: { state: string; count: number }[];
       };
       get_node_device_summary: {
-        Args: { p_node_id?: string };
+        Args: { p_node_id: string | null };
         Returns: NodeDeviceSummary[];
       };
       cleanup_old_data: {
         Args: Record<string, never>;
-        Returns: void;
+        Returns: undefined;
       };
+      update_device_state_with_error: {
+        Args: { p_device_id: string; p_last_error: string | null };
+        Returns: undefined;
+      };
+      exec_sql: {
+        Args: { query: string; params: (string | null)[] };
+        Returns: undefined;
+      };
+      increment_device_error_count: {
+        Args: { device_id: string };
+        Returns: undefined;
+      };
+      increment_execution_device_count: {
+        Args: { exec_id: string; count_type: string };
+        Returns: undefined;
+      };
+      increment_workflow_version: {
+        Args: { workflow_id: string };
+        Returns: { version: number }[];
+      };
+    };
+    Enums: {
+      [_ in never]: never;
+    };
+    CompositeTypes: {
+      [_ in never]: never;
     };
   };
 }

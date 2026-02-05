@@ -105,8 +105,17 @@ export class DeviceRecovery extends EventEmitter {
     if (this.checkInterval) {
       clearInterval(this.checkInterval);
       this.checkInterval = null;
-      logger.info('Device recovery monitor stopped');
     }
+    
+    // Cancel all pending timeouts to prevent memory leaks and stale callbacks
+    for (const timeout of this.pendingTimeouts) {
+      clearTimeout(timeout);
+    }
+    this.pendingTimeouts.clear();
+    
+    logger.info('Device recovery monitor stopped', {
+      clearedTimeouts: this.pendingTimeouts.size,
+    });
   }
 
   /**
@@ -315,8 +324,9 @@ export class DeviceRecovery extends EventEmitter {
 
   /**
    * 복구 시도
+   * @returns true if recovery succeeded, false otherwise
    */
-  private async attemptRecovery(device: DeviceInfo): Promise<void> {
+  private async attemptRecovery(device: DeviceInfo): Promise<boolean> {
     logger.info('Attempting device recovery', { deviceId: device.id });
 
     try {
@@ -330,6 +340,7 @@ export class DeviceRecovery extends EventEmitter {
       logger.info('Recovery attempt completed', { deviceId: device.id });
       
       this.emit('device:recovered', device.id);
+      return true;
       
     } catch (error) {
       logger.error('Recovery attempt failed', {
@@ -338,6 +349,7 @@ export class DeviceRecovery extends EventEmitter {
       });
       device.lastError = (error as Error).message;
       this.emit('device:recovery-failed', device.id, error);
+      return false;
     }
   }
 
@@ -374,12 +386,8 @@ export class DeviceRecovery extends EventEmitter {
       return false;
     }
 
-    try {
-      await this.attemptRecovery(device);
-      return true;
-    } catch {
-      return false;
-    }
+    // Return the actual success status from attemptRecovery
+    return await this.attemptRecovery(device);
   }
 
   /**

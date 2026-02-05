@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     // 해당 날짜의 실행 통계 조회
     const { data: executions, error } = await supabase
       .from("video_executions")
-      .select("status, actual_watch_seconds, started_at")
+      .select("status, actual_watch_seconds, started_at, video_id")
       .gte("started_at", startOfDay)
       .lte("started_at", endOfDay);
 
@@ -39,14 +39,14 @@ export async function GET(request: NextRequest) {
     const totalWatchTime = watchTimes.reduce((sum, t) => sum + t, 0);
     const avgWatchTime = watchTimes.length > 0 ? totalWatchTime / watchTimes.length : 0;
 
-    // 고유 비디오 수 (video_id로 계산하려면 추가 쿼리 필요)
-    const uniqueVideos = new Set(data.map((e) => (e as Record<string, unknown>).video_id)).size;
+    // 고유 비디오 수
+    const uniqueVideos = new Set(data.map((e) => e.video_id)).size;
 
-    // 시간대별 작업 수
+    // 시간대별 작업 수 (UTC 기준)
     const tasksPerHour = Array(24).fill(0);
     for (const exec of data) {
       if (exec.started_at) {
-        const hour = new Date(exec.started_at).getHours();
+        const hour = new Date(exec.started_at).getUTCHours();
         tasksPerHour[hour]++;
       }
     }
@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
     const { count: activeDevices } = await supabase
       .from("devices")
       .select("*", { count: "exact", head: true })
-      .in("status", ["online", "busy", "idle"]);
+      .in("status", ["IDLE", "RUNNING", "BUSY"]);
 
     const report = {
       date: targetDate,
