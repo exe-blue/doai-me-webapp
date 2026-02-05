@@ -20,6 +20,7 @@ import { QueueManager } from './queue/QueueManager';
 import { WorkflowWorker } from './queue/WorkflowWorker';
 import { SocketServer } from './socket/index';
 import { MetricsCollector, AlertManager } from './monitor';
+import { SupabaseSyncService } from './queue/SupabaseSync';
 
 // 환경 변수 로드
 dotenv.config({ path: '../../.env' });
@@ -33,6 +34,7 @@ const IS_PRODUCTION = NODE_ENV === 'production';
 const PORT = parseInt(process.env.WORKFLOW_PORT || '3002', 10);
 const HOST = process.env.HOST || (IS_PRODUCTION ? '0.0.0.0' : 'localhost');
 const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
+const CELERY_API_URL = process.env.CELERY_API_URL || 'http://localhost:8000';
 
 const CORS_ORIGINS = IS_PRODUCTION
   ? ['https://doai.me', 'https://www.doai.me']
@@ -79,7 +81,7 @@ const stateManager = new StateManager({ redisUrl: REDIS_URL });
 const queueManager = new QueueManager({ redisUrl: REDIS_URL });
 
 // Workflow Worker
-const workflowWorker = new WorkflowWorker({ redisUrl: REDIS_URL });
+const workflowWorker = new WorkflowWorker({ redisUrl: REDIS_URL, celeryApiUrl: CELERY_API_URL });
 
 // Socket Server
 const socketServer = new SocketServer(
@@ -89,26 +91,45 @@ const socketServer = new SocketServer(
   { corsOrigin: CORS_ORIGINS }
 );
 
+// Supabase Sync Service
+const supabaseSync = new SupabaseSyncService();
+supabaseSync.attach(workflowWorker, queueManager);
+supabaseSync.attachCeleryBridge(workflowWorker.getCeleryBridge());
+workflowWorker.setSupabaseSync(supabaseSync);
+
 // ============================================
 // 모니터링 시스템 초기화
 // ============================================
 
+// Process logger for Redis events
+const processLogger = {
+  error: (message: string, context?: Record<string, unknown>) => {
+    console.error(message, context ? JSON.stringify(context) : '');
+  },
+  info: (message: string, context?: Record<string, unknown>) => {
+    console.info(message, context ? JSON.stringify(context) : '');
+  },
+  warn: (message: string, context?: Record<string, unknown>) => {
+    console.warn(message, context ? JSON.stringify(context) : '');
+  },
+};
+
 // Redis 인스턴스 (메트릭 수집/알림용)
 const monitorRedis = new Redis(REDIS_URL, { maxRetriesPerRequest: null });
 monitorRedis.on('error', (err) => {
-  console.error('[Redis Monitor] Error:', err);
+  processLogger.error('[Redis Monitor] Error:', { error: err.message });
 });
 monitorRedis.on('reconnecting', () => {
-  console.info('[Redis Monitor] Reconnecting...');
+  processLogger.info('[Redis Monitor] Reconnecting...');
 });
 
 // Redis Subscriber (Pub/Sub용 별도 연결)
 const subscriberRedis = new Redis(REDIS_URL, { maxRetriesPerRequest: null });
 subscriberRedis.on('error', (err) => {
-  console.error('[Redis Subscriber] Error:', err);
+  processLogger.error('[Redis Subscriber] Error:', { error: err.message });
 });
 subscriberRedis.on('reconnecting', () => {
-  console.info('[Redis Subscriber] Reconnecting...');
+  processLogger.info('[Redis Subscriber] Reconnecting...');
 });
 
 // 메트릭 수집기 (1분마다 수집)
@@ -118,14 +139,33 @@ const metricsCollector = new MetricsCollector(monitorRedis);
 const alertManager = new AlertManager(monitorRedis);
 
 // Redis Pub/Sub으로 메트릭 수신하여 알림 체크
-subscriberRedis.subscribe('channel:metrics');
+// Wrap subscription in async IIFE with error handling
+(async () => {
+  try {
+    await subscriberRedis.subscribe('channel:metrics');
+    processLogger.info('[Monitor] Subscribed to channel:metrics');
+  } catch (subscribeError) {
+    processLogger.error('[Monitor] Failed to subscribe to channel:metrics:', { error: (subscribeError as Error).message });
+    // Don't crash the process, but log the failure
+  }
+})();
+
 subscriberRedis.on('message', async (channel, message) => {
   if (channel === 'channel:metrics') {
     try {
       const metrics = JSON.parse(message);
+      // Validate that parsed payload has expected metrics structure
+      if (!metrics || typeof metrics !== 'object') {
+        processLogger.warn('[Monitor] Invalid metrics payload: not an object');
+        return;
+      }
       await alertManager.checkConditions(metrics);
     } catch (error) {
-      console.error('[Monitor] Failed to process metrics:', (error as Error).message);
+      if (error instanceof SyntaxError) {
+        processLogger.error('[Monitor] Failed to parse metrics JSON:', { error: error.message });
+      } else {
+        processLogger.error('[Monitor] Failed to process metrics:', { error: (error as Error).message });
+      }
     }
   }
 });
@@ -278,11 +318,18 @@ app.get('/api/alerts/history', async (req, res) => {
 app.post('/api/alerts/acknowledge', async (req, res) => {
   const { level, message } = req.body;
 
-  if (!level || !message) {
-    return res.status(400).json({ error: 'level and message required' });
+  // Validate level is a non-empty string and one of the allowed values
+  const allowedLevels = ['info', 'warning', 'error', 'critical'];
+  if (!level || typeof level !== 'string' || !allowedLevels.includes(level)) {
+    return res.status(400).json({ error: `level must be one of: ${allowedLevels.join(', ')}` });
   }
 
-  const success = await alertManager.acknowledgeAlert(level, message);
+  // Validate message is a non-empty string
+  if (!message || typeof message !== 'string' || message.trim() === '') {
+    return res.status(400).json({ error: 'message must be a non-empty string' });
+  }
+
+  const success = await alertManager.acknowledgeAlert(level, message.trim());
   res.json({ success });
 });
 
@@ -328,14 +375,22 @@ const supabase = createClient(supabaseUrl, supabaseKey);
  * 영상 목록 조회
  */
 app.get('/api/videos', async (req, res) => {
-  const { status, priority, limit = '50', offset = '0' } = req.query;
+  const { status, priority, limit: limitStr = '50', offset: offsetStr = '0' } = req.query;
+
+  // Validate and parse limit and offset
+  const parsedLimit = parseInt(limitStr as string, 10);
+  const parsedOffset = parseInt(offsetStr as string, 10);
+  
+  // Validate numeric values
+  const limit = (Number.isInteger(parsedLimit) && parsedLimit > 0 && parsedLimit <= 1000) ? parsedLimit : 50;
+  const offset = (Number.isInteger(parsedOffset) && parsedOffset >= 0) ? parsedOffset : 0;
 
   try {
     let query = supabase
       .from('videos')
       .select('*')
       .order('created_at', { ascending: false })
-      .range(parseInt(offset as string, 10), parseInt(offset as string, 10) + parseInt(limit as string, 10) - 1);
+      .range(offset, offset + limit - 1);
 
     if (status && status !== 'all') {
       query = query.eq('status', status);
@@ -1042,20 +1097,35 @@ app.patch('/api/executions/:id', async (req, res) => {
     // 완료/실패 시 daily_stats 업데이트
     if (updateData.status === 'completed' || updateData.status === 'failed') {
       const today = new Date().toISOString().split('T')[0];
-      await supabase.rpc('update_daily_stats', {
-        p_date: today,
-        p_completed: updateData.status === 'completed' ? 1 : 0,
-        p_failed: updateData.status === 'failed' ? 1 : 0,
-        p_watch_time: (updateData.actual_watch_duration_sec as number) || 0,
-        p_video_id: data.video_id,
-      });
-
-      // 영상 카운트 업데이트
-      if (data.video_id) {
-        await supabase.rpc('increment_video_views', {
+      
+      try {
+        // Update daily stats
+        const { error: statsError } = await supabase.rpc('update_daily_stats', {
+          p_date: today,
+          p_completed: updateData.status === 'completed' ? 1 : 0,
+          p_failed: updateData.status === 'failed' ? 1 : 0,
+          p_watch_time: (updateData.actual_watch_duration_sec as number) || 0,
           p_video_id: data.video_id,
-          p_success: updateData.status === 'completed',
         });
+
+        if (statsError) {
+          processLogger.error('[Stats] Failed to update daily stats:', { error: statsError.message, date: today });
+        }
+
+        // 영상 카운트 업데이트
+        if (data.video_id) {
+          const { error: viewsError } = await supabase.rpc('increment_video_views', {
+            p_video_id: data.video_id,
+            p_success: updateData.status === 'completed',
+          });
+
+          if (viewsError) {
+            processLogger.error('[Stats] Failed to increment video views:', { error: viewsError.message, videoId: data.video_id });
+          }
+        }
+      } catch (statsException) {
+        // Log but don't fail the main update
+        processLogger.error('[Stats] Exception during stats update:', { error: (statsException as Error).message });
       }
     }
 

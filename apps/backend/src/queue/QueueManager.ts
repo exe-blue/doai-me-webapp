@@ -25,6 +25,7 @@ export interface WorkflowJobData {
   node_id: string;
   params: Record<string, unknown>;
   priority?: number;
+  job_assignment_id?: string;
   created_at: number;
 }
 
@@ -38,9 +39,11 @@ export interface WorkflowDefinition {
 
 export interface WorkflowStep {
   id: string;
-  action: 'autox' | 'adb' | 'system' | 'wait' | 'condition';
+  action: 'autox' | 'adb' | 'system' | 'wait' | 'condition' | 'celery';
   script?: string;
   command?: string;
+  celery_task?: string;
+  celery_params?: Record<string, unknown>;
   timeout: number;
   retry: { attempts: number; delay: number; backoff: string };
   onError: 'fail' | 'skip' | 'goto';

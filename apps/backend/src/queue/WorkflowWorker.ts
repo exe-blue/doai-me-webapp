@@ -15,6 +15,10 @@ import { Worker, Job, Queue } from 'bullmq';
 import Redis from 'ioredis';
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import { EventEmitter } from 'node:events';
+import { CeleryBridge, CeleryTaskResult } from './CeleryBridge';
+
+// Forward-declared to avoid circular dependency
+import type { SupabaseSyncService } from './SupabaseSync';
 
 // ============================================
 // 타입 정의
@@ -27,6 +31,7 @@ export interface WorkflowJobData {
   device_ids: string[];
   node_id: string;
   params: Record<string, unknown>;
+  job_assignment_id?: string;
   created_at: number;
 }
 
@@ -40,9 +45,11 @@ export interface WorkflowDefinition {
 
 export interface WorkflowStep {
   id: string;
-  action: 'autox' | 'adb' | 'system' | 'wait' | 'condition';
+  action: 'autox' | 'adb' | 'system' | 'wait' | 'condition' | 'celery';
   script?: string;
   command?: string;
+  celery_task?: string;
+  celery_params?: Record<string, unknown>;
   timeout: number;
   retry: { attempts: number; delay: number; backoff: string };
   onError: 'fail' | 'skip' | 'goto';
@@ -69,6 +76,7 @@ export interface WorkflowWorkerConfig {
   redisUrl: string;
   jobTimeout: number;
   agentResponseTimeout: number;
+  celeryApiUrl: string;
 }
 
 // ============================================
@@ -117,6 +125,7 @@ const DEFAULT_CONFIG: WorkflowWorkerConfig = {
   redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
   jobTimeout: 300000,        // 5분
   agentResponseTimeout: 30000, // 30초
+  celeryApiUrl: process.env.CELERY_API_URL || 'http://localhost:8000',
 };
 
 const SOCKET_EVENTS = {
@@ -142,10 +151,12 @@ export class WorkflowWorker extends EventEmitter {
   private connection: Redis;
   private workers: Map<string, Worker> = new Map();
   private io: SocketIOServer | null = null;
-  
+  private celeryBridge: CeleryBridge;
+  private supabaseSync: SupabaseSyncService | null = null;
+
   // 노드별 소켓 매핑
   private nodeSocketMap: Map<string, Socket> = new Map();
-  
+
   // 진행 중인 Job 추적
   private pendingJobs: Map<string, {
     resolve: (result: WorkflowJobResult) => void;
@@ -159,9 +170,13 @@ export class WorkflowWorker extends EventEmitter {
   constructor(config: Partial<WorkflowWorkerConfig> = {}) {
     super();
     this.config = { ...DEFAULT_CONFIG, ...config };
-    
+
     this.connection = new Redis(this.config.redisUrl, {
       maxRetriesPerRequest: null,
+    });
+
+    this.celeryBridge = new CeleryBridge({
+      apiUrl: this.config.celeryApiUrl,
     });
   }
 
@@ -259,7 +274,21 @@ export class WorkflowWorker extends EventEmitter {
   }
 
   /**
-   * Job 처리 - Socket.IO로 Agent에 전달
+   * SupabaseSyncService 연결
+   */
+  setSupabaseSync(sync: SupabaseSyncService): void {
+    this.supabaseSync = sync;
+  }
+
+  /**
+   * CeleryBridge 인스턴스 반환
+   */
+  getCeleryBridge(): CeleryBridge {
+    return this.celeryBridge;
+  }
+
+  /**
+   * Job 처리 - Celery 스텝과 Agent 스텝 분리 실행
    */
   private async processJob(job: Job<WorkflowJobData, WorkflowJobResult>): Promise<WorkflowJobResult> {
     const { job_id, workflow_id, workflow, device_ids, node_id, params } = job.data;
@@ -267,54 +296,170 @@ export class WorkflowWorker extends EventEmitter {
 
     console.log(`[WorkflowWorker] Processing job ${job_id}: ${workflow_id} for ${device_ids.length} devices`);
 
-    // 노드 소켓 확인
-    const socket = this.nodeSocketMap.get(node_id);
-    if (!socket || !socket.connected) {
-      throw new Error(`Node ${node_id} not connected`);
+    // 이벤트: 워크플로우 시작
+    this.emit('workflow:start', { job_id, workflow_id, device_ids, node_id });
+
+    // 스텝을 celery / agent로 분리
+    const celerySteps = workflow.steps.filter((s) => s.action === 'celery');
+    const agentSteps = workflow.steps.filter((s) => s.action !== 'celery');
+
+    const celeryResults: Array<{ stepId: string; success: boolean; error?: string }> = [];
+
+    // 1. Celery 스텝 순차 실행 (서버 직접 실행)
+    for (const step of celerySteps) {
+      try {
+        this.emit('workflow:progress', {
+          job_id,
+          device_id: device_ids[0] || 'server',
+          current_step: step.id,
+          progress: 0,
+          message: `Executing celery task: ${step.celery_task}`,
+        });
+
+        await this.executeCeleryStep(job_id, step, params);
+        celeryResults.push({ stepId: step.id, success: true });
+
+        this.emit('workflow:progress', {
+          job_id,
+          device_id: device_ids[0] || 'server',
+          current_step: step.id,
+          progress: 100,
+          message: `Celery task completed: ${step.celery_task}`,
+        });
+      } catch (error) {
+        const errorMsg = (error as Error).message;
+        celeryResults.push({ stepId: step.id, success: false, error: errorMsg });
+
+        this.emit('workflow:error', {
+          job_id,
+          device_id: device_ids[0] || 'server',
+          step_id: step.id,
+          error: errorMsg,
+          retry_count: 0,
+        });
+
+        // onError 정책 적용
+        if (step.onError === 'fail') {
+          const result: WorkflowJobResult = {
+            job_id,
+            total: device_ids.length,
+            success: 0,
+            failed: device_ids.length,
+            duration_ms: Date.now() - startTime,
+            device_results: device_ids.map((id) => ({
+              device_id: id,
+              success: false,
+              error: `Celery step ${step.id} failed: ${errorMsg}`,
+              duration_ms: Date.now() - startTime,
+            })),
+          };
+          this.emit('workflow:complete', result);
+          return result;
+        }
+        // 'skip' → continue to next step
+      }
     }
 
-    // Job 결과를 기다리는 Promise 생성
-    return new Promise((resolve, reject) => {
-      // 타임아웃 설정
-      const timeout = setTimeout(() => {
-        this.pendingJobs.delete(job_id);
-        reject(new Error(`Job timeout after ${this.config.jobTimeout}ms`));
-      }, workflow.timeout || this.config.jobTimeout);
+    // 2. Agent 스텝이 있으면 기존 Socket.IO 흐름
+    if (agentSteps.length > 0) {
+      const socket = this.nodeSocketMap.get(node_id);
+      if (!socket || !socket.connected) {
+        throw new Error(`Node ${node_id} not connected`);
+      }
 
-      // Pending Job 등록
-      this.pendingJobs.set(job_id, {
-        resolve: (result) => {
-          clearTimeout(timeout);
-          resolve(result);
-        },
-        reject: (error) => {
-          clearTimeout(timeout);
-          reject(error);
-        },
-        deviceResults: new Map(),
-        totalDevices: device_ids.length,
-        completedDevices: 0,
-        startTime,
-      });
+      // Agent에게 보내는 워크플로우에는 agent 스텝만 포함
+      const agentWorkflow = { ...workflow, steps: agentSteps };
 
-      // Agent에 EXECUTE_WORKFLOW 이벤트 전송
-      const executeEvent: ExecuteWorkflowEvent = {
-        job_id,
-        workflow_id,
-        workflow,
-        device_ids,
-        params,
-      };
-
-      socket.emit(SOCKET_EVENTS.EXECUTE_WORKFLOW, executeEvent, (ack: { received: boolean }) => {
-        if (!ack?.received) {
+      return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
           this.pendingJobs.delete(job_id);
-          clearTimeout(timeout);
-          reject(new Error('Agent did not acknowledge workflow execution'));
-        }
-      });
+          reject(new Error(`Job timeout after ${this.config.jobTimeout}ms`));
+        }, agentWorkflow.timeout || this.config.jobTimeout);
 
-      console.log(`[WorkflowWorker] Sent EXECUTE_WORKFLOW to node ${node_id}`);
+        this.pendingJobs.set(job_id, {
+          resolve: (result) => {
+            clearTimeout(timeout);
+            resolve(result);
+          },
+          reject: (error) => {
+            clearTimeout(timeout);
+            reject(error);
+          },
+          deviceResults: new Map(),
+          totalDevices: device_ids.length,
+          completedDevices: 0,
+          startTime,
+        });
+
+        const executeEvent: ExecuteWorkflowEvent = {
+          job_id,
+          workflow_id,
+          workflow: agentWorkflow,
+          device_ids,
+          params,
+        };
+
+        socket.emit(SOCKET_EVENTS.EXECUTE_WORKFLOW, executeEvent, (ack: { received: boolean }) => {
+          if (!ack?.received) {
+            this.pendingJobs.delete(job_id);
+            clearTimeout(timeout);
+            reject(new Error('Agent did not acknowledge workflow execution'));
+          }
+        });
+
+        console.log(`[WorkflowWorker] Sent EXECUTE_WORKFLOW to node ${node_id}`);
+      });
+    }
+
+    // 3. Celery 스텝만 있으면 바로 결과 반환
+    const allSuccess = celeryResults.every((r) => r.success);
+    const failedCount = celeryResults.filter((r) => !r.success).length;
+
+    const result: WorkflowJobResult = {
+      job_id,
+      total: device_ids.length,
+      success: allSuccess ? device_ids.length : device_ids.length - failedCount,
+      failed: allSuccess ? 0 : failedCount,
+      duration_ms: Date.now() - startTime,
+      device_results: device_ids.map((id) => ({
+        device_id: id,
+        success: allSuccess,
+        error: allSuccess ? undefined : celeryResults.find((r) => !r.success)?.error,
+        duration_ms: Date.now() - startTime,
+      })),
+    };
+
+    this.emit('workflow:complete', result);
+    return result;
+  }
+
+  /**
+   * 단일 Celery 스텝 실행
+   */
+  private async executeCeleryStep(
+    jobId: string,
+    step: WorkflowStep,
+    params: Record<string, unknown>,
+  ): Promise<CeleryTaskResult> {
+    if (!step.celery_task) {
+      throw new Error(`Step ${step.id} has action=celery but no celery_task specified`);
+    }
+
+    const mergedParams = { ...params, ...step.celery_params };
+
+    return this.celeryBridge.executeTask(step.celery_task, mergedParams, {
+      timeout: step.timeout || 300000,
+      onProgress: (result) => {
+        if (result.progress !== undefined) {
+          this.emit('workflow:progress', {
+            job_id: jobId,
+            device_id: 'server',
+            current_step: step.id,
+            progress: result.progress,
+            message: `Celery ${step.celery_task}: ${result.status}`,
+          });
+        }
+      },
     });
   }
 

@@ -61,58 +61,65 @@ export interface NodeUpdate {
 // 디바이스 (스마트폰)
 // ============================================
 
-export type DeviceState = 'DISCONNECTED' | 'IDLE' | 'QUEUED' | 'RUNNING' | 'ERROR' | 'QUARANTINE';
+export type DeviceStatus = 'online' | 'offline' | 'busy' | 'error';
 
 export interface Device {
   id: string;
-  node_id: string | null;
+  pc_id: string | null;
+  device_number: number | null;
   serial_number: string | null;
-  name: string | null;
-  state: DeviceState;
+  ip_address: string | null;
   model: string | null;
   android_version: string | null;
-  battery: number | null;
-  ip_address: string | null;
+  connection_type: string;
+  usb_port: number | null;
+  status: DeviceStatus;
+  battery_level: number | null;
+  last_heartbeat: string | null;
+  last_task_at: string | null;
   error_count: number;
   last_error: string | null;
-  last_workflow_id: string | null;
-  last_seen: string | null;
-  metadata: Json;
+  last_error_at: string | null;
+  management_code: string | null;
   created_at: string;
   updated_at: string;
 }
 
 export interface DeviceInsert {
   id: string;
-  node_id?: string | null;
+  pc_id?: string | null;
+  device_number?: number | null;
   serial_number?: string | null;
-  name?: string | null;
-  state?: DeviceState;
+  ip_address?: string | null;
   model?: string | null;
   android_version?: string | null;
-  battery?: number | null;
-  ip_address?: string | null;
+  connection_type?: string;
+  usb_port?: number | null;
+  status?: DeviceStatus;
+  battery_level?: number | null;
+  last_heartbeat?: string | null;
+  last_task_at?: string | null;
   error_count?: number;
   last_error?: string | null;
-  last_workflow_id?: string | null;
-  last_seen?: string | null;
-  metadata?: Json;
+  last_error_at?: string | null;
 }
 
 export interface DeviceUpdate {
-  node_id?: string | null;
+  pc_id?: string | null;
+  device_number?: number | null;
   serial_number?: string | null;
-  name?: string | null;
-  state?: DeviceState;
+  ip_address?: string | null;
   model?: string | null;
   android_version?: string | null;
-  battery?: number | null;
-  ip_address?: string | null;
+  connection_type?: string;
+  usb_port?: number | null;
+  status?: DeviceStatus;
+  battery_level?: number | null;
+  last_heartbeat?: string | null;
+  last_task_at?: string | null;
   error_count?: number;
   last_error?: string | null;
-  last_workflow_id?: string | null;
-  last_seen?: string | null;
-  metadata?: Json;
+  last_error_at?: string | null;
 }
 
 // ============================================
@@ -122,13 +129,13 @@ export interface DeviceUpdate {
 export interface DeviceStateRecord {
   id: string;
   device_id: string;
-  node_id: string | null;
-  state: DeviceState;
+  pc_id: string | null;
+  status: DeviceStatus;
   current_workflow_id: string | null;
   current_step: string | null;
   progress: number;
   error_message: string | null;
-  battery: number | null;
+  battery_level: number | null;
   last_heartbeat: string;
   updated_at: string;
 }
@@ -139,12 +146,16 @@ export interface DeviceStateRecord {
 
 export interface WorkflowStep {
   id: string;
-  action: 'autox' | 'adb' | 'wait' | 'system' | 'condition';
+  action: 'autox' | 'adb' | 'wait' | 'system' | 'condition' | 'celery';
   script?: string;
+  command?: string;
   params?: Record<string, unknown>;
+  celery_task?: string;
+  celery_params?: Record<string, unknown>;
   timeout?: number;
-  retry?: { max: number; delay: number };
-  onError?: 'continue' | 'fail' | 'skip';
+  retry?: { attempts: number; delay: number; backoff: string };
+  onError?: 'fail' | 'skip' | 'goto';
+  nextOnError?: string;
 }
 
 export interface Workflow {
@@ -326,12 +337,10 @@ export interface AlertInsert {
 
 export interface DeviceStats {
   total: number;
-  DISCONNECTED: number;
-  IDLE: number;
-  QUEUED: number;
-  RUNNING: number;
-  ERROR: number;
-  QUARANTINE: number;
+  online: number;
+  offline: number;
+  busy: number;
+  error: number;
 }
 
 export interface NodeDeviceSummary {
@@ -339,8 +348,8 @@ export interface NodeDeviceSummary {
   node_name: string | null;
   node_status: NodeStatus;
   total_devices: number;
-  idle_devices: number;
-  running_devices: number;
+  online_devices: number;
+  busy_devices: number;
   error_devices: number;
 }
 
@@ -348,8 +357,8 @@ export interface SystemOverview {
   online_nodes: number;
   total_nodes: number;
   total_devices: number;
-  idle_devices: number;
-  running_devices: number;
+  online_devices: number;
+  busy_devices: number;
   error_devices: number;
   running_workflows: number;
   unacknowledged_alerts: number;
@@ -418,19 +427,19 @@ export type Database = {
       };
     };
     Functions: {
-      get_device_state_counts: {
+      get_device_status_counts: {
         Args: Record<string, never>;
-        Returns: { state: string; count: number }[];
+        Returns: { status: string; count: number }[];
       };
       get_node_device_summary: {
-        Args: { p_node_id: string | null };
+        Args: { p_pc_id: string | null };
         Returns: NodeDeviceSummary[];
       };
       cleanup_old_data: {
         Args: Record<string, never>;
         Returns: undefined;
       };
-      update_device_state_with_error: {
+      update_device_status_with_error: {
         Args: { p_device_id: string; p_last_error: string | null };
         Returns: undefined;
       };
