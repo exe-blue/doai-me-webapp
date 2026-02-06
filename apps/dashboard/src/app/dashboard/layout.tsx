@@ -26,6 +26,8 @@ import {
   Cpu,
   UserPlus,
   PlusCircle,
+  Globe,
+  Bot,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -99,6 +101,13 @@ const navigation: NavigationGroup[] = [
     items: [
       { label: '로그', href: '/dashboard/logs', icon: ScrollText },
       { label: '설정', href: '/dashboard/settings', icon: Settings },
+    ],
+  },
+  {
+    title: '기타',
+    items: [
+      { label: '기술 소개', href: '/tech', icon: Globe },
+      { label: 'Why Not Bot', href: '/why-not-bot', icon: Bot },
     ],
   },
 ];

@@ -176,8 +176,8 @@
    ============================================= */
 
 :root {
-  --header-height: 3.5rem;
   --radius: 0.5rem;
+  --header-height: 3.5rem;
 
   --background: #fff;
   --foreground: #000;
@@ -185,20 +185,15 @@
   --card-foreground: #000;
   --popover: #fff;
   --popover-foreground: #000;
-
-  /* Primary: Yellow */
   --primary: #ffdb33;
   --primary-hover: #ffcc00;
   --primary-foreground: #000;
-
   --secondary: #000;
   --secondary-foreground: #fff;
   --muted: #cccccc;
   --muted-foreground: #5a5a5a;
-
   --accent: #fae583;
   --accent-foreground: #000;
-
   --destructive: #e63946;
   --destructive-foreground: #fff;
   --border: #000;
@@ -211,14 +206,12 @@
   --chart-4: #000;
   --chart-5: #5a5a5a;
 
-  /* Aurora colors */
   --color-1: #ffdb33;
   --color-2: #fae583;
   --color-3: #e63946;
   --color-4: #000;
   --color-5: #5a5a5a;
 
-  /* Sidebar */
   --sidebar: #fafafa;
   --sidebar-foreground: #000;
   --sidebar-primary: #ffdb33;
@@ -229,7 +222,6 @@
   --sidebar-ring: #ffdb33;
 }
 
-/* Dark Mode */
 .dark {
   --background: #1a1a1a;
   --foreground: #f5f5f5;
@@ -237,19 +229,15 @@
   --card-foreground: #f5f5f5;
   --popover: #242424;
   --popover-foreground: #f5f5f5;
-
   --primary: #ffdb33;
   --primary-hover: #ffcc00;
   --primary-foreground: #000;
-
   --secondary: #3a3a3a;
   --secondary-foreground: #f5f5f5;
   --muted: #3f3f46;
   --muted-foreground: #a0a0a0;
-
   --accent: #fae583;
   --accent-foreground: #000;
-
   --destructive: #e63946;
   --destructive-foreground: #fff;
   --border: #5c5c5c;
@@ -262,7 +250,6 @@
   --chart-4: #f5f5f5;
   --chart-5: #a0a0a0;
 
-  /* Sidebar - Dark */
   --sidebar: #141414;
   --sidebar-foreground: #f5f5f5;
   --sidebar-primary: #ffdb33;
