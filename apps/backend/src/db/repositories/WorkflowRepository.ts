@@ -190,8 +190,11 @@ export class WorkflowRepository {
         throw rpcError;
       }
 
-      // RPC returns the new version
-      return data as number;
+      // RPC returns the new version as array of {version}
+      if (Array.isArray(data) && data.length > 0) {
+        return (data[0] as { version: number }).version;
+      }
+      return data as unknown as number;
     } catch {
       // If RPC call throws, try fallback
       return await this.incrementVersionFallback(id);

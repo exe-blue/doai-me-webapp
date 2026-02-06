@@ -405,7 +405,7 @@ export class AdbController {
       }
     }
 
-    logger.info('WiFi ADB enabled for %d/%d devices', results.length, devices.length);
+    logger.info(`WiFi ADB enabled for ${results.length}/${devices.length} devices`);
     return results;
   }
 

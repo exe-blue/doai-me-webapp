@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from core.config import settings
-from routers import pcs_router, devices_router, tasks_router, health_router
+from routers import pcs_router, devices_router, tasks_router, health_router, appium_router
 
 # 로깅 설정
 logging.basicConfig(
@@ -80,6 +80,7 @@ app.include_router(health_router)
 app.include_router(pcs_router)
 app.include_router(devices_router)
 app.include_router(tasks_router)
+app.include_router(appium_router)
 
 
 # 루트 엔드포인트

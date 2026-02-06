@@ -250,7 +250,7 @@ export class NodeRepository {
    */
   async getNodeDeviceSummary(nodeId?: string): Promise<NodeDeviceSummary[]> {
     const { data, error } = await this.db.rpc('get_node_device_summary', {
-      p_node_id: nodeId || null,
+      p_pc_id: nodeId || null,
     });
 
     if (error) throw error;

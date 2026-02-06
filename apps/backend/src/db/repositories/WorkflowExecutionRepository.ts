@@ -5,16 +5,17 @@
  */
 
 import { getSupabase } from '../supabase';
-import type { 
-  WorkflowExecution, 
-  WorkflowExecutionInsert, 
+import type {
+  WorkflowExecution,
+  WorkflowExecutionInsert,
   WorkflowExecutionUpdate,
   ExecutionStatus,
   ExecutionLog,
   ExecutionLogInsert,
   LogLevel,
   LogStatus,
-  Workflow
+  Workflow,
+  Json
 } from '../types';
 
 // 실행 + 워크플로우 + 디바이스 조인 타입
@@ -110,7 +111,7 @@ export class WorkflowExecutionRepository {
       .limit(limit);
 
     if (error) throw error;
-    return (data || []) as ExecutionWithDetails[];
+    return (data || []) as unknown as ExecutionWithDetails[];
   }
 
   /**
@@ -162,7 +163,7 @@ export class WorkflowExecutionRepository {
     extra?: {
       current_step?: string;
       progress?: number;
-      result?: unknown;
+      result?: Json | null;
       error_message?: string;
       completed_devices?: number;
       failed_devices?: number;

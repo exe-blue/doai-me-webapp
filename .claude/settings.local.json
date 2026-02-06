@@ -65,7 +65,19 @@
       "mcp__claude_ai_Vercel__get_deployment",
       "Bash(git pull:*)",
       "mcp__claude_ai_Vercel__get_project",
-      "Bash(git stash:*)"
+      "Bash(git stash:*)",
+      "Bash(npm view:*)",
+      "Bash(python3:*)",
+      "Bash(for key in vultr id_ed25519 id_rsa)",
+      "Bash(do echo \"=== Trying $key ===\")",
+      "Bash(xargs basename:*)",
+      "Bash(git -C /mnt/c/Users/ChoiJoonho/doai-me-webapp diff --name-only -- apps/dashboard/ package-lock.json)",
+      "Bash(fi)",
+      "Bash(git -C /mnt/c/Users/ChoiJoonho/doai-me-webapp diff --cached --stat)",
+      "Bash(git -C /mnt/c/Users/ChoiJoonho/doai-me-webapp reset HEAD:*)",
+      "Bash(git -C /mnt/c/Users/ChoiJoonho/doai-me-webapp diff --cached --name-only)",
+      "Bash(git -C /mnt/c/Users/ChoiJoonho/doai-me-webapp push origin main)",
+      "Bash(npm run dev:next:*)"
     ]
   }
 }

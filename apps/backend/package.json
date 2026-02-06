@@ -8,7 +8,8 @@
     "start": "node dist/socket_service.js",
     "dev": "ts-node socket_service.ts",
     "test:latency": "ts-node latency_test.ts",
-    "test": "npm run test:latency",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "socketio": "node socketio-server.js",
     "socketio:dev": "nodemon socketio-server.js",
     "worker": "node workers/workflowWorker.js",
@@ -22,8 +23,9 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@doai/shared": "file:../../packages/shared",
     "@socket.io/redis-adapter": "^8.3.0",
-    "@supabase/supabase-js": "^2.93.3",
+    "@supabase/supabase-js": "^2.95.3",
     "bullmq": "^5.0.0",
     "cors": "^2.8.6",
     "dotenv": "^16.6.1",
@@ -42,6 +44,7 @@
     "@types/ws": "^8.5.10",
     "nodemon": "^3.0.1",
     "ts-node": "^10.9.2",
-    "typescript": "^5.5.0"
+    "typescript": "^5.5.0",
+    "vitest": "^4.0.18"
   }
 }

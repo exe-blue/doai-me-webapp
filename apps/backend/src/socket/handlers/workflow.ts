@@ -67,7 +67,7 @@ export function registerWorkflowHandlers(
     try {
       // Redis 상태 업데이트
       await stateManager.updateDeviceState(device_id, {
-        state: 'RUNNING',
+        status: 'busy',
         workflow_id: job_id,
         current_step,
         progress,
@@ -95,7 +95,7 @@ export function registerWorkflowHandlers(
       // Redis 상태 업데이트
       if (success) {
         await stateManager.updateDeviceState(device_id, {
-          state: 'COMPLETED',
+          status: 'online',
           workflow_id: undefined,
           current_step: undefined,
           progress: 100,
@@ -105,7 +105,7 @@ export function registerWorkflowHandlers(
         setTimeout(async () => {
           try {
             await stateManager.updateDeviceState(device_id, {
-              state: 'IDLE',
+              status: 'online',
             });
           } catch (e) {
             console.error('[WorkflowHandler] Failed to set IDLE:', e);
@@ -113,7 +113,7 @@ export function registerWorkflowHandlers(
         }, 1000);
       } else {
         await stateManager.updateDeviceState(device_id, {
-          state: 'ERROR',
+          status: 'error',
           error_message: error,
         });
       }
@@ -139,7 +139,7 @@ export function registerWorkflowHandlers(
     try {
       // Redis 상태 업데이트
       await stateManager.updateDeviceState(device_id, {
-        state: 'ERROR',
+        status: 'error',
         error_message: `Step ${step_id}: ${error}`,
         error_count: retry_count,
       });

@@ -34,6 +34,11 @@
       "types": "./dist/constants.d.ts",
       "import": "./dist/constants.js",
       "require": "./dist/constants.js"
+    },
+    "./database": {
+      "types": "./dist/database.d.ts",
+      "import": "./dist/database.js",
+      "require": "./dist/database.js"
     }
   },
   "scripts": {
@@ -45,6 +50,16 @@
   "devDependencies": {
     "rimraf": "^5.0.0",
     "typescript": "^5.0.0"
+  },
+  "typesVersions": {
+    "*": {
+      "database": ["dist/database.d.ts"],
+      "types": ["dist/types.d.ts"],
+      "api": ["dist/api.d.ts"],
+      "socket": ["dist/socket.d.ts"],
+      "queue": ["dist/queue.d.ts"],
+      "constants": ["dist/constants.d.ts"]
+    }
   },
   "files": [
     "dist",
