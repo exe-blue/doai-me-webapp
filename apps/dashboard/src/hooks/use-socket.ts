@@ -32,8 +32,12 @@ const SOCKET_SERVER_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhos
 // Strict naming convention: P01-001, P02-015 etc.
 const VALID_PC_ID_PATTERN = /^P\d{1,2}-\d{3}$/;
 
-export function useSocket(options: SocketHookOptions = {}) {
-  const { autoConnect = true } = options;
+interface UseSocketOptions extends SocketHookOptions {
+  authToken?: string | null;
+}
+
+export function useSocket(options: UseSocketOptions = {}) {
+  const { autoConnect = true, authToken } = options;
   const socketRef = useRef<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [devices, setDevices] = useState<Device[]>([]);
@@ -83,7 +87,8 @@ export function useSocket(options: SocketHookOptions = {}) {
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionAttempts: 5,
-      reconnectionDelay: TIMING.RECONNECT_DELAY
+      reconnectionDelay: TIMING.RECONNECT_DELAY,
+      ...(authToken ? { auth: { token: authToken } } : {}),
     });
 
     socketRef.current = socket;
@@ -174,7 +179,7 @@ export function useSocket(options: SocketHookOptions = {}) {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [autoConnect]);
+  }, [autoConnect, authToken]);
 
   // Start streaming for a device
   const startStream = useCallback((deviceId: string, onFrame: (frame: StreamFrame) => void) => {
