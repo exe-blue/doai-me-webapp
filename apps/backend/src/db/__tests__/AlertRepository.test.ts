@@ -33,11 +33,9 @@ import { AlertRepository } from '../repositories/AlertRepository';
 const MOCK_ALERT: Alert = {
   id: 1,
   level: 'warning',
-  title: 'Device Offline',
   message: 'Device device-001 has been offline for 5 minutes',
   source: 'device-monitor',
-  device_id: 'device-001',
-  node_id: null,
+  data: {},
   acknowledged: false,
   acknowledged_at: null,
   acknowledged_by: null,
