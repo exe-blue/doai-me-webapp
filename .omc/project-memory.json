@@ -196,9 +196,39 @@
   },
   "hotPaths": [
     {
+      "path": "apps/dashboard/src/app/dashboard/register/page.tsx",
+      "accessCount": 34,
+      "lastAccessed": 1770398893797,
+      "type": "file"
+    },
+    {
+      "path": "apps/dashboard/src/app/dashboard/layout.tsx",
+      "accessCount": 19,
+      "lastAccessed": 1770399164815,
+      "type": "file"
+    },
+    {
+      "path": "",
+      "accessCount": 18,
+      "lastAccessed": 1770398182988,
+      "type": "directory"
+    },
+    {
       "path": "apps/backend/socketio-server.js",
       "accessCount": 10,
       "lastAccessed": 1770396755300,
+      "type": "directory"
+    },
+    {
+      "path": "apps/dashboard/src/components/layout/app-sidebar.tsx",
+      "accessCount": 9,
+      "lastAccessed": 1770398137148,
+      "type": "file"
+    },
+    {
+      "path": "apps/dashboard/src",
+      "accessCount": 7,
+      "lastAccessed": 1770397398329,
       "type": "directory"
     },
     {
@@ -208,10 +238,16 @@
       "type": "directory"
     },
     {
-      "path": "apps/dashboard/src",
-      "accessCount": 5,
-      "lastAccessed": 1770396783618,
-      "type": "directory"
+      "path": "apps/dashboard/src/hooks/use-socket.ts",
+      "accessCount": 4,
+      "lastAccessed": 1770397265980,
+      "type": "file"
+    },
+    {
+      "path": "apps/dashboard/src/app/dashboard/videos/page.tsx",
+      "accessCount": 4,
+      "lastAccessed": 1770397564465,
+      "type": "file"
     },
     {
       "path": "apps/dashboard/Dockerfile",
@@ -220,15 +256,33 @@
       "type": "file"
     },
     {
-      "path": "apps/dashboard/src/app/dashboard/layout.tsx",
+      "path": "apps/dashboard/src/app/api/videos/route.ts",
       "accessCount": 3,
-      "lastAccessed": 1770396940448,
+      "lastAccessed": 1770397293675,
       "type": "file"
     },
     {
-      "path": "apps/dashboard/src/hooks/use-socket.ts",
+      "path": "apps/dashboard/src/components/ui/slider.tsx",
       "accessCount": 3,
-      "lastAccessed": 1770396948369,
+      "lastAccessed": 1770397386077,
+      "type": "file"
+    },
+    {
+      "path": "apps/dashboard/src/lib/supabase.ts",
+      "accessCount": 3,
+      "lastAccessed": 1770397416102,
+      "type": "directory"
+    },
+    {
+      "path": "apps/dashboard/src/components/ui/switch.tsx",
+      "accessCount": 3,
+      "lastAccessed": 1770397489090,
+      "type": "file"
+    },
+    {
+      "path": "apps/dashboard/src/app/dashboard/jobs/page.tsx",
+      "accessCount": 3,
+      "lastAccessed": 1770398206543,
       "type": "file"
     },
     {
@@ -244,12 +298,6 @@
       "type": "file"
     },
     {
-      "path": "",
-      "accessCount": 2,
-      "lastAccessed": 1770396725370,
-      "type": "directory"
-    },
-    {
       "path": "apps/dashboard/src/app/globals.css",
       "accessCount": 2,
       "lastAccessed": 1770396764002,
@@ -262,39 +310,27 @@
       "type": "file"
     },
     {
-      "path": "apps/dashboard/src/app/dashboard/videos/page.tsx",
+      "path": "apps/dashboard/src/contexts/socket-context.tsx",
       "accessCount": 2,
-      "lastAccessed": 1770396930886,
+      "lastAccessed": 1770397269987,
       "type": "file"
     },
     {
-      "path": "apps/dashboard/src/app/dashboard/register/page.tsx",
+      "path": "packages/shared/package.json",
       "accessCount": 2,
-      "lastAccessed": 1770396931293,
+      "lastAccessed": 1770397423094,
       "type": "file"
     },
     {
-      "path": "apps/dashboard/src/components/layout/app-sidebar.tsx",
+      "path": "packages/shared/src/database.ts",
       "accessCount": 2,
-      "lastAccessed": 1770396932145,
+      "lastAccessed": 1770397443635,
       "type": "file"
     },
     {
-      "path": "apps/dashboard/src/components/ui/slider.tsx",
+      "path": "apps/dashboard/src/components/jobs/job-card.tsx",
       "accessCount": 2,
-      "lastAccessed": 1770396941231,
-      "type": "file"
-    },
-    {
-      "path": "apps/dashboard/src/components/ui/switch.tsx",
-      "accessCount": 2,
-      "lastAccessed": 1770396941537,
-      "type": "file"
-    },
-    {
-      "path": "apps/dashboard/src/app/api/videos/route.ts",
-      "accessCount": 2,
-      "lastAccessed": 1770396947787,
+      "lastAccessed": 1770398212134,
       "type": "file"
     },
     {
@@ -358,21 +394,9 @@
       "type": "file"
     },
     {
-      "path": "apps/dashboard/src/contexts/socket-context.tsx",
-      "accessCount": 1,
-      "lastAccessed": 1770396762377,
-      "type": "file"
-    },
-    {
       "path": "apps/dashboard/src/app/api/jobs/route.ts",
       "accessCount": 1,
       "lastAccessed": 1770396763432,
-      "type": "file"
-    },
-    {
-      "path": "apps/dashboard/src/app/dashboard/jobs/page.tsx",
-      "accessCount": 1,
-      "lastAccessed": 1770396764747,
       "type": "file"
     },
     {
@@ -406,12 +430,6 @@
       "type": "file"
     },
     {
-      "path": "packages/shared/package.json",
-      "accessCount": 1,
-      "lastAccessed": 1770396786728,
-      "type": "file"
-    },
-    {
       "path": "packages/shared/src/types.ts",
       "accessCount": 1,
       "lastAccessed": 1770396789983,
@@ -430,9 +448,51 @@
       "type": "file"
     },
     {
-      "path": "packages/shared/src/database.ts",
+      "path": "apps/dashboard/src/components/ui/pagination.tsx",
       "accessCount": 1,
-      "lastAccessed": 1770396792097,
+      "lastAccessed": 1770397273079,
+      "type": "file"
+    },
+    {
+      "path": "apps/dashboard/src/lib/api-utils.ts",
+      "accessCount": 1,
+      "lastAccessed": 1770397297261,
+      "type": "file"
+    },
+    {
+      "path": "apps/dashboard/src/components/ui/skeleton.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1770397301230,
+      "type": "file"
+    },
+    {
+      "path": "apps/dashboard/src/components/video/video-kpi-strip.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1770397477078,
+      "type": "file"
+    },
+    {
+      "path": "apps/dashboard/src/components/jobs/index.ts",
+      "accessCount": 1,
+      "lastAccessed": 1770398153682,
+      "type": "file"
+    },
+    {
+      "path": "apps/dashboard/src/app/dashboard/logs/page.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1770398154354,
+      "type": "file"
+    },
+    {
+      "path": "apps/dashboard/src/components/jobs/job-create-modal.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1770398170849,
+      "type": "file"
+    },
+    {
+      "path": "apps/dashboard/src/components/jobs/log-drawer.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1770398171262,
       "type": "file"
     }
   ],

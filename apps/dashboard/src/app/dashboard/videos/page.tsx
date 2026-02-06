@@ -17,6 +17,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
+import { CommentsDialog } from "@/components/video/comments-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -113,6 +114,10 @@ export default function VideosPage() {
 
   // Socket for device data
   const { devices } = useSocketContext();
+
+  // Comments dialog
+  const [commentsVideoId, setCommentsVideoId] = useState<string | null>(null);
+  const [commentsVideoTitle, setCommentsVideoTitle] = useState("");
 
   // 새 영상 등록 폼
   const [newVideo, setNewVideo] = useState({
@@ -505,6 +510,7 @@ export default function VideosPage() {
               <TableHead>검색 키워드</TableHead>
               <TableHead>진행률</TableHead>
               <TableHead>시청시간</TableHead>
+              <TableHead className="w-[50px]"></TableHead>
               <TableHead>상태</TableHead>
               <TableHead>우선순위</TableHead>
               <TableHead>등록방법</TableHead>
@@ -514,13 +520,13 @@ export default function VideosPage() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                   로딩중...
                 </TableCell>
               </TableRow>
             ) : videos.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                   등록된 영상이 없습니다
                 </TableCell>
               </TableRow>
@@ -575,6 +581,22 @@ export default function VideosPage() {
                       : video.watch_duration_sec
                         ? `${video.watch_duration_sec}초`
                         : "60초"}
+                  </TableCell>
+
+                  {/* 댓글 */}
+                  <TableCell>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCommentsVideoId(video.id);
+                        setCommentsVideoTitle(video.title || video.id);
+                      }}
+                      aria-label="댓글 보기"
+                    >
+                      <MessageSquare className="h-4 w-4" />
+                    </Button>
                   </TableCell>
 
                   {/* 상태 */}
@@ -667,6 +689,16 @@ export default function VideosPage() {
           </TableBody>
         </Table>
       </div>
+
+      {/* Comments Dialog */}
+      <CommentsDialog
+        videoId={commentsVideoId || ''}
+        videoTitle={commentsVideoTitle}
+        open={!!commentsVideoId}
+        onOpenChange={(open) => {
+          if (!open) setCommentsVideoId(null);
+        }}
+      />
 
       {/* Pagination */}
       {totalPages > 1 && (

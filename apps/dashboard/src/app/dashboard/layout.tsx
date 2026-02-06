@@ -1,5 +1,9 @@
 'use client';
 
+import { useState } from 'react';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+import { makeQueryClient } from '@/lib/query-client';
 import { SocketProvider } from '@/contexts/socket-context';
 import { SidebarProvider } from '@/components/layout/sidebar-context';
 import { AppSidebar, type NavigationGroup } from '@/components/layout/app-sidebar';
@@ -115,35 +119,40 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return (
-    <SocketProvider>
-      <SidebarProvider>
-        <div className="flex h-screen overflow-hidden bg-background">
-          {/* Sidebar */}
-          <AppSidebar
-            navigation={navigation}
-            logo={
-              <Link href="/dashboard" className="flex items-center gap-2">
-                <span className="font-head text-lg font-bold text-sidebar-foreground">DoAi.Me</span>
-              </Link>
-            }
-          />
+  const [queryClient] = useState(() => makeQueryClient());
 
-          {/* Main content area */}
-          <div className="flex flex-1 flex-col overflow-hidden">
-            {/* Header */}
-            <Header
-              showSearch={false}
-              showNotifications={true}
+  return (
+    <QueryClientProvider client={queryClient}>
+      <SocketProvider>
+        <SidebarProvider>
+          <div className="flex h-screen overflow-hidden bg-background">
+            {/* Sidebar */}
+            <AppSidebar
+              navigation={navigation}
+              logo={
+                <Link href="/dashboard" className="flex items-center gap-2">
+                  <span className="font-head text-lg font-bold text-sidebar-foreground">DoAi.Me</span>
+                </Link>
+              }
             />
 
-            {/* Page content */}
-            <main id="main-content" className="flex-1 overflow-y-auto p-4 bg-background">
-              {children}
-            </main>
+            {/* Main content area */}
+            <div className="flex flex-1 flex-col overflow-hidden">
+              {/* Header */}
+              <Header
+                showSearch={false}
+                showNotifications={true}
+              />
+
+              {/* Page content */}
+              <main id="main-content" className="flex-1 overflow-y-auto p-4 bg-background">
+                {children}
+              </main>
+            </div>
           </div>
-        </div>
-      </SidebarProvider>
-    </SocketProvider>
+        </SidebarProvider>
+      </SocketProvider>
+      <ReactQueryDevtools initialIsOpen={false} />
+    </QueryClientProvider>
   );
 }

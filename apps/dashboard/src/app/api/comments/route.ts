@@ -21,10 +21,52 @@ export async function GET(request: NextRequest) {
 
     const jobId = searchParams.get('job_id');
     const deviceId = searchParams.get('device_id');
+    const videoId = searchParams.get('video_id');
+
+    // Support video_id: look up most recent job for this video
+    if (videoId && !jobId) {
+      const { data: job } = await supabase
+        .from('jobs')
+        .select('id')
+        .eq('video_id', videoId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (!job) {
+        return NextResponse.json({ success: true, comments: [], total_unused: 0 });
+      }
+
+      // Query comments for this job
+      const showAll = searchParams.get('all') === 'true';
+      let query = supabase
+        .from('comments')
+        .select('*', { count: 'exact' })
+        .eq('job_id', job.id)
+        .order('created_at', { ascending: true });
+
+      if (!showAll) {
+        query = query.eq('is_used', false).limit(10);
+      } else {
+        query = query.limit(50);
+      }
+
+      const { data: comments, error, count } = await query;
+
+      if (error) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      return NextResponse.json({
+        success: true,
+        comments: comments || [],
+        total_unused: count,
+      });
+    }
 
     if (!jobId) {
       return NextResponse.json(
-        { error: 'job_id is required' },
+        { error: 'job_id or video_id is required' },
         { status: 400 }
       );
     }

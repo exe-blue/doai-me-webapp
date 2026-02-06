@@ -6,35 +6,23 @@ import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import {
-  Settings,
   Wifi,
   Server,
-  ThumbsUp,
-  MessageSquare,
-  UserPlus,
-  Clock,
   Save,
   RotateCcw,
   CheckCircle2,
+  ArrowRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSocketContext } from '@/contexts/socket-context';
 import { cn } from '@/lib/utils';
+import Link from 'next/link';
 
 interface GlobalSettings {
   // Connection Settings
   socketUrl: string;
   autoReconnect: boolean;
   heartbeatInterval: number;
-
-  // Default Probabilities
-  defaultLikeRate: number;
-  defaultCommentRate: number;
-  defaultSubscribeRate: number;
-
-  // Default Duration
-  defaultMinDuration: number;
-  defaultMaxDuration: number;
 
   // Device Settings
   defaultResolutionWidth: number;
@@ -47,13 +35,6 @@ const DEFAULT_SETTINGS: GlobalSettings = {
   socketUrl: 'http://localhost:3001',
   autoReconnect: true,
   heartbeatInterval: 5000,
-
-  defaultLikeRate: 30,
-  defaultCommentRate: 5,
-  defaultSubscribeRate: 10,
-
-  defaultMinDuration: 60,
-  defaultMaxDuration: 180,
 
   defaultResolutionWidth: 1080,
   defaultResolutionHeight: 2340,
@@ -89,7 +70,14 @@ export default function SettingsPage() {
   };
 
   const saveSettings = () => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+    // Merge with existing stored data (watch settings etc.)
+    try {
+      const existing = localStorage.getItem(STORAGE_KEY);
+      const merged = existing ? { ...JSON.parse(existing), ...settings } : settings;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+    } catch {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+    }
     setHasChanges(false);
     setSaved(true);
     toast.success('설정이 저장되었습니다');
@@ -157,6 +145,17 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      {/* Watch settings callout */}
+      <Link
+        href="/dashboard/watch-settings"
+        className="flex items-center justify-between rounded-md border-2 border-primary/50 bg-primary/10 px-4 py-3 hover:bg-primary/20 transition-colors"
+      >
+        <span className="font-sans text-sm text-foreground">
+          시청 설정은 <span className="font-bold">시청설정</span> 페이지로 이동되었습니다
+        </span>
+        <ArrowRight className="h-4 w-4 text-foreground" />
+      </Link>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Connection Settings */}
         <div className="rounded-md border border-border bg-background overflow-hidden">
@@ -213,117 +212,6 @@ export default function SettingsPage() {
                 className="font-sans text-sm bg-card border-border focus:border-border"
               />
             </div>
-          </div>
-        </div>
-
-        {/* Default Probabilities */}
-        <div className="rounded-md border border-border bg-background overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card/50">
-            <div className="flex items-center gap-3">
-              <Settings className="h-4 w-4 text-green-500" />
-              <span className="font-sans text-sm font-bold text-foreground">DEFAULT_PROBABILITIES</span>
-            </div>
-          </div>
-
-          <div className="p-4 space-y-4">
-            {/* Default Like Rate */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <ThumbsUp className="h-4 w-4 text-blue-500" />
-                  <span className="font-sans text-xs text-muted-foreground">Default Like Rate</span>
-                </div>
-                <span className="font-sans text-sm text-foreground">{settings.defaultLikeRate}%</span>
-              </div>
-              <Slider
-                value={[settings.defaultLikeRate]}
-                onValueChange={(v) => updateSetting('defaultLikeRate', v[0])}
-                max={100}
-                step={5}
-                className="w-full"
-              />
-            </div>
-
-            {/* Default Comment Rate */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <MessageSquare className="h-4 w-4 text-green-500" />
-                  <span className="font-sans text-xs text-muted-foreground">Default Comment Rate</span>
-                </div>
-                <span className="font-sans text-sm text-foreground">{settings.defaultCommentRate}%</span>
-              </div>
-              <Slider
-                value={[settings.defaultCommentRate]}
-                onValueChange={(v) => updateSetting('defaultCommentRate', v[0])}
-                max={100}
-                step={5}
-                className="w-full"
-              />
-            </div>
-
-            {/* Default Subscribe Rate */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <UserPlus className="h-4 w-4 text-red-500" />
-                  <span className="font-sans text-xs text-muted-foreground">Default Subscribe Rate</span>
-                </div>
-                <span className="font-sans text-sm text-foreground">{settings.defaultSubscribeRate}%</span>
-              </div>
-              <Slider
-                value={[settings.defaultSubscribeRate]}
-                onValueChange={(v) => updateSetting('defaultSubscribeRate', v[0])}
-                max={100}
-                step={5}
-                className="w-full"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Default Duration Settings */}
-        <div className="rounded-md border border-border bg-background overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card/50">
-            <div className="flex items-center gap-3">
-              <Clock className="h-4 w-4 text-yellow-500" />
-              <span className="font-sans text-sm font-bold text-foreground">DEFAULT_DURATION</span>
-            </div>
-          </div>
-
-          <div className="p-4 space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="flex-1">
-                <label className="font-sans text-[10px] text-muted-foreground uppercase block mb-2">
-                  Min Duration (seconds)
-                </label>
-                <Input
-                  type="number"
-                  min={10}
-                  max={settings.defaultMaxDuration}
-                  value={settings.defaultMinDuration}
-                  onChange={(e) => updateSetting('defaultMinDuration', parseInt(e.target.value) || 60)}
-                  className="font-sans text-sm bg-card border-border focus:border-border"
-                />
-              </div>
-              <span className="font-sans text-muted-foreground mt-6">~</span>
-              <div className="flex-1">
-                <label className="font-sans text-[10px] text-muted-foreground uppercase block mb-2">
-                  Max Duration (seconds)
-                </label>
-                <Input
-                  type="number"
-                  min={settings.defaultMinDuration}
-                  max={600}
-                  value={settings.defaultMaxDuration}
-                  onChange={(e) => updateSetting('defaultMaxDuration', parseInt(e.target.value) || 180)}
-                  className="font-sans text-sm bg-card border-border focus:border-border"
-                />
-              </div>
-            </div>
-            <p className="font-sans text-[10px] text-muted-foreground">
-              Default watch duration range for new jobs
-            </p>
           </div>
         </div>
 

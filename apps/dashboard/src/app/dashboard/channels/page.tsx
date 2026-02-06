@@ -12,6 +12,7 @@ import {
   Play,
   Pause,
   Users,
+  Bell,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,7 +51,6 @@ import { Badge } from "@/components/ui/badge";
 import { StatsCard } from "@/components/ui/stats-card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Slider } from "@/components/ui/slider";
 import {
   Sheet,
   SheetContent,
@@ -59,6 +59,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { WatchSettingsReadonly } from "@/components/watch-settings/watch-settings-readonly";
 
 interface Channel {
   id: string;
@@ -69,7 +70,8 @@ interface Channel {
   subscriber_count: string;
   video_count: number;
   auto_collect: boolean;
-  collect_interval_hours: number;
+  push_status: 'active' | 'pending' | 'expired' | 'none';
+  push_expires_at: string | null;
   last_collected_at: string | null;
   default_watch_duration_sec: number;
   default_prob_like: number;
@@ -131,11 +133,6 @@ export default function ChannelsPage() {
   const [newChannel, setNewChannel] = useState({
     url: "",
     auto_collect: true,
-    collect_interval_hours: 24,
-    default_watch_duration_sec: 60,
-    default_prob_like: 0,
-    default_prob_comment: 0,
-    default_prob_subscribe: 0,
   });
 
   useEffect(() => {
@@ -215,11 +212,6 @@ export default function ChannelsPage() {
         name: channelHandle,
         handle: channelHandle,
         auto_collect: newChannel.auto_collect,
-        collect_interval_hours: newChannel.collect_interval_hours,
-        default_watch_duration_sec: newChannel.default_watch_duration_sec,
-        default_prob_like: newChannel.default_prob_like,
-        default_prob_comment: newChannel.default_prob_comment,
-        default_prob_subscribe: newChannel.default_prob_subscribe,
         status: "active",
       });
 
@@ -236,11 +228,6 @@ export default function ChannelsPage() {
       setNewChannel({
         url: "",
         auto_collect: true,
-        collect_interval_hours: 24,
-        default_watch_duration_sec: 60,
-        default_prob_like: 0,
-        default_prob_comment: 0,
-        default_prob_subscribe: 0,
       });
       fetchChannels();
     } catch {
@@ -382,90 +369,8 @@ export default function ChannelsPage() {
                 />
               </div>
 
-              {/* 수집 주기 */}
-              {newChannel.auto_collect && (
-                <div className="space-y-2">
-                  <Label>수집 주기: {newChannel.collect_interval_hours}시간마다</Label>
-                  <Slider
-                    value={[newChannel.collect_interval_hours]}
-                    onValueChange={([v]) =>
-                      setNewChannel({ ...newChannel, collect_interval_hours: v })
-                    }
-                    min={1}
-                    max={72}
-                    step={1}
-                  />
-                </div>
-              )}
-
-              {/* 기본 시청 설정 */}
-              <div className="space-y-4 rounded-lg border border-border p-4">
-                <h4 className="font-medium font-head text-foreground">기본 시청 설정</h4>
-                <p className="text-xs text-muted-foreground">
-                  이 채널에서 수집된 영상에 적용될 기본값
-                </p>
-
-                <div className="space-y-2">
-                  <Label>시청 시간: {newChannel.default_watch_duration_sec}초</Label>
-                  <Slider
-                    value={[newChannel.default_watch_duration_sec]}
-                    onValueChange={([v]) =>
-                      setNewChannel({ ...newChannel, default_watch_duration_sec: v })
-                    }
-                    min={30}
-                    max={600}
-                    step={10}
-                  />
-                </div>
-
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-muted-foreground">좋아요 %</Label>
-                    <Input
-                      type="number"
-                      min={0}
-                      max={100}
-                      value={newChannel.default_prob_like}
-                      onChange={(e) =>
-                        setNewChannel({
-                          ...newChannel,
-                          default_prob_like: Math.min(100, Number(e.target.value) || 0),
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-muted-foreground">댓글 %</Label>
-                    <Input
-                      type="number"
-                      min={0}
-                      max={100}
-                      value={newChannel.default_prob_comment}
-                      onChange={(e) =>
-                        setNewChannel({
-                          ...newChannel,
-                          default_prob_comment: Math.min(100, Number(e.target.value) || 0),
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-muted-foreground">구독 %</Label>
-                    <Input
-                      type="number"
-                      min={0}
-                      max={100}
-                      value={newChannel.default_prob_subscribe}
-                      onChange={(e) =>
-                        setNewChannel({
-                          ...newChannel,
-                          default_prob_subscribe: Math.min(100, Number(e.target.value) || 0),
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-              </div>
+              {/* 글로벌 기본값 표시 */}
+              <WatchSettingsReadonly />
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
@@ -518,6 +423,7 @@ export default function ChannelsPage() {
               <TableHead className="w-[300px]">채널</TableHead>
               <TableHead>구독자</TableHead>
               <TableHead>자동 수집</TableHead>
+              <TableHead>알림</TableHead>
               <TableHead>마지막 수집</TableHead>
               <TableHead>상태</TableHead>
               <TableHead className="w-[50px]"></TableHead>
@@ -526,13 +432,13 @@ export default function ChannelsPage() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                   로딩중...
                 </TableCell>
               </TableRow>
             ) : filteredChannels.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                   등록된 채널이 없습니다
                 </TableCell>
               </TableRow>
@@ -580,6 +486,30 @@ export default function ChannelsPage() {
                         toggleAutoCollect(channel.id, checked)
                       }
                     />
+                  </TableCell>
+
+                  {/* 푸시 알림 상태 */}
+                  <TableCell>
+                    {(() => {
+                      const ps = channel.push_status || 'none';
+                      const pushStyles: Record<string, string> = {
+                        active: 'bg-green-400 text-green-900 border-green-900',
+                        pending: 'bg-yellow-400 text-yellow-900 border-yellow-900',
+                        expired: 'bg-red-400 text-red-900 border-red-900',
+                        none: 'bg-gray-300 text-gray-700 border-gray-700',
+                      };
+                      const pushLabels: Record<string, string> = {
+                        active: 'PUSH 활성',
+                        pending: '대기중',
+                        expired: '만료',
+                        none: '미설정',
+                      };
+                      return (
+                        <Badge className={`${pushStyles[ps]} border-2 font-bold text-[10px]`}>
+                          {pushLabels[ps]}
+                        </Badge>
+                      );
+                    })()}
                   </TableCell>
 
                   {/* 마지막 수집 */}
@@ -729,7 +659,7 @@ export default function ChannelsPage() {
                       <div>
                         <div className="font-medium text-foreground">자동 수집</div>
                         <div className="text-xs text-muted-foreground">
-                          {selectedChannel.collect_interval_hours}시간마다 수집
+                          새 영상 업로드 시 자동 등록
                         </div>
                       </div>
                       <Switch
@@ -740,19 +670,44 @@ export default function ChannelsPage() {
                       />
                     </div>
 
+                    {/* Push notification status */}
                     <div className="rounded-lg border border-border p-4 space-y-2">
-                      <div className="text-sm font-medium text-foreground">기본 시청 설정</div>
-                      <div className="grid grid-cols-2 gap-2 text-sm">
-                        <div className="text-muted-foreground">시청 시간</div>
-                        <div className="text-foreground">{selectedChannel.default_watch_duration_sec}초</div>
-                        <div className="text-muted-foreground">좋아요 확률</div>
-                        <div className="text-foreground">{selectedChannel.default_prob_like}%</div>
-                        <div className="text-muted-foreground">댓글 확률</div>
-                        <div className="text-foreground">{selectedChannel.default_prob_comment}%</div>
-                        <div className="text-muted-foreground">구독 확률</div>
-                        <div className="text-foreground">{selectedChannel.default_prob_subscribe}%</div>
+                      <div className="flex items-center gap-2">
+                        <Bell className="h-4 w-4 text-blue-500" />
+                        <span className="text-sm font-medium text-foreground">Push 알림</span>
                       </div>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div className="text-muted-foreground">상태</div>
+                        <div className="text-foreground">
+                          {{
+                            active: 'PUSH 활성',
+                            pending: '대기중',
+                            expired: '만료',
+                            none: '미설정',
+                          }[selectedChannel.push_status || 'none']}
+                        </div>
+                        {selectedChannel.push_expires_at && (
+                          <>
+                            <div className="text-muted-foreground">만료일</div>
+                            <div className="text-foreground">
+                              {new Date(selectedChannel.push_expires_at).toLocaleDateString('ko-KR')}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full mt-2 text-xs"
+                        onClick={() => alert('WebSub 연동 필요')}
+                      >
+                        <Bell className="h-3 w-3 mr-1.5" />
+                        알림 갱신
+                      </Button>
                     </div>
+
+                    {/* Watch settings readonly */}
+                    <WatchSettingsReadonly />
 
                     <div className="rounded-lg border border-border p-4 space-y-2">
                       <div className="text-sm font-medium text-foreground">채널 정보</div>
