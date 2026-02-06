@@ -21,6 +21,11 @@ files:
 # 추가 리소스 (설치 경로에 복사)
 # 패키지 로컬 + 모노레포 루트 양쪽에서 수집
 extraResources:
+  # 아이콘 파일 (트레이, 윈도우 아이콘용)
+  - from: "resources/icon.ico"
+    to: "icon.ico"
+  - from: "resources/icon.png"
+    to: "icon.png"
   # platform-tools: 로컬 우선, 모노레포 루트 폴백
   - from: "resources/platform-tools"
     to: "platform-tools"

@@ -45,6 +45,14 @@ const SERVER_URL = process.env.SERVER_URL || process.env.DOAIME_SERVER_URL || 'h
 const IS_DEV = process.env.NODE_ENV === 'development';
 const WORKER_SERVER_PORT = parseInt(process.env.WORKER_SERVER_PORT || '3001', 10);
 
+// 패키징된 앱에서는 extraResources 경로, 개발 모드에서는 상대 경로
+function getIconPath(filename = 'icon.ico'): string {
+  if (app.isPackaged) {
+    return path.join(process.resourcesPath, filename);
+  }
+  return path.join(__dirname, '../resources', filename);
+}
+
 // ============================================
 // 전역 변수
 // ============================================
@@ -163,7 +171,7 @@ function createWindow(): void {
       contextIsolation: true,
       nodeIntegration: false,
     },
-    icon: path.join(__dirname, '../resources/icon.ico'),
+    icon: getIconPath(),
   });
 
   if (IS_DEV) {
@@ -193,7 +201,7 @@ function createWindow(): void {
 // ============================================
 
 function createTray(): void {
-  const iconPath = path.join(__dirname, '../resources/icon.ico');
+  const iconPath = getIconPath();
   const icon = nativeImage.createFromPath(iconPath);
   
   tray = new Tray(icon.resize({ width: 16, height: 16 }));
