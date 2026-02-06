@@ -19,7 +19,26 @@ files:
   - "!**/*.map"
 
 # 추가 리소스 (설치 경로에 복사)
+# 패키지 로컬 + 모노레포 루트 양쪽에서 수집
 extraResources:
+  # platform-tools: 로컬 우선, 모노레포 루트 폴백
+  - from: "resources/platform-tools"
+    to: "platform-tools"
+    filter:
+      - "**/*"
+  - from: "../../resources/platform-tools"
+    to: "platform-tools"
+    filter:
+      - "**/*"
+  # APK: 로컬 우선, 모노레포 루트 폴백
+  - from: "resources/apks"
+    to: "apks"
+    filter:
+      - "*.apk"
+  - from: "../../resources/apks"
+    to: "apks"
+    filter:
+      - "*.apk"
   - from: "resources/scripts"
     to: "scripts"
     filter:

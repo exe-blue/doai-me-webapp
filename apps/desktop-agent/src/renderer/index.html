@@ -911,6 +911,97 @@
       margin-right: 6px;
     }
 
+    /* APK Install Cards */
+    .apk-section {
+      margin-top: 8px;
+    }
+
+    .apk-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .apk-card {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+    }
+
+    .apk-icon {
+      width: 36px;
+      height: 36px;
+      background: var(--bg-secondary);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .apk-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .apk-name {
+      font-size: 13px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .apk-size {
+      font-size: 11px;
+      color: var(--text-secondary);
+      margin-top: 2px;
+    }
+
+    .btn-apk-install {
+      padding: 6px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      background: var(--accent);
+      color: white;
+      white-space: nowrap;
+      transition: all 0.15s;
+      font-family: inherit;
+      -webkit-app-region: no-drag;
+    }
+
+    .btn-apk-install:hover {
+      background: #2563eb;
+    }
+
+    .btn-apk-install:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .btn-apk-install.success {
+      background: var(--success);
+    }
+
+    .btn-apk-install.error {
+      background: var(--error);
+    }
+
+    .apk-empty {
+      text-align: center;
+      color: var(--text-secondary);
+      font-size: 12px;
+      padding: 16px;
+    }
+
     /* Footer */
     .footer {
       padding: 8px 16px;
@@ -1292,12 +1383,19 @@
           <button class="btn btn-secondary" onclick="panelDeviceAction('reconnect')">재연결</button>
           <button class="btn btn-secondary" onclick="panelDeviceAction('reboot')">재부팅</button>
         </div>
+
+        <div class="section-subtitle">APK 설치</div>
+        <div class="apk-section">
+          <div class="apk-list" id="panelApkList">
+            <div class="apk-empty">APK 목록 로딩 중...</div>
+          </div>
+        </div>
       </div>
     </div>
 
     <!-- Footer -->
     <footer class="footer">
-      <span>DoAi.Me v1.2.0</span>
+      <span>DoAi.Me v1.2.3</span>
       <span id="lastUpdate">마지막 업데이트: -</span>
     </footer>
   </div>
@@ -1345,7 +1443,9 @@
       runInfraCheck: () => Promise.resolve(null),
       startScrcpy: () => Promise.resolve({ success: false }),
       stopScrcpy: () => Promise.resolve({ success: false }),
-      isScrcpyActive: () => Promise.resolve(false)
+      isScrcpyActive: () => Promise.resolve(false),
+      getBundledApks: () => Promise.resolve([]),
+      installApk: () => Promise.resolve({ success: false, message: 'Not available' })
     };
 
     // ============================================
@@ -1595,6 +1695,7 @@
       document.getElementById('panelDeviceLastSeen').textContent = formatTime(device.lastActivity || device.lastSeen || Date.now());
 
       updateScrcpyButton();
+      loadBundledApks();
 
       // 패널 열기
       document.getElementById('devicePanel').classList.add('open');
@@ -1672,6 +1773,88 @@
         }
       } catch (err) {
         addLog({ level: 'ERROR', category: 'DEVICE', message: '명령 실패 (' + action + '): ' + err.message });
+      }
+    }
+
+    // ============================================
+    // APK Install Functions
+    // ============================================
+    function formatFileSize(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+
+    function getApkIcon(name) {
+      const lower = name.toLowerCase();
+      if (lower.includes('youtube')) return '▶';
+      if (lower.includes('appium') || lower.includes('settings')) return '⚙';
+      return '📦';
+    }
+
+    async function loadBundledApks() {
+      const container = document.getElementById('panelApkList');
+      if (!container) return;
+
+      try {
+        const apks = await api.getBundledApks();
+
+        if (!apks || apks.length === 0) {
+          container.innerHTML = '<div class="apk-empty">번들된 APK가 없습니다</div>';
+          return;
+        }
+
+        container.innerHTML = apks.map(apk => `
+          <div class="apk-card" data-apk="${apk.fileName}">
+            <div class="apk-icon">${getApkIcon(apk.name)}</div>
+            <div class="apk-info">
+              <div class="apk-name">${apk.name}</div>
+              <div class="apk-size">${formatFileSize(apk.size)}</div>
+            </div>
+            <button class="btn-apk-install" onclick="installApk('${apk.fileName}', this)">설치</button>
+          </div>
+        `).join('');
+      } catch (err) {
+        container.innerHTML = '<div class="apk-empty">APK 목록 로딩 실패</div>';
+        console.error('loadBundledApks error:', err);
+      }
+    }
+
+    async function installApk(fileName, btnElement) {
+      if (!state.selectedDeviceSerial || !btnElement) return;
+
+      btnElement.disabled = true;
+      btnElement.textContent = '설치 중...';
+
+      try {
+        const result = await api.installApk(state.selectedDeviceSerial, fileName);
+
+        if (result.success) {
+          btnElement.textContent = '완료';
+          btnElement.classList.add('success');
+          addLog({ level: 'INFO', category: 'DEVICE', message: 'APK 설치 완료: ' + fileName });
+        } else {
+          btnElement.textContent = '실패';
+          btnElement.classList.add('error');
+          addLog({ level: 'ERROR', category: 'DEVICE', message: 'APK 설치 실패: ' + (result.message || fileName) });
+        }
+
+        // 3초 후 버튼 복원
+        setTimeout(() => {
+          btnElement.textContent = '설치';
+          btnElement.classList.remove('success', 'error');
+          btnElement.disabled = false;
+        }, 3000);
+      } catch (err) {
+        btnElement.textContent = '오류';
+        btnElement.classList.add('error');
+        btnElement.disabled = false;
+        addLog({ level: 'ERROR', category: 'DEVICE', message: 'APK 설치 오류: ' + err.message });
+
+        setTimeout(() => {
+          btnElement.textContent = '설치';
+          btnElement.classList.remove('error');
+        }, 3000);
       }
     }
 

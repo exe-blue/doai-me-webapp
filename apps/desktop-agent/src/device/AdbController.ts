@@ -6,6 +6,8 @@
 
 import { execFile, spawn } from 'child_process';
 import { promisify } from 'util';
+import fs from 'fs';
+import { getResourcePath } from '../config/AppConfig';
 import { logger } from '../utils/logger';
 
 const execFileAsync = promisify(execFile);
@@ -29,6 +31,22 @@ export interface AdbDevice {
 }
 
 /**
+ * 번들된 ADB 바이너리 경로 탐색
+ * resources/platform-tools/ 에 포함된 ADB를 찾습니다.
+ */
+function findBundledAdb(): string | null {
+  try {
+    const bundled = getResourcePath(
+      process.platform === 'win32' ? 'platform-tools/adb.exe' : 'platform-tools/adb'
+    );
+    return fs.existsSync(bundled) ? bundled : null;
+  } catch {
+    // app이 아직 ready 상태가 아닐 수 있음
+    return null;
+  }
+}
+
+/**
  * ADB 컨트롤러 클래스
  */
 export class AdbController {
@@ -36,8 +54,11 @@ export class AdbController {
   private timeout: number;
 
   constructor(options: AdbOptions = {}) {
-    this.adbPath = options.adbPath || process.env.ADB_PATH || 'adb';
+    // 우선순위: 명시적 옵션 → 환경변수 → 번들된 바이너리 → 시스템 PATH
+    this.adbPath = options.adbPath || process.env.ADB_PATH || findBundledAdb() || 'adb';
     this.timeout = options.timeout || 30000; // 30초
+
+    logger.info('[AdbController] ADB path resolved', { adbPath: this.adbPath });
   }
 
   /**

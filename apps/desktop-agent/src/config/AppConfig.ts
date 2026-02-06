@@ -103,3 +103,31 @@ export function getAppConfig(): AppConfig {
   }
   return cached;
 }
+
+/**
+ * 번들된 리소스 경로를 반환합니다.
+ *
+ * - 패키징 후: process.resourcesPath (e.g. {설치폴더}/resources/)
+ * - 개발 중:   패키지 로컬 → 모노레포 루트 순으로 탐색
+ *
+ * @param subpath  리소스 하위 경로 (e.g. 'platform-tools/adb.exe', 'apks')
+ */
+export function getResourcePath(subpath: string): string {
+  if (app.isPackaged) {
+    return path.join(process.resourcesPath, subpath);
+  }
+
+  // 개발 모드: 패키지 로컬 우선, 모노레포 루트 폴백
+  const localPath = path.join(app.getAppPath(), 'resources', subpath);
+  if (fs.existsSync(localPath)) {
+    return localPath;
+  }
+
+  const monoRepoPath = path.join(app.getAppPath(), '..', '..', 'resources', subpath);
+  if (fs.existsSync(monoRepoPath)) {
+    return monoRepoPath;
+  }
+
+  // 기본값: 로컬 경로 반환 (존재 여부는 호출측에서 판단)
+  return localPath;
+}

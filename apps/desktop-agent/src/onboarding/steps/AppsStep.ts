@@ -5,6 +5,7 @@
  */
 
 import { BaseStep, StepContext } from './BaseStep';
+import { getResourcePath } from '../../config/AppConfig';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -101,8 +102,8 @@ export class AppsStep extends BaseStep {
       return apkPath;
     }
 
-    // 상대 경로인 경우 resources 디렉토리 기준
-    const resourcesDir = process.env.APK_DIR || path.join(process.cwd(), 'resources', 'apk');
+    // 상대 경로인 경우 번들된 리소스 디렉토리 기준
+    const resourcesDir = process.env.APK_DIR || getResourcePath('apks');
     return path.join(resourcesDir, path.basename(apkPath));
   }
 

@@ -23,7 +23,8 @@ import { AutoUpdater, getAutoUpdater } from './updater/AutoUpdater';
 import { DeviceRecovery } from './recovery/DeviceRecovery';
 import { NodeRecovery, getNodeRecovery, SavedState } from './recovery/NodeRecovery';
 import { logger } from './utils/logger';
-import { loadAppConfig } from './config/AppConfig';
+import { loadAppConfig, getResourcePath } from './config/AppConfig';
+import fs from 'fs';
 
 // Manager components for Worker orchestration
 import {
@@ -170,6 +171,10 @@ function createWindow(): void {
   }
 
   mainWindow.loadFile(path.join(__dirname, 'index.html'));
+
+  mainWindow.once('ready-to-show', () => {
+    mainWindow?.show();
+  });
 
   mainWindow.on('close', (event) => {
     if (!isAppQuitting) {
@@ -781,6 +786,60 @@ function setupIPC(): void {
   ipcMain.handle('is-scrcpy-active', (_event, serial: string) => {
     const scrcpy = getScrcpyController();
     return scrcpy.isStreaming(serial);
+  });
+
+  // ============================================
+  // APK 관리 IPC 핸들러
+  // ============================================
+
+  // 번들된 APK 목록 조회
+  ipcMain.handle('get-bundled-apks', async () => {
+    try {
+      const apksDir = getResourcePath('apks');
+      if (!fs.existsSync(apksDir)) return [];
+      const files = fs.readdirSync(apksDir).filter(f => f.endsWith('.apk'));
+      return files.map(fileName => ({
+        fileName,
+        name: fileName.replace('.apk', ''),
+        path: path.join(apksDir, fileName),
+        size: fs.statSync(path.join(apksDir, fileName)).size,
+      }));
+    } catch (error) {
+      logger.error('get-bundled-apks failed', { error: (error as Error).message });
+      return [];
+    }
+  });
+
+  // 선택한 APK를 디바이스에 설치
+  ipcMain.handle('install-apk', async (_event, serial: string, apkFileName: string) => {
+    try {
+      // 파일 이름 검증 (경로 순회 방지)
+      if (apkFileName.includes('/') || apkFileName.includes('\\') || apkFileName.includes('..')) {
+        return { success: false, message: '잘못된 파일 이름' };
+      }
+
+      const apkPath = getResourcePath(`apks/${apkFileName}`);
+      if (!fs.existsSync(apkPath)) {
+        return { success: false, message: `APK 파일 없음: ${apkFileName}` };
+      }
+
+      pushLog({ timestamp: Date.now(), level: 'info', message: `APK 설치 시작: ${apkFileName} → ${serial}`, source: 'device' });
+
+      const adb = getAdbController();
+      const output = await adb.execute(serial, `install -r -g '${apkPath}'`);
+
+      if (output.toLowerCase().includes('failure')) {
+        pushLog({ timestamp: Date.now(), level: 'error', message: `APK 설치 실패: ${output}`, source: 'device' });
+        return { success: false, message: `설치 실패: ${output}` };
+      }
+
+      pushLog({ timestamp: Date.now(), level: 'info', message: `APK 설치 완료: ${apkFileName} → ${serial}`, source: 'device' });
+      return { success: true, message: '설치 완료' };
+    } catch (error) {
+      const msg = (error as Error).message;
+      pushLog({ timestamp: Date.now(), level: 'error', message: `APK 설치 오류: ${msg}`, source: 'device' });
+      return { success: false, message: msg };
+    }
   });
 
   // ============================================

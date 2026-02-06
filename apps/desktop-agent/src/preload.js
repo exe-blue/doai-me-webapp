@@ -170,6 +170,16 @@ contextBridge.exposeInMainWorld('api', {
   isScrcpyActive: (serial) => ipcRenderer.invoke('is-scrcpy-active', serial),
 
   // ========================================================================
+  // v1.2.0: APK 관리
+  // ========================================================================
+
+  // 번들된 APK 목록 조회
+  getBundledApks: () => ipcRenderer.invoke('get-bundled-apks'),
+
+  // APK 설치
+  installApk: (serial, apkFileName) => ipcRenderer.invoke('install-apk', serial, apkFileName),
+
+  // ========================================================================
   // v1.2.0: 인프라 헬스체크
   // ========================================================================
 

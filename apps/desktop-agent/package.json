@@ -1,6 +1,6 @@
 {
   "name": "doai-agent",
-  "version": "1.2.0",
+  "version": "1.2.3",
   "description": "DOAI Device Control Agent",
   "main": "dist/main.js",
   "scripts": {
@@ -17,9 +17,13 @@
     "prebuild:linux": "tsc",
     "build:linux": "electron-builder --linux",
     "build:dir": "tsc && electron-builder --dir",
+    "predist": "node scripts/verify-resources.js",
     "dist": "tsc && electron-builder",
+    "predist:win": "node scripts/verify-resources.js",
     "dist:win": "tsc && electron-builder --win",
+    "predist:mac": "node scripts/verify-resources.js",
     "dist:mac": "tsc && electron-builder --mac",
+    "predist:linux": "node scripts/verify-resources.js",
     "dist:linux": "tsc && electron-builder --linux",
     "release": "tsc && electron-builder --publish always",
     "release:win": "tsc && electron-builder --win --publish always",
@@ -29,20 +33,21 @@
   },
   "dependencies": {
     "@doai/shared": "file:../../packages/shared",
-    "socket.io-client": "^4.7.4",
-    "systeminformation": "^5.21.22",
-    "dotenv": "^16.4.1",
-    "electron-updater": "^6.3.9",
-    "electron-log": "^5.1.1",
     "bullmq": "^5.0.0",
-    "ioredis": "^5.3.2"
+    "dotenv": "^16.4.1",
+    "electron-log": "^5.1.1",
+    "electron-updater": "^6.3.9",
+    "ioredis": "^5.3.2",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.7.4",
+    "systeminformation": "^5.21.22"
   },
   "devDependencies": {
+    "@types/node": "^20.11.0",
+    "cross-env": "^7.0.3",
     "electron": "40.1.0",
     "electron-builder": "^24.13.2",
-    "cross-env": "^7.0.3",
-    "typescript": "^5.3.3",
-    "@types/node": "^20.11.0"
+    "typescript": "^5.3.3"
   },
   "repository": {
     "type": "git",
