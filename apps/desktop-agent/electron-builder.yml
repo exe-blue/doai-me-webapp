@@ -7,36 +7,27 @@ copyright: Copyright © 2024–2026 DoAi Inc.
 
 # 빌드 디렉토리 설정
 directories:
-  output: dist
+  output: release
   buildResources: build
 
 # 포함할 파일
 files:
-  - "src/**/*"
+  - "dist/**/*"
   - "build/**/*"
   - "node_modules/**/*"
   - "package.json"
-  - "!**/*.ts"
   - "!**/*.map"
 
 # 추가 리소스 (설치 경로에 복사)
 extraResources:
-  - from: "resources/apks"
-    to: "apks"
-    filter:
-      - "**/*"
   - from: "resources/scripts"
     to: "scripts"
     filter:
       - "**/*"
-  - from: "resources/config"
-    to: "config"
+  - from: "."
+    to: "."
     filter:
-      - "**/*"
-  - from: "resources/icons"
-    to: "icons"
-    filter:
-      - "**/*"
+      - "config.json.example"
 
 # ============================================
 # Windows 설정
@@ -55,9 +46,9 @@ win:
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
-  installerIcon: resources/icons/icon.ico
-  uninstallerIcon: resources/icons/icon.ico
-  installerHeaderIcon: resources/icons/icon.ico
+  installerIcon: resources/icon.ico
+  uninstallerIcon: resources/icon.ico
+  installerHeaderIcon: resources/icon.ico
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: "DoAi.Me Agent"
@@ -116,7 +107,7 @@ linux:
       arch: [x64]
     - target: deb
       arch: [x64]
-  icon: resources/icons
+  icon: resources/icon.png
   category: Utility
   maintainer: support@doai.me
   artifactName: "${productName}-${version}-${arch}.${ext}"
@@ -151,6 +142,9 @@ publish:
 # ============================================
 # 추가 설정
 # ============================================
+
+# WSL에서 Windows 타겟 빌드 시 네이티브 모듈 리빌드 스킵
+npmRebuild: false
 
 # asar 아카이브 설정
 asar: true

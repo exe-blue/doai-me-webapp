@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import {
   PlayCircle,
@@ -9,7 +10,6 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
-  Loader2,
   ChevronLeft,
   ChevronRight,
   Timer,
@@ -23,6 +23,8 @@ import { JobCreateModal, type CreateJobResponse } from '@/components/jobs/job-cr
 import { JobCard, type Job } from '@/components/jobs/job-card';
 import { LogDrawer } from '@/components/jobs/log-drawer';
 import { cn } from '@/lib/utils';
+import { useActiveJobsQuery, useCompletedJobsQuery, jobKeys } from '@/hooks/queries';
+import { PageLoading } from '@/components/shared/page-loading';
 
 // =============================================
 // Types
@@ -65,64 +67,48 @@ function extractVideoId(url: string): string | null {
 // =============================================
 
 export default function JobsPage() {
+  const queryClient = useQueryClient();
   const { isConnected, devices, getSocket } = useSocketContext();
-  
+
   // 모달 상태
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [logDrawerOpen, setLogDrawerOpen] = useState(false);
   const [selectedJobForLogs, setSelectedJobForLogs] = useState<Job | null>(null);
-  
-  // 작업 데이터
-  const [jobs, setJobs] = useState<Job[]>([]);
-  const [completedJobs, setCompletedJobs] = useState<Job[]>([]);
-  const [loading, setLoading] = useState(true);
+
+  // 작업 데이터 — React Query
+  const {
+    data: jobsRaw = [],
+    refetch: refetchJobs,
+  } = useActiveJobsQuery(5000);
+  const jobs = jobsRaw as unknown as Job[];
+
+  const {
+    data: completedJobsRaw = [],
+    isLoading: loading,
+    refetch: refetchCompleted,
+  } = useCompletedJobsQuery();
+  const completedJobs = completedJobsRaw as unknown as Job[];
+
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  
+
   // 실시간 프로그레스 상태
   const [jobProgressMap, setJobProgressMap] = useState<Record<string, JobProgress>>({});
   const [elapsedTimes, setElapsedTimes] = useState<Record<string, number>>({});
-  
+
   // 히스토리 페이지네이션
   const [historyPage, setHistoryPage] = useState(1);
 
   const idleDevices = devices.filter(d => d.status === 'online');
 
-  // =============================================
-  // Data Fetching
-  // =============================================
+  // Stable refetch callbacks for socket handlers
+  const fetchJobs = useCallback(() => {
+    refetchJobs();
+  }, [refetchJobs]);
 
-  const fetchJobs = useCallback(async () => {
-    try {
-      const response = await fetch('/api/jobs');
-      const data = await response.json();
-      setJobs(data.jobs || []);
-    } catch (err) {
-      console.error('Failed to fetch jobs:', err);
-    }
-  }, []);
-
-  const fetchCompletedJobs = useCallback(async () => {
-    try {
-      const response = await fetch('/api/jobs?status=completed&limit=100');
-      const data = await response.json();
-      setCompletedJobs(data.jobs || []);
-    } catch (err) {
-      console.error('Failed to fetch completed jobs:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchJobs();
-    fetchCompletedJobs();
-    const interval = setInterval(() => {
-      fetchJobs();
-      fetchCompletedJobs();
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [fetchJobs, fetchCompletedJobs]);
+  const fetchCompletedJobs = useCallback(() => {
+    refetchCompleted();
+  }, [refetchCompleted]);
 
   // =============================================
   // Socket.io Real-time Updates
@@ -226,7 +212,7 @@ export default function JobsPage() {
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await Promise.all([fetchJobs(), fetchCompletedJobs()]);
+    await queryClient.invalidateQueries({ queryKey: jobKeys.all });
     setTimeout(() => setIsRefreshing(false), 500);
   };
 
@@ -337,11 +323,7 @@ export default function JobsPage() {
   // =============================================
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <PageLoading text="작업 목록을 불러오는 중..." />;
   }
 
   return (

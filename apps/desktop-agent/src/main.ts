@@ -23,7 +23,7 @@ import { AutoUpdater, getAutoUpdater } from './updater/AutoUpdater';
 import { DeviceRecovery } from './recovery/DeviceRecovery';
 import { NodeRecovery, getNodeRecovery, SavedState } from './recovery/NodeRecovery';
 import { logger } from './utils/logger';
-import { loadAppConfig, getAppConfig, type AppConfig } from './config/AppConfig';
+import { loadAppConfig } from './config/AppConfig';
 
 // Manager components for Worker orchestration
 import {
@@ -48,7 +48,6 @@ const WORKER_SERVER_PORT = parseInt(process.env.WORKER_SERVER_PORT || '3001', 10
 // 전역 변수
 // ============================================
 
-let appConfig: AppConfig | null = null;
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let socketClient: SocketClient | null = null;
@@ -378,14 +377,9 @@ async function startAgent(): Promise<void> {
 
   // ============================================
   // Manager Components 초기화 (Worker 오케스트레이션)
-  // appRole === 'manager' 일 때만 시작
   // ============================================
 
-  if (appConfig?.appRole === 'manager') {
-    await initializeManagerComponents();
-  } else {
-    logger.info('[Manager] Skipping Manager components (appRole is not "manager")');
-  }
+  await initializeManagerComponents();
 
   // 디바이스 상태 변경 시 renderer에 브로드캐스트
   deviceManager.on('device:connected', (device: { serial: string }) => {
@@ -595,9 +589,16 @@ function setupIPC(): void {
     };
   });
 
-  // 앱 역할 조회 (v1.2.0)
-  ipcMain.handle('get-app-role', () => {
-    return { role: appConfig?.appRole || 'bot' };
+  // 노드 종합 상태 조회 (v1.2.0)
+  ipcMain.handle('get-node-status', () => {
+    return {
+      nodeId: NODE_ID,
+      serverConnected: socketClient?.connected || false,
+      workerServerRunning: workerServer?.isRunning() || false,
+      workerServerPort: workerServer?.getPort() || WORKER_SERVER_PORT,
+      connectedWorkers: workerServer?.getConnectedWorkerCount() || 0,
+      deviceCount: deviceManager?.getConnectedDevices().length || 0,
+    };
   });
 
   // 디바이스 목록 조회
@@ -870,8 +871,8 @@ function sendToRenderer(channel: string, data?: unknown): void {
 app.on('ready', async () => {
   logger.info('App ready');
 
-  // 역할 기반 설정 로드 (v1.2.0)
-  appConfig = loadAppConfig();
+  // 설정 로드 (v1.2.0)
+  loadAppConfig();
 
   createWindow();
   createTray();

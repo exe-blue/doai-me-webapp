@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import {
   Play,
@@ -45,52 +46,15 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
-
-interface RunningTask {
-  id: string;
-  video_id: string;
-  device_id: string;
-  node_id: string;
-  status: "running" | "completing";
-  progress: number;
-  current_step: string;
-  watch_duration_sec: number;
-  elapsed_sec: number;
-  will_like: boolean;
-  will_comment: boolean;
-  will_subscribe: boolean;
-  started_at: string;
-  video?: {
-    title: string;
-    thumbnail_url: string;
-    channel_name: string;
-  };
-}
-
-interface NodeStatus {
-  id: string;
-  name: string;
-  status: "online" | "offline" | "busy";
-  connected_at: string | null;
-  total_devices: number;
-  active_devices: number;
-  idle_devices: number;
-  error_devices: number;
-  tasks_per_minute: number;
-  cpu_usage: number;
-  memory_usage: number;
-}
-
-interface RealtimeStats {
-  total_running: number;
-  completed_today: number;
-  failed_today: number;
-  avg_duration: number;
-  tasks_per_minute: number;
-  likes_today: number;
-  comments_today: number;
-  subscribes_today: number;
-}
+import {
+  useRunningTasksQuery,
+  useNodesQuery,
+  useTodayStatsQuery,
+  runningKeys,
+  type RunningTask,
+} from "@/hooks/queries";
+import { PageLoading } from "@/components/shared/page-loading";
+import { EmptyState } from "@/components/shared/empty-state";
 
 interface ActivityLog {
   id: string;
@@ -113,7 +77,6 @@ const stepLabels: Record<string, string> = {
   completing: "완료 처리",
 };
 
-// 시간 포맷 함수
 function formatTimeAgo(dateString: string): string {
   const date = new Date(dateString);
   const now = new Date();
@@ -134,37 +97,58 @@ function formatDuration(seconds: number): string {
 }
 
 export default function RunningPage() {
-  const [runningTasks, setRunningTasks] = useState<RunningTask[]>([]);
-  const [nodes, setNodes] = useState<NodeStatus[]>([]);
-  const [stats, setStats] = useState<RealtimeStats>({
-    total_running: 0,
-    completed_today: 0,
-    failed_today: 0,
-    avg_duration: 0,
-    tasks_per_minute: 0,
-    likes_today: 0,
-    comments_today: 0,
-    subscribes_today: 0,
-  });
+  const queryClient = useQueryClient();
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
-  const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [nodeFilter, setNodeFilter] = useState<string>("all");
   const [selectedTask, setSelectedTask] = useState<RunningTask | null>(null);
   const [isAutoRefresh, setIsAutoRefresh] = useState(true);
 
-  const refreshInterval = useRef<NodeJS.Timeout | null>(null);
   const activityEndRef = useRef<HTMLDivElement>(null);
 
-  // Refs for stable function references
-  const nodeFilterRef = useRef(nodeFilter);
-  nodeFilterRef.current = nodeFilter;
+  // React Query hooks
+  const {
+    data: runningTasks = [],
+    isLoading: tasksLoading,
+    refetch: refetchTasks,
+  } = useRunningTasksQuery(
+    nodeFilter,
+    isAutoRefresh ? 3000 : false,
+  );
 
+  const {
+    data: nodes = [],
+    isLoading: nodesLoading,
+  } = useNodesQuery();
+
+  const stats = useMemo(() => {
+    const totalRunning = runningTasks.length;
+    const tasksPerMinute = nodes.reduce((sum, n) => sum + n.tasks_per_minute, 0);
+    return { totalRunning, tasksPerMinute };
+  }, [runningTasks, nodes]);
+
+  const {
+    data: todayStats,
+  } = useTodayStatsQuery({
+    runningCount: stats.totalRunning,
+    nodesData: nodes,
+  });
+
+  const computedStats = useMemo(() => ({
+    total_running: stats.totalRunning,
+    completed_today: todayStats?.completed_today ?? 0,
+    failed_today: todayStats?.failed_today ?? 0,
+    avg_duration: todayStats?.avg_duration ?? 0,
+    tasks_per_minute: stats.tasksPerMinute,
+    likes_today: todayStats?.likes_today ?? 0,
+    comments_today: todayStats?.comments_today ?? 0,
+    subscribes_today: todayStats?.subscribes_today ?? 0,
+  }), [stats, todayStats]);
+
+  const isLoading = tasksLoading && nodesLoading;
+
+  // Supabase Realtime - subscribe once on mount
   useEffect(() => {
-    // Initial data fetch
-    fetchAllData();
-
-    // Supabase Realtime 연결
     const channel = supabase
       .channel("running_tasks")
       .on(
@@ -177,6 +161,8 @@ export default function RunningPage() {
         },
         (payload) => {
           handleRealtimeUpdate(payload);
+          // Invalidate React Query caches on realtime events
+          queryClient.invalidateQueries({ queryKey: runningKeys.all });
         }
       )
       .subscribe();
@@ -185,47 +171,12 @@ export default function RunningPage() {
       supabase.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Subscribe once on mount
+  }, [queryClient]);
 
-  // Separate effect for auto-refresh interval
-  useEffect(() => {
-    if (isAutoRefresh) {
-      refreshInterval.current = setInterval(fetchAllData, 3000);
-    } else if (refreshInterval.current) {
-      clearInterval(refreshInterval.current);
-      refreshInterval.current = null;
-    }
-
-    return () => {
-      if (refreshInterval.current) {
-        clearInterval(refreshInterval.current);
-        refreshInterval.current = null;
-      }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAutoRefresh]);
-
-  // Re-fetch when nodeFilter changes
-  useEffect(() => {
-    fetchRunningTasks();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nodeFilter]);
-
-  function handleRealtimeUpdate(payload: { eventType: string; new?: Record<string, unknown>; old?: Record<string, unknown> }) {
+  function handleRealtimeUpdate(payload: { eventType: string; new?: Record<string, unknown> }) {
     if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
       if (!payload.new) return;
       const newData = payload.new as unknown as RunningTask;
-      setRunningTasks((prev) => {
-        const idx = prev.findIndex((t) => t.id === newData.id);
-        if (idx >= 0) {
-          const updated = [...prev];
-          updated[idx] = { ...updated[idx], ...newData };
-          return updated;
-        }
-        return [...prev, newData];
-      });
-
-      // 활동 로그 추가
       addActivityLog({
         type: payload.eventType === "INSERT" ? "start" : "complete",
         message:
@@ -234,10 +185,6 @@ export default function RunningPage() {
             : `작업 업데이트: ${newData.device_id || "unknown"}`,
         device_id: newData.device_id,
       });
-    } else if (payload.eventType === "DELETE") {
-      if (!payload.old) return;
-      const oldData = payload.old as unknown as { id: string };
-      setRunningTasks((prev) => prev.filter((t) => t.id !== oldData.id));
     }
   }
 
@@ -252,221 +199,6 @@ export default function RunningPage() {
     ]);
   }
 
-  async function fetchAllData() {
-    // Fetch running tasks first to get fresh count
-    const runningCount = await fetchRunningTasks();
-    // Pass the fresh count to fetchStats
-    await Promise.all([fetchNodes(), fetchStats(runningCount)]);
-    setLoading(false);
-  }
-
-  async function fetchRunningTasks(): Promise<number> {
-    try {
-      let query = supabase
-        .from("video_executions")
-        .select(`
-          *,
-          video:videos (title, thumbnail_url, channel_name)
-        `)
-        .eq("status", "running")
-        .order("started_at", { ascending: false });
-
-      if (nodeFilter !== "all") {
-        query = query.eq("node_id", nodeFilter);
-      }
-
-      const { data, error } = await query;
-
-      if (!error && data) {
-        const tasksWithProgress = data.map((task) => {
-          const video = Array.isArray(task.video) ? task.video[0] : task.video;
-          return {
-            ...task,
-            video,
-            progress: Math.min(
-              100,
-              Math.floor(
-                ((Date.now() - new Date(task.started_at || Date.now()).getTime()) / 1000 /
-                  (task.watch_duration_sec || 60)) *
-                  100
-              )
-            ),
-            current_step: getSimulatedStep(task),
-            elapsed_sec: Math.floor(
-              (Date.now() - new Date(task.started_at || Date.now()).getTime()) / 1000
-            ),
-          };
-        });
-        setRunningTasks(tasksWithProgress);
-        return tasksWithProgress.length;
-      }
-      return 0;
-    } catch (err) {
-      console.error("실행 중 작업 로드 실패:", err);
-      return 0;
-    }
-  }
-
-  function getSimulatedStep(task: { started_at?: string; watch_duration_sec?: number }): string {
-    const elapsed = (Date.now() - new Date(task.started_at || Date.now()).getTime()) / 1000;
-    const duration = task.watch_duration_sec || 60;
-    const progress = elapsed / duration;
-
-    if (progress < 0.05) return "initializing";
-    if (progress < 0.1) return "opening_youtube";
-    if (progress < 0.15) return "searching";
-    if (progress < 0.2) return "selecting_video";
-    if (progress < 0.9) return "watching";
-    if (progress < 0.93) return "liking";
-    if (progress < 0.96) return "commenting";
-    if (progress < 0.98) return "subscribing";
-    return "completing";
-  }
-
-  async function fetchNodes(): Promise<typeof nodes> {
-    // 실제로는 별도 테이블이나 API에서 가져옴
-    const { data } = await supabase
-      .from("nodes")
-      .select("*")
-      .order("name");
-
-    if (data && data.length > 0) {
-      const mappedNodes = data.map(n => ({
-        id: n.id,
-        name: n.name || n.id,
-        status: (n.status === "online" ? "online" : n.status === "busy" ? "busy" : "offline") as "online" | "busy" | "offline",
-        connected_at: n.connected_at,
-        total_devices: n.total_devices || 100,
-        active_devices: n.active_devices || 0,
-        idle_devices: n.idle_devices || 0,
-        error_devices: n.error_devices || 0,
-        tasks_per_minute: n.tasks_per_minute || 0,
-        cpu_usage: n.cpu_usage || 0,
-        memory_usage: n.memory_usage || 0,
-      }));
-      setNodes(mappedNodes);
-      return mappedNodes;
-    } else {
-      // 더미 데이터
-      const dummyNodes: typeof nodes = [
-        {
-          id: "node-1",
-          name: "Node 1 (Mini PC)",
-          status: "online",
-          connected_at: new Date(Date.now() - 3600000).toISOString(),
-          total_devices: 100,
-          active_devices: 42,
-          idle_devices: 53,
-          error_devices: 5,
-          tasks_per_minute: 8.5,
-          cpu_usage: 45,
-          memory_usage: 62,
-        },
-        {
-          id: "node-2",
-          name: "Node 2 (Mini PC)",
-          status: "online",
-          connected_at: new Date(Date.now() - 7200000).toISOString(),
-          total_devices: 100,
-          active_devices: 38,
-          idle_devices: 58,
-          error_devices: 4,
-          tasks_per_minute: 7.2,
-          cpu_usage: 38,
-          memory_usage: 55,
-        },
-        {
-          id: "node-3",
-          name: "Node 3 (Mini PC)",
-          status: "busy",
-          connected_at: new Date(Date.now() - 1800000).toISOString(),
-          total_devices: 100,
-          active_devices: 85,
-          idle_devices: 12,
-          error_devices: 3,
-          tasks_per_minute: 12.1,
-          cpu_usage: 78,
-          memory_usage: 81,
-        },
-        {
-          id: "node-4",
-          name: "Node 4 (Mini PC)",
-          status: "offline",
-          connected_at: null,
-          total_devices: 100,
-          active_devices: 0,
-          idle_devices: 0,
-          error_devices: 100,
-          tasks_per_minute: 0,
-          cpu_usage: 0,
-          memory_usage: 0,
-        },
-        {
-          id: "node-5",
-          name: "Node 5 (Mini PC)",
-          status: "online",
-          connected_at: new Date(Date.now() - 5400000).toISOString(),
-          total_devices: 100,
-          active_devices: 51,
-          idle_devices: 45,
-          error_devices: 4,
-          tasks_per_minute: 9.8,
-          cpu_usage: 52,
-          memory_usage: 68,
-        },
-      ];
-      setNodes(dummyNodes);
-      return dummyNodes;
-    }
-  }
-
-  async function fetchStats(currentRunningCount?: number, currentNodes?: typeof nodes) {
-    try {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      const { data: completedData } = await supabase
-        .from("video_executions")
-        .select("id, watch_duration_sec, liked, commented, subscribed")
-        .eq("status", "completed")
-        .gte("completed_at", today.toISOString());
-
-      const { data: failedData } = await supabase
-        .from("video_executions")
-        .select("id")
-        .eq("status", "failed")
-        .gte("created_at", today.toISOString());
-
-      const completed = completedData || [];
-      const failed = failedData || [];
-
-      // Use provided count if available (fresh data), otherwise fall back to state
-      const runningCount = currentRunningCount ?? runningTasks.length;
-      // Use provided nodes if available (fresh data), otherwise fall back to state
-      const nodesData = currentNodes ?? nodes;
-
-      setStats({
-        total_running: runningCount,
-        completed_today: completed.length,
-        failed_today: failed.length,
-        avg_duration:
-          completed.length > 0
-            ? Math.round(
-                completed.reduce((sum, c) => sum + (c.watch_duration_sec || 0), 0) /
-                  completed.length
-              )
-            : 0,
-        // Use the freshly fetched or state nodes data
-        tasks_per_minute: nodesData.reduce((sum, n) => sum + n.tasks_per_minute, 0),
-        likes_today: completed.filter((c) => c.liked).length,
-        comments_today: completed.filter((c) => c.commented).length,
-        subscribes_today: completed.filter((c) => c.subscribed).length,
-      });
-    } catch (err) {
-      console.error("통계 로드 실패:", err);
-    }
-  }
-
   async function stopTask(taskId: string) {
     const { error } = await supabase
       .from("video_executions")
@@ -476,7 +208,7 @@ export default function RunningPage() {
     if (error) {
       alert("작업 중지에 실패했습니다");
     } else {
-      fetchRunningTasks();
+      refetchTasks();
     }
   }
 
@@ -492,8 +224,12 @@ export default function RunningPage() {
     if (error) {
       alert("전체 중지에 실패했습니다");
     } else {
-      fetchRunningTasks();
+      refetchTasks();
     }
+  }
+
+  function handleRefreshAll() {
+    queryClient.invalidateQueries({ queryKey: runningKeys.all });
   }
 
   const nodeStatusColor: Record<string, string> = {
@@ -510,6 +246,10 @@ export default function RunningPage() {
     comment: { icon: MessageSquare, color: "text-purple-500" },
     subscribe: { icon: UserPlus, color: "text-orange-500" },
   };
+
+  if (isLoading) {
+    return <PageLoading text="실시간 모니터링 데이터를 불러오는 중..." />;
+  }
 
   return (
     <TooltipProvider>
@@ -538,7 +278,7 @@ export default function RunningPage() {
               )}
               {isAutoRefresh ? "자동 갱신 중" : "자동 갱신 꺼짐"}
             </Button>
-            <Button variant="outline" size="sm" onClick={fetchAllData}>
+            <Button variant="outline" size="sm" onClick={handleRefreshAll}>
               <RefreshCw className="mr-2 h-4 w-4" />
               새로고침
             </Button>
@@ -561,7 +301,7 @@ export default function RunningPage() {
               <div>
                 <p className="text-sm text-muted-foreground">실행 중</p>
                 <p className="text-3xl font-bold text-green-500">
-                  {stats.total_running}
+                  {computedStats.total_running}
                 </p>
               </div>
               <div className="h-12 w-12 border-2 border-foreground bg-green-500/10 flex items-center justify-center">
@@ -574,7 +314,7 @@ export default function RunningPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">오늘 완료</p>
-                <p className="text-3xl font-bold text-foreground">{stats.completed_today}</p>
+                <p className="text-3xl font-bold text-foreground">{computedStats.completed_today}</p>
               </div>
               <div className="h-12 w-12 border-2 border-foreground bg-blue-500/10 flex items-center justify-center">
                 <CheckCircle2 className="h-6 w-6 text-blue-500" />
@@ -583,15 +323,15 @@ export default function RunningPage() {
             <div className="mt-2 flex gap-4 text-xs">
               <span className="flex items-center gap-1 text-muted-foreground">
                 <ThumbsUp className="h-3 w-3 text-pink-500" />
-                {stats.likes_today}
+                {computedStats.likes_today}
               </span>
               <span className="flex items-center gap-1 text-muted-foreground">
                 <MessageSquare className="h-3 w-3 text-purple-500" />
-                {stats.comments_today}
+                {computedStats.comments_today}
               </span>
               <span className="flex items-center gap-1 text-muted-foreground">
                 <UserPlus className="h-3 w-3 text-orange-500" />
-                {stats.subscribes_today}
+                {computedStats.subscribes_today}
               </span>
             </div>
           </div>
@@ -601,7 +341,7 @@ export default function RunningPage() {
               <div>
                 <p className="text-sm text-muted-foreground">처리 속도</p>
                 <p className="text-3xl font-bold text-foreground">
-                  {stats.tasks_per_minute.toFixed(1)}
+                  {computedStats.tasks_per_minute.toFixed(1)}
                   <span className="text-sm text-muted-foreground">/분</span>
                 </p>
               </div>
@@ -616,7 +356,7 @@ export default function RunningPage() {
               <div>
                 <p className="text-sm text-muted-foreground">오늘 실패</p>
                 <p className="text-3xl font-bold text-red-500">
-                  {stats.failed_today}
+                  {computedStats.failed_today}
                 </p>
               </div>
               <div className="h-12 w-12 border-2 border-foreground bg-red-500/10 flex items-center justify-center">
@@ -625,10 +365,10 @@ export default function RunningPage() {
             </div>
             <div className="mt-2 text-xs text-muted-foreground">
               성공률:{" "}
-              {stats.completed_today + stats.failed_today > 0
+              {computedStats.completed_today + computedStats.failed_today > 0
                 ? (
-                    (stats.completed_today /
-                      (stats.completed_today + stats.failed_today)) *
+                    (computedStats.completed_today /
+                      (computedStats.completed_today + computedStats.failed_today)) *
                     100
                   ).toFixed(1)
                 : 100}
@@ -643,62 +383,66 @@ export default function RunningPage() {
             <Server className="h-5 w-5" />
             노드 상태
           </h2>
-          <div className="grid grid-cols-5 gap-3">
-            {nodes.map((node) => (
-              <div
-                key={node.id}
-                className={`p-3 rounded-lg border border-border ${
-                  node.status === "offline" ? "opacity-60" : ""
-                }`}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="font-medium text-sm text-foreground">{node.name}</span>
-                  <Badge
-                    className={`${nodeStatusColor[node.status]} text-white text-xs border-0`}
-                  >
-                    {node.status === "online"
-                      ? "온라인"
-                      : node.status === "busy"
-                      ? "바쁨"
-                      : "오프라인"}
-                  </Badge>
+          {nodes.length === 0 ? (
+            <EmptyState icon={Server} title="등록된 노드 없음" description="노드를 등록하면 여기에 표시됩니다" />
+          ) : (
+            <div className="grid grid-cols-5 gap-3">
+              {nodes.map((node) => (
+                <div
+                  key={node.id}
+                  className={`p-3 rounded-lg border border-border ${
+                    node.status === "offline" ? "opacity-60" : ""
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-medium text-sm text-foreground">{node.name}</span>
+                    <Badge
+                      className={`${nodeStatusColor[node.status]} text-white text-xs border-0`}
+                    >
+                      {node.status === "online"
+                        ? "온라인"
+                        : node.status === "busy"
+                        ? "바쁨"
+                        : "오프라인"}
+                    </Badge>
+                  </div>
+
+                  {node.status !== "offline" && (
+                    <>
+                      <div className="grid grid-cols-3 gap-1 text-xs mb-2">
+                        <div className="text-center">
+                          <div className="font-medium text-green-500">
+                            {node.active_devices}
+                          </div>
+                          <div className="text-muted-foreground">활성</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="font-medium text-gray-400">
+                            {node.idle_devices}
+                          </div>
+                          <div className="text-muted-foreground">대기</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="font-medium text-red-500">
+                            {node.error_devices}
+                          </div>
+                          <div className="text-muted-foreground">오류</div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-xs">
+                          <span className="text-muted-foreground">CPU</span>
+                          <span className="text-muted-foreground">{node.cpu_usage}%</span>
+                        </div>
+                        <Progress value={node.cpu_usage} className="h-1" />
+                      </div>
+                    </>
+                  )}
                 </div>
-
-                {node.status !== "offline" && (
-                  <>
-                    <div className="grid grid-cols-3 gap-1 text-xs mb-2">
-                      <div className="text-center">
-                        <div className="font-medium text-green-500">
-                          {node.active_devices}
-                        </div>
-                        <div className="text-muted-foreground">활성</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="font-medium text-gray-400">
-                          {node.idle_devices}
-                        </div>
-                        <div className="text-muted-foreground">대기</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="font-medium text-red-500">
-                          {node.error_devices}
-                        </div>
-                        <div className="text-muted-foreground">오류</div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-xs">
-                        <span className="text-muted-foreground">CPU</span>
-                        <span className="text-muted-foreground">{node.cpu_usage}%</span>
-                      </div>
-                      <Progress value={node.cpu_usage} className="h-1" />
-                    </div>
-                  </>
-                )}
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* 메인 콘텐츠: 실행 중 작업 + 활동 로그 */}
@@ -748,11 +492,7 @@ export default function RunningPage() {
               </div>
               <div className="flex-1 overflow-hidden p-4">
                 <ScrollArea className="h-full">
-                  {loading ? (
-                    <div className="flex items-center justify-center h-full">
-                      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                    </div>
-                  ) : runningTasks.length === 0 ? (
+                  {runningTasks.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
                       <Play className="h-12 w-12 mb-2 opacity-20" />
                       <p>실행 중인 작업이 없습니다</p>
@@ -923,7 +663,6 @@ export default function RunningPage() {
             </DialogHeader>
             {selectedTask && (
               <div className="space-y-4">
-                {/* 영상 정보 */}
                 <div className="flex gap-4">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
@@ -944,7 +683,6 @@ export default function RunningPage() {
                   </div>
                 </div>
 
-                {/* 진행 상황 */}
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-blue-400 font-medium">
@@ -962,7 +700,6 @@ export default function RunningPage() {
                   </div>
                 </div>
 
-                {/* 디바이스 정보 */}
                 <div className="grid grid-cols-2 gap-4 p-3 bg-muted rounded-lg">
                   <div>
                     <p className="text-xs text-muted-foreground">노드</p>
@@ -974,7 +711,6 @@ export default function RunningPage() {
                   </div>
                 </div>
 
-                {/* 예정 작업 */}
                 <div className="flex gap-4">
                   <div
                     className={`flex items-center gap-2 px-3 py-2 rounded-lg ${
@@ -1008,7 +744,6 @@ export default function RunningPage() {
                   </div>
                 </div>
 
-                {/* 액션 버튼 */}
                 <div className="flex justify-end gap-2">
                   <Button
                     variant="destructive"

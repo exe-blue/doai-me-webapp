@@ -1,0 +1,6 @@
+{
+  "backendBaseUrl": "https://api.doai.me",
+  "nodeId": "node_001",
+  "workerServerPort": 3001,
+  "logLevel": "info"
+}

@@ -150,11 +150,11 @@ contextBridge.exposeInMainWorld('api', {
   getHeatmapData: () => ipcRenderer.invoke('get-heatmap-data'),
 
   // ========================================================================
-  // v1.2.0: 역할 조회
+  // v1.2.0: 노드 종합 상태
   // ========================================================================
 
-  // 앱 역할 (manager | bot)
-  getAppRole: () => ipcRenderer.invoke('get-app-role'),
+  // 노드 상태 (서버 연결, Worker 서버, 디바이스 수 등)
+  getNodeStatus: () => ipcRenderer.invoke('get-node-status'),
 
   // ========================================================================
   // v1.2.0: scrcpy 화면 제어

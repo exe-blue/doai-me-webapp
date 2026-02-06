@@ -132,28 +132,33 @@
       50% { opacity: 0.5; }
     }
 
-    /* Role Banner */
-    .role-banner {
-      padding: 6px 16px;
-      font-size: 12px;
-      font-weight: 600;
-      text-align: center;
-      display: none;
+    /* Node Status Banner */
+    .node-status-banner {
+      padding: 4px 16px;
+      font-size: 11px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      color: var(--text-secondary);
     }
 
-    .role-banner.manager {
-      background: rgba(245, 158, 11, 0.2);
-      color: var(--warning);
-      border-bottom: 1px solid rgba(245, 158, 11, 0.3);
-      display: block;
+    .node-status-banner .ns-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
     }
 
-    .role-banner.bot {
-      background: rgba(59, 130, 246, 0.2);
-      color: var(--accent);
-      border-bottom: 1px solid rgba(59, 130, 246, 0.3);
-      display: block;
+    .node-status-banner .ns-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
     }
+
+    .node-status-banner .ns-dot.ok { background: var(--success); }
+    .node-status-banner .ns-dot.off { background: var(--text-secondary); opacity: 0.4; }
 
     /* Main Layout */
     .main-container {
@@ -954,8 +959,12 @@
       </div>
     </header>
 
-    <!-- Role Banner (v1.2.0) -->
-    <div class="role-banner" id="roleBanner"></div>
+    <!-- Node Status Banner (v1.2.0) -->
+    <div class="node-status-banner" id="nodeStatusBanner">
+      <span class="ns-item"><span class="ns-dot off" id="nsBannerServer"></span> 서버</span>
+      <span class="ns-item"><span class="ns-dot off" id="nsBannerWorker"></span> Worker 서버</span>
+      <span class="ns-item" id="nsBannerDevices">기기 0대</span>
+    </div>
 
     <!-- Main Container -->
     <div class="main-container">
@@ -1322,7 +1331,7 @@
     // ============================================
     const api = window.api || {
       getConfig: () => Promise.resolve({ nodeId: 'DEV-NODE' }),
-      getAppRole: () => Promise.resolve({ role: 'bot' }),
+      getNodeStatus: () => Promise.resolve({ serverConnected: false, workerServerRunning: false, deviceCount: 0 }),
       getDevices: () => Promise.resolve([]),
       getLogs: () => Promise.resolve([]),
       onDeviceUpdate: () => {},
@@ -1824,6 +1833,27 @@
 
       const dot = statusEl.querySelector('.status-dot');
       dot.className = 'status-dot' + (message === '연결 중...' ? ' pulse' : '');
+
+      // 배너도 갱신
+      updateNodeStatusBanner();
+    }
+
+    // ============================================
+    // Node Status Banner (v1.2.0)
+    // ============================================
+    async function updateNodeStatusBanner() {
+      try {
+        if (!api.getNodeStatus) return;
+        const ns = await api.getNodeStatus();
+        document.getElementById('nsBannerServer').className =
+          'ns-dot ' + (ns.serverConnected ? 'ok' : 'off');
+        document.getElementById('nsBannerWorker').className =
+          'ns-dot ' + (ns.workerServerRunning ? 'ok' : 'off');
+        document.getElementById('nsBannerDevices').textContent =
+          `기기 ${ns.deviceCount}대`;
+      } catch (err) {
+        console.error('Failed to update node status banner:', err);
+      }
     }
 
     // ============================================
@@ -1858,15 +1888,8 @@
         state.nodeId = config.nodeId || 'NODE-1';
         document.getElementById('nodeId').textContent = state.nodeId;
 
-        // Role banner (v1.2.0)
-        if (api.getAppRole) {
-          const { role } = await api.getAppRole();
-          const banner = document.getElementById('roleBanner');
-          banner.className = 'role-banner ' + role;
-          banner.textContent = role === 'manager'
-            ? '이 PC는 매니저로 동작 중입니다.'
-            : '이 PC는 봇으로 동작 중입니다.';
-        }
+        // Node status banner (v1.2.0)
+        updateNodeStatusBanner();
 
         // Register event listeners
         if (api.onServerStatus) {
@@ -1884,6 +1907,7 @@
             if (state.currentTab === 'heatmap') {
               renderHeatmap();
             }
+            updateNodeStatusBanner();
             updateLastUpdate();
           });
         }

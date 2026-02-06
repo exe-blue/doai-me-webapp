@@ -18,7 +18,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/client";
 
 // 통합 폼 스키마 (confirmPassword는 optional)
 const authSchema = z.object({
@@ -61,6 +61,7 @@ export function AuthForm({ mode, onSuccess }: AuthFormProps) {
     setMessage(null);
 
     try {
+      const supabase = createClient();
       if (isSignIn) {
         // 로그인
         const { error } = await supabase.auth.signInWithPassword({
