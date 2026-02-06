@@ -3,9 +3,16 @@
  */
 const https = require('https');
 
-const PROJECT_REF = 'zmvwwwrslkbcafyzfuhb';
-const SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inptdnd3d3JzbGtiY2FmeXpmdWhiIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2OTYyNjExMSwiZXhwIjoyMDg1MjAyMTExfQ.87WdRD7xw4Qs1VtLAF0QujDlDCWr1L0xE-zvZ_AS_yM';
-const SECRET_KEY = 'sb_secret_2Q7mAh9izbRMdtRx31iCsg_cRhBqSnQ';
+require('dotenv').config();
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '';
+const PROJECT_REF = SUPABASE_URL.match(/https:\/\/(.+)\.supabase\.co/)?.[1] || '';
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const SECRET_KEY = process.env.SUPABASE_SECRET_KEY || '';
+
+if (!PROJECT_REF || !SERVICE_ROLE_KEY) {
+  console.error('SUPABASE_URL 및 SUPABASE_SERVICE_ROLE_KEY 환경변수가 필요합니다.');
+  process.exit(1);
+}
 
 const SQL_STATEMENTS = `
 ALTER TABLE jobs ADD COLUMN IF NOT EXISTS keyword TEXT DEFAULT NULL;

@@ -3,8 +3,14 @@
  */
 const https = require('https');
 
-const SUPABASE_URL = 'https://zmvwwwrslkbcafyzfuhb.supabase.co';
-const SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inptdnd3d3JzbGtiY2FmeXpmdWhiIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2OTYyNjExMSwiZXhwIjoyMDg1MjAyMTExfQ.87WdRD7xw4Qs1VtLAF0QujDlDCWr1L0xE-zvZ_AS_yM';
+require('dotenv').config();
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
+  console.error('SUPABASE_URL 및 SUPABASE_SERVICE_ROLE_KEY 환경변수가 필요합니다.');
+  process.exit(1);
+}
 
 // SQL statements to execute
 const sqlStatements = [
@@ -19,7 +25,7 @@ async function executeQuery(sql) {
         const postData = JSON.stringify({ query: sql });
 
         const options = {
-            hostname: 'zmvwwwrslkbcafyzfuhb.supabase.co',
+            hostname: new URL(SUPABASE_URL).hostname,
             port: 443,
             path: '/rest/v1/rpc/query',
             method: 'POST',
@@ -48,7 +54,7 @@ async function executeQuery(sql) {
 async function testConnection() {
     return new Promise((resolve, reject) => {
         const options = {
-            hostname: 'zmvwwwrslkbcafyzfuhb.supabase.co',
+            hostname: new URL(SUPABASE_URL).hostname,
             port: 443,
             path: '/rest/v1/jobs?select=id&limit=1',
             method: 'GET',
@@ -74,7 +80,7 @@ async function testConnection() {
 async function checkColumn(table, column) {
     return new Promise((resolve, reject) => {
         const options = {
-            hostname: 'zmvwwwrslkbcafyzfuhb.supabase.co',
+            hostname: new URL(SUPABASE_URL).hostname,
             port: 443,
             path: `/rest/v1/${table}?select=${column}&limit=1`,
             method: 'GET',
