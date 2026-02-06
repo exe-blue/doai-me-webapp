@@ -354,7 +354,7 @@ export default function DevicesPage() {
         {/* 헤더 */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+            <h1 className="text-2xl font-head font-bold text-foreground flex items-center gap-2">
               <Smartphone className="h-6 w-6" />
               디바이스 관리
             </h1>

@@ -1,20 +1,9 @@
 import type { Metadata } from "next";
-import { Archivo_Black, Space_Grotesk } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Toaster } from "sonner";
+import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
 import "./globals.css";
-
-const archivoBlack = Archivo_Black({
-  weight: "400",
-  variable: "--font-archivo-black",
-  subsets: ["latin"],
-});
-
-const spaceGrotesk = Space_Grotesk({
-  variable: "--font-space-grotesk",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: "DoAi.Me - AI가 스스로 콘텐츠를 소비하는 세계",
@@ -49,7 +38,7 @@ export default function RootLayout({
   return (
     <html lang="ko" suppressHydrationWarning>
       <body
-        className={`${archivoBlack.variable} ${spaceGrotesk.variable} antialiased`}
+        className="antialiased"
       >
         <ThemeProvider
           attribute="class"

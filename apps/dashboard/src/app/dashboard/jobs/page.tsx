@@ -355,13 +355,13 @@ export default function JobsPage() {
           <div className="flex items-center gap-2 mt-2">
             <div
               className={cn(
-                'h-2 w-2 rounded-full',
+                'h-2 w-2 border-2 border-foreground',
                 isConnected
-                  ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]'
-                  : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]'
+                  ? 'bg-green-500'
+                  : 'bg-red-500'
               )}
             />
-            <span className="font-mono text-xs text-muted-foreground">
+            <span className="font-sans text-xs text-muted-foreground">
               대기: {idleDevices.length}대 | 온라인: {devices.filter(d => d.status !== 'offline').length}대
             </span>
           </div>
@@ -373,7 +373,7 @@ export default function JobsPage() {
             size="sm"
             onClick={handleRefresh}
             disabled={isRefreshing}
-            className="font-mono text-xs"
+            className="font-sans text-xs"
           >
             <RefreshCw className={cn('h-4 w-4 mr-1', isRefreshing && 'animate-spin')} />
             새로고침
@@ -381,7 +381,7 @@ export default function JobsPage() {
           <Button
             size="sm"
             onClick={() => setCreateModalOpen(true)}
-            className="font-mono text-xs bg-green-600 hover:bg-green-700"
+            className="font-sans text-xs bg-green-600 hover:bg-green-700"
           >
             <Plus className="h-4 w-4 mr-1" />
             새 작업
@@ -397,14 +397,14 @@ export default function JobsPage() {
         <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card/50">
           <div className="flex items-center gap-3">
             <Clock className="h-4 w-4 text-blue-500" />
-            <span className="font-mono text-sm font-bold text-foreground">작업 큐</span>
-            <span className="font-mono text-xs text-muted-foreground">
+            <span className="font-head text-sm font-bold text-foreground">작업 큐</span>
+            <span className="font-sans text-xs text-muted-foreground">
               ({jobs.length}개 {runningJob ? '• 1개 실행중' : ''})
             </span>
           </div>
           <div className="flex items-center gap-1 text-muted-foreground">
             <ArrowDown className="h-3 w-3" />
-            <span className="font-mono text-[10px]">실행 방향</span>
+            <span className="font-sans text-[10px]">실행 방향</span>
           </div>
         </div>
 
@@ -414,8 +414,8 @@ export default function JobsPage() {
             // Empty State
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <PlayCircle className="h-12 w-12 text-zinc-700 mb-4" />
-              <p className="font-mono text-sm text-muted-foreground mb-1">대기 중인 작업 없음</p>
-              <p className="font-mono text-xs text-muted-foreground">새 작업을 등록하세요</p>
+              <p className="font-sans text-sm text-muted-foreground mb-1">대기 중인 작업 없음</p>
+              <p className="font-sans text-xs text-muted-foreground">새 작업을 등록하세요</p>
             </div>
           ) : (
             <div className="flex flex-col-reverse gap-2">
@@ -463,8 +463,8 @@ export default function JobsPage() {
           <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card/50">
             <div className="flex items-center gap-3">
               <History className="h-4 w-4 text-blue-500" />
-              <span className="font-mono text-sm font-bold text-foreground">실행 기록</span>
-              <span className="font-mono text-xs text-muted-foreground">({completedJobs.length}개)</span>
+              <span className="font-head text-sm font-bold text-foreground">실행 기록</span>
+              <span className="font-sans text-xs text-muted-foreground">({completedJobs.length}개)</span>
             </div>
             
             {/* Pagination Controls */}
@@ -479,7 +479,7 @@ export default function JobsPage() {
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
-                <span className="font-mono text-xs text-muted-foreground">
+                <span className="font-sans text-xs text-muted-foreground">
                   {historyPage} / {historyTotalPages}
                 </span>
                 <Button
@@ -498,7 +498,7 @@ export default function JobsPage() {
           {/* Compact History Table */}
           <div className="divide-y divide-border/50">
             {/* Header */}
-            <div className="hidden sm:grid grid-cols-12 gap-2 px-4 py-2 bg-card/30 text-[10px] font-mono text-muted-foreground uppercase">
+            <div className="hidden sm:grid grid-cols-12 gap-2 px-4 py-2 bg-card/30 text-[10px] font-sans text-muted-foreground uppercase">
               <div className="col-span-1">상태</div>
               <div className="col-span-5">작업</div>
               <div className="col-span-3">시간</div>
@@ -551,11 +551,11 @@ export default function JobsPage() {
                     </div>
                     
                     <div className="min-w-0">
-                      <p className="font-mono text-xs text-foreground truncate">
+                      <p className="font-sans text-xs text-foreground truncate">
                         {job.display_name || job.title}
                       </p>
                       {job.title !== job.display_name && (
-                        <p className="font-mono text-[9px] text-muted-foreground truncate">
+                        <p className="font-sans text-[9px] text-muted-foreground truncate">
                           {job.title}
                         </p>
                       )}
@@ -564,7 +564,7 @@ export default function JobsPage() {
 
                   {/* Timing: Started / Duration */}
                   <div className="col-span-3">
-                    <p className="font-mono text-[10px] text-muted-foreground">
+                    <p className="font-sans text-[10px] text-muted-foreground">
                       {new Date(job.created_at).toLocaleString('ko-KR', {
                         month: 'short',
                         day: 'numeric',
@@ -572,7 +572,7 @@ export default function JobsPage() {
                         minute: '2-digit',
                       })}
                     </p>
-                    <p className="font-mono text-[10px] text-muted-foreground flex items-center gap-1">
+                    <p className="font-sans text-[10px] text-muted-foreground flex items-center gap-1">
                       <Timer className="h-3 w-3" />
                       {job.duration_sec}초
                     </p>
@@ -580,13 +580,13 @@ export default function JobsPage() {
 
                   {/* Result: Views / Likes */}
                   <div className="col-span-2">
-                    <p className="font-mono text-[10px]">
+                    <p className="font-sans text-[10px]">
                       <span className="text-green-400">{job.stats?.completed || 0}</span>
                       <span className="text-muted-foreground">/</span>
                       <span className="text-muted-foreground">{job.total_assigned || 0}</span>
                     </p>
                     {(job.stats?.failed || 0) > 0 && (
-                      <p className="font-mono text-[9px] text-red-400">
+                      <p className="font-sans text-[9px] text-red-400">
                         {job.stats?.failed} fail
                       </p>
                     )}

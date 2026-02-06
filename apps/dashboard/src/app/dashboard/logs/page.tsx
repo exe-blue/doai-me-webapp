@@ -302,7 +302,7 @@ export default function SystemLogsPage() {
         {/* 헤더 */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+            <h1 className="text-2xl font-bold font-head text-foreground flex items-center gap-2">
               <ScrollText className="h-6 w-6" />
               시스템 로그
             </h1>

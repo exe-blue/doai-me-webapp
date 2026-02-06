@@ -219,7 +219,7 @@ export default function RegisterPage() {
           <Sparkles className="h-6 w-6 text-primary" />
           작업등록
         </h1>
-        <p className="font-mono text-sm text-muted-foreground mt-2">
+        <p className="font-sans text-sm text-muted-foreground mt-2">
           YouTube 영상 또는 채널을 등록하여 자동 작업을 시작합니다
         </p>
       </div>
@@ -229,14 +229,14 @@ export default function RegisterPage() {
         <TabsList className="w-full bg-background border border-border">
           <TabsTrigger
             value="video"
-            className="flex-1 gap-2 font-mono data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+            className="flex-1 gap-2 font-sans data-[state=active]:bg-blue-600 data-[state=active]:text-white"
           >
             <Video className="h-4 w-4" />
             단일 영상
           </TabsTrigger>
           <TabsTrigger
             value="channel"
-            className="flex-1 gap-2 font-mono data-[state=active]:bg-green-600 data-[state=active]:text-white"
+            className="flex-1 gap-2 font-sans data-[state=active]:bg-green-600 data-[state=active]:text-white"
           >
             <Tv className="h-4 w-4" />
             채널 연동
@@ -248,18 +248,18 @@ export default function RegisterPage() {
           {/* 기본 정보 Card */}
           <Card className="bg-background border-border">
             <CardHeader className="pb-4">
-              <CardTitle className="font-mono text-sm flex items-center gap-2">
+              <CardTitle className="font-head font-sans text-sm flex items-center gap-2">
                 <Youtube className="h-4 w-4 text-red-500" />
                 기본 정보
               </CardTitle>
-              <CardDescription className="font-mono text-xs">
+              <CardDescription className="font-sans text-xs">
                 타겟 영상 URL과 목표 조회수를 설정합니다
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Video URL */}
               <div className="space-y-2">
-                <Label className="font-mono text-xs text-muted-foreground uppercase">
+                <Label className="font-sans text-xs text-muted-foreground uppercase">
                   영상 URL <span className="text-red-500">*</span>
                 </Label>
                 <Input
@@ -267,14 +267,14 @@ export default function RegisterPage() {
                   placeholder="https://youtu.be/..."
                   value={videoUrl}
                   onChange={(e) => setVideoUrl(e.target.value)}
-                  className="font-mono text-sm bg-card border-border focus:border-primary"
+                  className="font-sans text-sm bg-card border-border focus:border-primary"
                 />
               </div>
 
               {/* Target Views & Display Name */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label className="font-mono text-xs text-muted-foreground uppercase flex items-center gap-2">
+                  <Label className="font-sans text-xs text-muted-foreground uppercase flex items-center gap-2">
                     <Target className="h-3 w-3 text-orange-500" />
                     목표 조회수
                   </Label>
@@ -284,11 +284,11 @@ export default function RegisterPage() {
                     value={targetViews}
                     onChange={(e) => setTargetViews(e.target.value)}
                     min={1}
-                    className="font-mono text-sm bg-card border-border"
+                    className="font-sans text-sm bg-card border-border"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="font-mono text-xs text-muted-foreground uppercase flex items-center gap-2">
+                  <Label className="font-sans text-xs text-muted-foreground uppercase flex items-center gap-2">
                     <FileText className="h-3 w-3 text-purple-500" />
                     작업명 (비워두면 자동 생성)
                   </Label>
@@ -297,7 +297,7 @@ export default function RegisterPage() {
                     placeholder="자동 생성됨"
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
-                    className="font-mono text-sm bg-card border-border"
+                    className="font-sans text-sm bg-card border-border"
                   />
                 </div>
               </div>
@@ -310,7 +310,7 @@ export default function RegisterPage() {
               <AccordionItem value="behavior" className="border-b-0">
                 <CardHeader className="pb-0">
                   <AccordionTrigger className="hover:no-underline py-0">
-                    <CardTitle className="font-mono text-sm flex items-center gap-2">
+                    <CardTitle className="font-head font-sans text-sm flex items-center gap-2">
                       <Settings2 className="h-4 w-4 text-cyan-500" />
                       행동 패턴 설정
                     </CardTitle>
@@ -321,11 +321,11 @@ export default function RegisterPage() {
                     {/* Watch Duration - Dual Thumb Slider */}
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
-                        <Label className="font-mono text-xs text-muted-foreground uppercase flex items-center gap-2">
+                        <Label className="font-sans text-xs text-muted-foreground uppercase flex items-center gap-2">
                           <Clock className="h-3 w-3 text-cyan-500" />
                           시청 시간 범위
                         </Label>
-                        <span className="font-mono text-xs text-cyan-400">
+                        <span className="font-sans text-xs text-cyan-400">
                           {formatDuration(watchDuration[0])} ~ {formatDuration(watchDuration[1])}
                         </span>
                       </div>
@@ -337,7 +337,7 @@ export default function RegisterPage() {
                         step={10}
                         className="w-full"
                       />
-                      <p className="font-mono text-[10px] text-muted-foreground">
+                      <p className="font-sans text-[10px] text-muted-foreground">
                         각 기기가 무작위로 이 범위 내에서 시청합니다 (10초 ~ 10분)
                       </p>
                     </div>
@@ -345,16 +345,16 @@ export default function RegisterPage() {
                     <div className="h-px bg-border" />
 
                     {/* Interactions Header */}
-                    <p className="font-mono text-xs text-muted-foreground uppercase">상호작용 확률</p>
+                    <p className="font-sans text-xs text-muted-foreground uppercase">상호작용 확률</p>
 
                     {/* Like Probability */}
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <ThumbsUp className="h-4 w-4 text-blue-500" />
-                          <span className="font-mono text-sm text-foreground">👍 좋아요</span>
+                          <span className="font-sans text-sm text-foreground">👍 좋아요</span>
                         </div>
-                        <span className="font-mono text-sm font-bold text-blue-400">{likeProb[0]}%</span>
+                        <span className="font-sans text-sm font-bold text-blue-400">{likeProb[0]}%</span>
                       </div>
                       <Slider
                         value={likeProb}
@@ -370,9 +370,9 @@ export default function RegisterPage() {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <MessageSquare className="h-4 w-4 text-green-500" />
-                          <span className="font-mono text-sm text-foreground">💬 댓글</span>
+                          <span className="font-sans text-sm text-foreground">💬 댓글</span>
                         </div>
-                        <span className="font-mono text-sm font-bold text-green-400">{commentProb[0]}%</span>
+                        <span className="font-sans text-sm font-bold text-green-400">{commentProb[0]}%</span>
                       </div>
                       <Slider
                         value={commentProb}
@@ -388,9 +388,9 @@ export default function RegisterPage() {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <UserPlus className="h-4 w-4 text-red-500" />
-                          <span className="font-mono text-sm text-foreground">🔔 구독</span>
+                          <span className="font-sans text-sm text-foreground">🔔 구독</span>
                         </div>
-                        <span className="font-mono text-sm font-bold text-red-400">{subscribeProb[0]}%</span>
+                        <span className="font-sans text-sm font-bold text-red-400">{subscribeProb[0]}%</span>
                       </div>
                       <Slider
                         value={subscribeProb}
@@ -409,12 +409,12 @@ export default function RegisterPage() {
           {/* 댓글 관리 Card */}
           <Card className="bg-background border-border">
             <CardHeader className="pb-4">
-              <CardTitle className="font-mono text-sm flex items-center gap-2">
+              <CardTitle className="font-head font-sans text-sm flex items-center gap-2">
                 <MessageSquare className="h-4 w-4 text-green-500" />
                 댓글 관리
                 <span className="text-[10px] text-muted-foreground font-normal">(선택사항)</span>
               </CardTitle>
-              <CardDescription className="font-mono text-xs">
+              <CardDescription className="font-sans text-xs">
                 직접 입력하거나 비워두면 AI가 자동 생성합니다
               </CardDescription>
             </CardHeader>
@@ -424,12 +424,12 @@ export default function RegisterPage() {
                 value={comments}
                 onChange={(e) => setComments(e.target.value)}
                 rows={4}
-                className="font-mono text-sm bg-card border-border resize-none"
+                className="font-sans text-sm bg-card border-border resize-none"
               />
               {comments.trim() && (
                 <div className="flex items-center gap-2">
                   <AlertCircle className="h-3 w-3 text-amber-500" />
-                  <p className="font-mono text-[10px] text-muted-foreground">
+                  <p className="font-sans text-[10px] text-muted-foreground">
                     수동 입력:{' '}
                     <span className="text-amber-400 font-bold">
                       {comments.split('\n').filter((c) => c.trim()).length}개
@@ -441,7 +441,7 @@ export default function RegisterPage() {
               {!comments.trim() && commentProb[0] > 0 && (
                 <div className="flex items-center gap-2">
                   <Sparkles className="h-3 w-3 text-purple-500" />
-                  <p className="font-mono text-[10px] text-purple-400">
+                  <p className="font-sans text-[10px] text-purple-400">
                     댓글 확률 {commentProb[0]}% 설정됨 → AI가 자동 생성합니다
                   </p>
                 </div>
@@ -453,7 +453,7 @@ export default function RegisterPage() {
           <Button
             onClick={handleVideoSubmit}
             disabled={isSubmitting || !videoUrl.trim()}
-            className="w-full font-mono bg-blue-600 hover:bg-blue-700 disabled:opacity-50 h-12 text-base"
+            className="w-full font-sans bg-blue-600 hover:bg-blue-700 disabled:opacity-50 h-12 text-base"
             size="lg"
           >
             {isSubmitting ? (
@@ -478,8 +478,8 @@ export default function RegisterPage() {
               <div className="flex items-start gap-3">
                 <Tv className="h-5 w-5 text-green-500 mt-0.5 shrink-0" />
                 <div>
-                  <p className="font-mono text-sm text-green-400 font-bold">채널 자동 모니터링</p>
-                  <p className="font-mono text-xs text-muted-foreground mt-1">
+                  <p className="font-sans text-sm text-green-400 font-bold">채널 자동 모니터링</p>
+                  <p className="font-sans text-xs text-muted-foreground mt-1">
                     등록된 채널에서 새 영상이 업로드되면 자동으로 작업이 생성됩니다.
                     채널 확인 주기는 약 30분입니다.
                   </p>
@@ -491,18 +491,18 @@ export default function RegisterPage() {
           {/* Channel Info Card */}
           <Card className="bg-background border-border">
             <CardHeader className="pb-4">
-              <CardTitle className="font-mono text-sm flex items-center gap-2">
+              <CardTitle className="font-head font-sans text-sm flex items-center gap-2">
                 <Youtube className="h-4 w-4 text-red-500" />
                 채널 정보
               </CardTitle>
-              <CardDescription className="font-mono text-xs">
+              <CardDescription className="font-sans text-xs">
                 모니터링할 YouTube 채널을 등록합니다
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Channel Name */}
               <div className="space-y-2">
-                <Label className="font-mono text-xs text-muted-foreground uppercase flex items-center gap-2">
+                <Label className="font-sans text-xs text-muted-foreground uppercase flex items-center gap-2">
                   <FileText className="h-3 w-3 text-purple-500" />
                   채널명 <span className="text-red-500">*</span>
                 </Label>
@@ -511,13 +511,13 @@ export default function RegisterPage() {
                   placeholder="예: 맛있는 요리 채널"
                   value={channelName}
                   onChange={(e) => setChannelName(e.target.value)}
-                  className="font-mono text-sm bg-card border-border"
+                  className="font-sans text-sm bg-card border-border"
                 />
               </div>
 
               {/* Channel URL */}
               <div className="space-y-2">
-                <Label className="font-mono text-xs text-muted-foreground uppercase flex items-center gap-2">
+                <Label className="font-sans text-xs text-muted-foreground uppercase flex items-center gap-2">
                   <Youtube className="h-3 w-3 text-red-500" />
                   채널 URL <span className="text-red-500">*</span>
                 </Label>
@@ -526,9 +526,9 @@ export default function RegisterPage() {
                   placeholder="https://youtube.com/@channel"
                   value={channelUrl}
                   onChange={(e) => setChannelUrl(e.target.value)}
-                  className="font-mono text-sm bg-card border-border"
+                  className="font-sans text-sm bg-card border-border"
                 />
-                <p className="font-mono text-[10px] text-muted-foreground">
+                <p className="font-sans text-[10px] text-muted-foreground">
                   @핸들, /channel/ID, /c/이름 형식 모두 지원됩니다
                 </p>
               </div>
@@ -539,7 +539,7 @@ export default function RegisterPage() {
           <Button
             onClick={handleChannelSubmit}
             disabled={isSubmitting || !channelName.trim() || !channelUrl.trim()}
-            className="w-full font-mono bg-green-600 hover:bg-green-700 disabled:opacity-50 h-12 text-base"
+            className="w-full font-sans bg-green-600 hover:bg-green-700 disabled:opacity-50 h-12 text-base"
             size="lg"
           >
             {isSubmitting ? (

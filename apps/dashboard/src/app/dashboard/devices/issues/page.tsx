@@ -437,7 +437,7 @@ export default function DeviceIssuesPage() {
         {/* 헤더 */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+            <h1 className="text-2xl font-bold font-head text-foreground flex items-center gap-2">
               <AlertTriangle className="h-6 w-6 text-yellow-500" />
               디바이스 이슈
             </h1>
@@ -506,7 +506,7 @@ export default function DeviceIssuesPage() {
 
         {/* 이슈 유형별 요약 */}
         <div className="rounded-lg border border-border bg-card/50 p-4">
-          <h2 className="text-lg font-semibold text-foreground mb-4">유형별 현황</h2>
+          <h2 className="text-lg font-semibold font-head text-foreground mb-4">유형별 현황</h2>
           <div className="grid grid-cols-8 gap-2">
             {typeStats.map((stat) => {
               const Icon = stat.icon;
@@ -854,7 +854,7 @@ export default function DeviceIssuesPage() {
                   {/* 메타데이터 */}
                   {Object.keys(selectedIssue.metadata).length > 0 && (
                     <div className="space-y-2">
-                      <h4 className="text-sm font-medium text-foreground">추가 정보</h4>
+                      <h4 className="text-sm font-medium font-head text-foreground">추가 정보</h4>
                       <div className="grid grid-cols-2 gap-2 text-sm">
                         {selectedIssue.metadata.battery_level !== undefined && (
                           <div className="p-2 bg-muted rounded text-foreground">

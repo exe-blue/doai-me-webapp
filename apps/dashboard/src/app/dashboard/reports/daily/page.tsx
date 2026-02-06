@@ -275,7 +275,7 @@ export default function DailyReportPage() {
         {/* 헤더 */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+            <h1 className="text-2xl font-bold font-head text-foreground flex items-center gap-2">
               <BarChart3 className="h-6 w-6" />
               일간 리포트
             </h1>
@@ -513,7 +513,7 @@ export default function DailyReportPage() {
 
             {/* 시간대별 차트 */}
             <div className="rounded-lg border border-border bg-card/50 p-4">
-              <h2 className="text-lg font-semibold text-foreground mb-2">시간대별 작업량</h2>
+              <h2 className="text-lg font-semibold font-head text-foreground mb-2">시간대별 작업량</h2>
               <p className="text-sm text-muted-foreground mb-4">24시간 동안의 작업 분포</p>
               <div className="flex items-end gap-1 h-40">
                 {hourlyData.map((data) => (
@@ -554,7 +554,7 @@ export default function DailyReportPage() {
 
               <TabsContent value="videos" className="mt-4">
                 <div className="rounded-lg border border-border bg-card/50 p-4">
-                  <h2 className="text-lg font-semibold text-foreground mb-2">영상별 실행 현황</h2>
+                  <h2 className="text-lg font-semibold font-head text-foreground mb-2">영상별 실행 현황</h2>
                   <p className="text-sm text-muted-foreground mb-4">실행 횟수 기준 상위 20개 영상</p>
                   <Table>
                     <TableHeader>
@@ -618,7 +618,7 @@ export default function DailyReportPage() {
 
               <TabsContent value="nodes" className="mt-4">
                 <div className="rounded-lg border border-border bg-card/50 p-4">
-                  <h2 className="text-lg font-semibold text-foreground mb-2">노드별 처리 현황</h2>
+                  <h2 className="text-lg font-semibold font-head text-foreground mb-2">노드별 처리 현황</h2>
                   <p className="text-sm text-muted-foreground mb-4">5개 노드의 일일 성과</p>
                   <div className="grid grid-cols-5 gap-4">
                     {nodePerformance.map((node) => (

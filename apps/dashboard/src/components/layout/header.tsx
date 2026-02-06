@@ -50,7 +50,7 @@ export function Header({
 
       {/* Title */}
       {title && (
-        <h1 className="text-lg font-semibold hidden md:block">{title}</h1>
+        <h1 className="text-lg font-head font-semibold hidden md:block">{title}</h1>
       )}
 
       {/* Search */}
@@ -72,7 +72,7 @@ export function Header({
         {showNotifications && (
           <Button variant="ghost" size="icon" className="relative">
             <Bell className="h-5 w-5" />
-            <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-destructive" />
+            <span className="absolute top-1 right-1 h-2 w-2 border border-foreground bg-destructive" />
           </Button>
         )}
 

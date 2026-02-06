@@ -330,7 +330,7 @@ export default function ExecutionHistoryPage() {
         {/* 헤더 */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+            <h1 className="text-2xl font-head font-bold text-foreground flex items-center gap-2">
               <History className="h-6 w-6" />
               실행 이력
             </h1>
@@ -627,14 +627,14 @@ export default function ExecutionHistoryPage() {
                       </TableCell>
 
                       <TableCell>
-                        <span className="text-sm font-mono text-foreground">
+                        <span className="text-sm font-sans text-foreground">
                           {formatDuration(exec.duration_seconds)}
                         </span>
                       </TableCell>
 
                       <TableCell>
                         <div className="text-sm">
-                          <span className="font-mono text-foreground">
+                          <span className="font-sans text-foreground">
                             {formatDuration(exec.watch_duration_seconds)}
                           </span>
                           <span className="text-muted-foreground text-xs ml-1">

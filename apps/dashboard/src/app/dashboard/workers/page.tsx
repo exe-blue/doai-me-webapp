@@ -27,6 +27,8 @@ import {
   HardDrive,
   Play,
   Loader2,
+  Plug,
+  Unplug,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -74,6 +76,17 @@ interface WorkersResponse {
   summary: WorkersSummary;
 }
 
+// Appium 세션 메트릭 타입
+interface AppiumMetrics {
+  appiumOnline: boolean;
+  appiumReady: boolean;
+  activeSessions: number;
+  maxSessions: number;
+  availablePorts: number;
+  usedPorts: Record<string, number>;
+  activeDevices: string[];
+}
+
 // 상태 배지 컴포넌트
 function StatusBadge({ status }: { status: string }) {
   const config: Record<string, { color: string; icon: React.ReactNode }> = {
@@ -86,7 +99,7 @@ function StatusBadge({ status }: { status: string }) {
   const { color, icon } = config[status] || config.offline;
 
   return (
-    <Badge variant="outline" className={`font-mono text-xs ${color} flex items-center gap-1`}>
+    <Badge variant="outline" className={`font-sans text-xs ${color} flex items-center gap-1`}>
       {icon}
       {status.toUpperCase()}
     </Badge>
@@ -115,19 +128,33 @@ function formatTimestamp(timestamp: string | null): string {
 
 export default function WorkersPage() {
   const [data, setData] = useState<WorkersResponse | null>(null);
+  const [appiumData, setAppiumData] = useState<AppiumMetrics | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
 
-  // Worker 데이터 조회
+  // Worker + Appium 데이터 병렬 조회
   const fetchWorkers = useCallback(async (showToast = false) => {
     try {
-      const response = await fetch('/api/workers');
-      if (!response.ok) throw new Error('Failed to fetch workers');
-      const result = await response.json();
-      // API 응답이 { success: true, data: WorkersResponse } 형태일 수 있음
-      const workersData: WorkersResponse = result.data ?? result;
-      setData(workersData);
+      const [workersRes, appiumRes] = await Promise.all([
+        fetch('/api/workers').catch(() => null),
+        fetch('/api/appium').catch(() => null),
+      ]);
+
+      // Workers 데이터
+      if (workersRes && workersRes.ok) {
+        const result = await workersRes.json();
+        const workersData: WorkersResponse = result.data ?? result;
+        setData(workersData);
+      }
+
+      // Appium 데이터
+      if (appiumRes && appiumRes.ok) {
+        const result = await appiumRes.json();
+        const metrics: AppiumMetrics = result.data ?? result;
+        setAppiumData(metrics);
+      }
+
       if (showToast) {
         toast.success('Worker 상태 갱신됨');
       }
@@ -186,8 +213,8 @@ export default function WorkersPage() {
           <h1 className="text-xl font-head text-foreground">Worker 모니터링</h1>
           <div className="flex items-center gap-3 mt-2">
             <div className="flex items-center gap-2">
-              <div className={`h-2 w-2 rounded-full ${managerOnline ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]' : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]'}`} />
-              <span className="font-mono text-xs text-muted-foreground">
+              <div className={`h-2 w-2 border-2 border-foreground ${managerOnline ? 'bg-green-500' : 'bg-red-500'}`} />
+              <span className="font-sans text-xs text-muted-foreground">
                 Manager: {managerOnline ? '연결됨' : '오프라인'}
               </span>
             </div>
@@ -198,7 +225,7 @@ export default function WorkersPage() {
             variant="outline"
             size="sm"
             onClick={() => setAutoRefresh(!autoRefresh)}
-            className={`font-mono text-xs ${autoRefresh ? 'border-green-700 text-green-400' : 'border-border text-muted-foreground'}`}
+            className={`font-sans text-xs ${autoRefresh ? 'border-green-700 text-green-400' : 'border-border text-muted-foreground'}`}
           >
             <Activity className={`h-3.5 w-3.5 mr-1.5 ${autoRefresh ? 'animate-pulse' : ''}`} />
             {autoRefresh ? 'AUTO' : 'MANUAL'}
@@ -208,7 +235,7 @@ export default function WorkersPage() {
             size="sm"
             onClick={handleRefresh}
             disabled={refreshing}
-            className="font-mono text-xs border-border hover:border-border"
+            className="font-sans text-xs border-border hover:border-border"
           >
             <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${refreshing ? 'animate-spin' : ''}`} />
             REFRESH
@@ -220,13 +247,13 @@ export default function WorkersPage() {
       <div className="grid grid-cols-4 gap-4">
         <Card className="bg-background border-border">
           <CardHeader className="pb-2">
-            <CardTitle className="font-mono text-xs text-muted-foreground flex items-center gap-2">
+            <CardTitle className="font-head font-sans text-xs text-muted-foreground flex items-center gap-2">
               <Server className="h-4 w-4" />
               Workers
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-mono font-bold text-foreground">
+            <div className="text-3xl font-sans font-bold text-foreground">
               {summary.onlineWorkers}
               <span className="text-muted-foreground">/{summary.totalWorkers}</span>
             </div>
@@ -235,13 +262,13 @@ export default function WorkersPage() {
 
         <Card className="bg-background border-border">
           <CardHeader className="pb-2">
-            <CardTitle className="font-mono text-xs text-muted-foreground flex items-center gap-2">
+            <CardTitle className="font-head font-sans text-xs text-muted-foreground flex items-center gap-2">
               <Smartphone className="h-4 w-4" />
               Devices
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-mono font-bold text-cyan-400">
+            <div className="text-3xl font-sans font-bold text-cyan-400">
               {summary.totalDevices}
             </div>
           </CardContent>
@@ -249,13 +276,13 @@ export default function WorkersPage() {
 
         <Card className="bg-background border-border">
           <CardHeader className="pb-2">
-            <CardTitle className="font-mono text-xs text-muted-foreground flex items-center gap-2">
+            <CardTitle className="font-head font-sans text-xs text-muted-foreground flex items-center gap-2">
               <Play className="h-4 w-4" />
               Active Jobs
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-mono font-bold text-yellow-400">
+            <div className="text-3xl font-sans font-bold text-yellow-400">
               {summary.activeJobs}
             </div>
           </CardContent>
@@ -263,13 +290,13 @@ export default function WorkersPage() {
 
         <Card className="bg-background border-border">
           <CardHeader className="pb-2">
-            <CardTitle className="font-mono text-xs text-muted-foreground flex items-center gap-2">
+            <CardTitle className="font-head font-sans text-xs text-muted-foreground flex items-center gap-2">
               <CheckCircle className="h-4 w-4" />
               Success Rate
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-mono font-bold text-green-400">
+            <div className="text-3xl font-sans font-bold text-green-400">
               {workers.length > 0
                 ? Math.round(
                     (workers.reduce((sum, w) => sum + w.metrics.successfulJobs, 0) /
@@ -286,7 +313,7 @@ export default function WorkersPage() {
       {/* Workers Table */}
       <Card className="bg-background border-border">
         <CardHeader>
-          <CardTitle className="font-mono text-sm text-foreground">
+          <CardTitle className="font-head font-sans text-sm text-foreground">
             연결된 Workers ({workers.length})
           </CardTitle>
         </CardHeader>
@@ -294,8 +321,8 @@ export default function WorkersPage() {
           {workers.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <WifiOff className="h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground font-mono text-sm">연결된 Worker가 없습니다</p>
-              <p className="text-muted-foreground font-mono text-xs mt-2">
+              <p className="text-muted-foreground font-sans text-sm">연결된 Worker가 없습니다</p>
+              <p className="text-muted-foreground font-sans text-xs mt-2">
                 {managerOnline
                   ? 'Worker 프로세스를 시작해주세요'
                   : 'Desktop Agent를 먼저 실행해주세요'}
@@ -305,45 +332,45 @@ export default function WorkersPage() {
             <Table>
               <TableHeader>
                 <TableRow className="border-border hover:bg-transparent">
-                  <TableHead className="font-mono text-xs text-muted-foreground">ID</TableHead>
-                  <TableHead className="font-mono text-xs text-muted-foreground">Type</TableHead>
-                  <TableHead className="font-mono text-xs text-muted-foreground">Status</TableHead>
-                  <TableHead className="font-mono text-xs text-muted-foreground">Devices</TableHead>
-                  <TableHead className="font-mono text-xs text-muted-foreground">Jobs</TableHead>
-                  <TableHead className="font-mono text-xs text-muted-foreground">Success</TableHead>
-                  <TableHead className="font-mono text-xs text-muted-foreground">Resources</TableHead>
-                  <TableHead className="font-mono text-xs text-muted-foreground">Uptime</TableHead>
-                  <TableHead className="font-mono text-xs text-muted-foreground">Last Heartbeat</TableHead>
+                  <TableHead className="font-sans text-xs text-muted-foreground">ID</TableHead>
+                  <TableHead className="font-sans text-xs text-muted-foreground">Type</TableHead>
+                  <TableHead className="font-sans text-xs text-muted-foreground">Status</TableHead>
+                  <TableHead className="font-sans text-xs text-muted-foreground">Devices</TableHead>
+                  <TableHead className="font-sans text-xs text-muted-foreground">Jobs</TableHead>
+                  <TableHead className="font-sans text-xs text-muted-foreground">Success</TableHead>
+                  <TableHead className="font-sans text-xs text-muted-foreground">Resources</TableHead>
+                  <TableHead className="font-sans text-xs text-muted-foreground">Uptime</TableHead>
+                  <TableHead className="font-sans text-xs text-muted-foreground">Last Heartbeat</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {workers.map((worker) => (
                   <TableRow key={worker.workerId} className="border-border">
-                    <TableCell className="font-mono text-xs text-foreground">
+                    <TableCell className="font-sans text-xs text-foreground">
                       {worker.workerId}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="font-mono text-xs border-border">
+                      <Badge variant="outline" className="font-sans text-xs border-border">
                         {worker.type}
                       </Badge>
                     </TableCell>
                     <TableCell>
                       <StatusBadge status={worker.status} />
                     </TableCell>
-                    <TableCell className="font-mono text-xs">
+                    <TableCell className="font-sans text-xs">
                       <div className="flex items-center gap-1.5">
                         <Smartphone className="h-3.5 w-3.5 text-cyan-400" />
                         <span className="text-foreground">{worker.deviceCount}</span>
                       </div>
                     </TableCell>
-                    <TableCell className="font-mono text-xs">
+                    <TableCell className="font-sans text-xs">
                       <div className="flex items-center gap-1.5">
                         <span className="text-yellow-400">{worker.activeJobs}</span>
                         <span className="text-muted-foreground">/</span>
                         <span className="text-muted-foreground">{worker.maxConcurrentJobs}</span>
                       </div>
                     </TableCell>
-                    <TableCell className="font-mono text-xs">
+                    <TableCell className="font-sans text-xs">
                       <div className="flex items-center gap-2">
                         <CheckCircle className="h-3.5 w-3.5 text-green-400" />
                         <span className="text-green-400">{worker.metrics.successfulJobs}</span>
@@ -351,7 +378,7 @@ export default function WorkersPage() {
                         <span className="text-red-400">{worker.metrics.failedJobs}</span>
                       </div>
                     </TableCell>
-                    <TableCell className="font-mono text-xs">
+                    <TableCell className="font-sans text-xs">
                       <div className="flex items-center gap-3">
                         <div className="flex items-center gap-1">
                           <Cpu className="h-3 w-3 text-muted-foreground" />
@@ -363,13 +390,13 @@ export default function WorkersPage() {
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">
+                    <TableCell className="font-sans text-xs text-muted-foreground">
                       <div className="flex items-center gap-1">
                         <Clock className="h-3 w-3" />
                         {formatTime(worker.metrics.uptimeSeconds)}
                       </div>
                     </TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">
+                    <TableCell className="font-sans text-xs text-muted-foreground">
                       {formatTimestamp(worker.lastHeartbeat)}
                     </TableCell>
                   </TableRow>
@@ -380,13 +407,142 @@ export default function WorkersPage() {
         </CardContent>
       </Card>
 
+      {/* Appium Session Monitoring */}
+      <Card className="bg-background border-border">
+        <CardHeader>
+          <CardTitle className="font-head font-sans text-sm text-foreground flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Plug className="h-4 w-4 text-purple-400" />
+              Appium 세션 모니터링
+            </div>
+            {appiumData ? (
+              <Badge
+                variant="outline"
+                className={`font-sans text-xs flex items-center gap-1 ${
+                  appiumData.appiumReady
+                    ? 'bg-green-500/20 text-green-400 border-green-500/30'
+                    : 'bg-red-500/20 text-red-400 border-red-500/30'
+                }`}
+              >
+                {appiumData.appiumReady ? (
+                  <Wifi className="h-3 w-3" />
+                ) : (
+                  <WifiOff className="h-3 w-3" />
+                )}
+                {appiumData.appiumReady ? 'READY' : 'OFFLINE'}
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="font-sans text-xs border-zinc-500/30 text-muted-foreground">
+                <Unplug className="h-3 w-3 mr-1" />
+                UNKNOWN
+              </Badge>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Appium Summary Cards */}
+          <div className="grid grid-cols-4 gap-3">
+            <div className="p-3 rounded bg-card border border-border">
+              <div className="font-sans text-[10px] text-muted-foreground">Server Status</div>
+              <div className="font-sans text-lg mt-1">
+                {appiumData?.appiumReady ? (
+                  <span className="text-green-400">Ready</span>
+                ) : (
+                  <span className="text-red-400">Offline</span>
+                )}
+              </div>
+            </div>
+            <div className="p-3 rounded bg-card border border-border">
+              <div className="font-sans text-[10px] text-muted-foreground">Active Sessions</div>
+              <div className="font-sans text-lg mt-1 text-foreground">
+                {appiumData?.activeSessions ?? 0}
+                <span className="text-muted-foreground">/{appiumData?.maxSessions ?? 10}</span>
+              </div>
+            </div>
+            <div className="p-3 rounded bg-card border border-border">
+              <div className="font-sans text-[10px] text-muted-foreground">Available Ports</div>
+              <div className="font-sans text-lg mt-1 text-cyan-400">
+                {appiumData?.availablePorts ?? 0}
+              </div>
+            </div>
+            <div className="p-3 rounded bg-card border border-border">
+              <div className="font-sans text-[10px] text-muted-foreground">Port Usage</div>
+              <div className="mt-2">
+                <div className="w-full h-2 rounded-full bg-zinc-800 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-purple-500 transition-all duration-300"
+                    style={{
+                      width: `${
+                        appiumData
+                          ? Math.round(
+                              (Object.keys(appiumData.usedPorts).length /
+                                Math.max(1, appiumData.availablePorts + Object.keys(appiumData.usedPorts).length)) *
+                                100
+                            )
+                          : 0
+                      }%`,
+                    }}
+                  />
+                </div>
+                <div className="font-sans text-[10px] text-muted-foreground mt-1">
+                  {appiumData ? Object.keys(appiumData.usedPorts).length : 0} used
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Active Sessions Table */}
+          {appiumData && appiumData.activeDevices.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow className="border-border hover:bg-transparent">
+                  <TableHead className="font-sans text-xs text-muted-foreground">Device UDID</TableHead>
+                  <TableHead className="font-sans text-xs text-muted-foreground">Port</TableHead>
+                  <TableHead className="font-sans text-xs text-muted-foreground">Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {appiumData.activeDevices.map((deviceUdid) => (
+                  <TableRow key={deviceUdid} className="border-border">
+                    <TableCell className="font-sans text-xs text-foreground">
+                      {deviceUdid}
+                    </TableCell>
+                    <TableCell className="font-sans text-xs text-cyan-400">
+                      {appiumData.usedPorts[deviceUdid] ?? '-'}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="outline"
+                        className="font-sans text-xs bg-green-500/20 text-green-400 border-green-500/30 flex items-center gap-1 w-fit"
+                      >
+                        <Activity className="h-3 w-3" />
+                        ACTIVE
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <Smartphone className="h-8 w-8 text-muted-foreground mb-2" />
+              <p className="text-muted-foreground font-sans text-xs">
+                {appiumData?.appiumReady
+                  ? '활성 Appium 세션이 없습니다'
+                  : 'Appium 서버에 연결할 수 없습니다'}
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Worker Details */}
       {workers.length > 0 && (
         <div className="grid grid-cols-2 gap-4">
           {workers.map((worker) => (
             <Card key={worker.workerId} className="bg-background border-border">
               <CardHeader className="pb-3">
-                <CardTitle className="font-mono text-sm text-foreground flex items-center justify-between">
+                <CardTitle className="font-head font-sans text-sm text-foreground flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Server className="h-4 w-4 text-cyan-400" />
                     {worker.workerId}
@@ -397,20 +553,20 @@ export default function WorkersPage() {
               <CardContent className="space-y-4">
                 {/* Devices List */}
                 <div>
-                  <h4 className="font-mono text-xs text-muted-foreground mb-2">연결된 디바이스 ({worker.devices.length})</h4>
+                  <h4 className="font-sans text-xs text-muted-foreground mb-2">연결된 디바이스 ({worker.devices.length})</h4>
                   <div className="space-y-1">
                     {worker.devices.length === 0 ? (
-                      <p className="font-mono text-xs text-muted-foreground">디바이스 없음</p>
+                      <p className="font-sans text-xs text-muted-foreground">디바이스 없음</p>
                     ) : (
                       worker.devices.slice(0, 5).map((device) => (
                         <div
                           key={device.deviceId}
                           className="flex items-center justify-between px-2 py-1 rounded bg-card"
                         >
-                          <span className="font-mono text-xs text-foreground">{device.adbId}</span>
+                          <span className="font-sans text-xs text-foreground">{device.adbId}</span>
                           <Badge
                             variant="outline"
-                            className={`font-mono text-[10px] ${
+                            className={`font-sans text-[10px] ${
                               device.state === 'IDLE'
                                 ? 'border-green-500/30 text-green-400'
                                 : device.state === 'RUNNING'
@@ -424,7 +580,7 @@ export default function WorkersPage() {
                       ))
                     )}
                     {worker.devices.length > 5 && (
-                      <p className="font-mono text-[10px] text-muted-foreground text-center mt-1">
+                      <p className="font-sans text-[10px] text-muted-foreground text-center mt-1">
                         +{worker.devices.length - 5} more devices
                       </p>
                     )}
@@ -434,18 +590,18 @@ export default function WorkersPage() {
                 {/* Metrics */}
                 <div className="grid grid-cols-3 gap-2">
                   <div className="p-2 rounded bg-card">
-                    <div className="font-mono text-[10px] text-muted-foreground">Total Jobs</div>
-                    <div className="font-mono text-lg text-foreground">{worker.metrics.totalJobsExecuted}</div>
+                    <div className="font-sans text-[10px] text-muted-foreground">Total Jobs</div>
+                    <div className="font-sans text-lg text-foreground">{worker.metrics.totalJobsExecuted}</div>
                   </div>
                   <div className="p-2 rounded bg-card">
-                    <div className="font-mono text-[10px] text-muted-foreground">Avg Duration</div>
-                    <div className="font-mono text-lg text-foreground">
+                    <div className="font-sans text-[10px] text-muted-foreground">Avg Duration</div>
+                    <div className="font-sans text-lg text-foreground">
                       {Math.round(worker.metrics.averageJobDurationMs / 1000)}s
                     </div>
                   </div>
                   <div className="p-2 rounded bg-card">
-                    <div className="font-mono text-[10px] text-muted-foreground">Success Rate</div>
-                    <div className="font-mono text-lg text-green-400">
+                    <div className="font-sans text-[10px] text-muted-foreground">Success Rate</div>
+                    <div className="font-sans text-lg text-green-400">
                       {worker.metrics.totalJobsExecuted > 0
                         ? Math.round((worker.metrics.successfulJobs / worker.metrics.totalJobsExecuted) * 100)
                         : 0}

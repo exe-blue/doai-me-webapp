@@ -163,7 +163,7 @@ export function AppSidebar({ navigation, logo, footer }: AppSidebarProps) {
           )}
         </AnimatePresence>
         {!isCollapsed && item.badge !== undefined && (
-          <span className="ml-auto rounded-full bg-primary px-2 py-0.5 text-xs text-primary-foreground">
+          <span className="ml-auto rounded border-2 border-foreground bg-primary px-2 py-0.5 text-xs text-primary-foreground">
             {item.badge}
           </span>
         )}
@@ -177,7 +177,7 @@ export function AppSidebar({ navigation, logo, footer }: AppSidebarProps) {
           <TooltipContent side="right" className="flex items-center gap-2">
             {item.label}
             {item.badge !== undefined && (
-              <span className="rounded-full bg-primary px-2 py-0.5 text-xs text-primary-foreground">
+              <span className="rounded border-2 border-foreground bg-primary px-2 py-0.5 text-xs text-primary-foreground">
                 {item.badge}
               </span>
             )}

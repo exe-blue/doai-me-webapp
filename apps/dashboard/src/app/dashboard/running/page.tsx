@@ -517,7 +517,7 @@ export default function RunningPage() {
         {/* 헤더 */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+            <h1 className="text-2xl font-bold font-head text-foreground flex items-center gap-2">
               <Activity className="h-6 w-6 text-green-500" />
               실시간 모니터링
             </h1>
@@ -564,7 +564,7 @@ export default function RunningPage() {
                   {stats.total_running}
                 </p>
               </div>
-              <div className="h-12 w-12 rounded-full bg-green-500/10 flex items-center justify-center">
+              <div className="h-12 w-12 border-2 border-foreground bg-green-500/10 flex items-center justify-center">
                 <Play className="h-6 w-6 text-green-500" />
               </div>
             </div>
@@ -576,7 +576,7 @@ export default function RunningPage() {
                 <p className="text-sm text-muted-foreground">오늘 완료</p>
                 <p className="text-3xl font-bold text-foreground">{stats.completed_today}</p>
               </div>
-              <div className="h-12 w-12 rounded-full bg-blue-500/10 flex items-center justify-center">
+              <div className="h-12 w-12 border-2 border-foreground bg-blue-500/10 flex items-center justify-center">
                 <CheckCircle2 className="h-6 w-6 text-blue-500" />
               </div>
             </div>
@@ -605,7 +605,7 @@ export default function RunningPage() {
                   <span className="text-sm text-muted-foreground">/분</span>
                 </p>
               </div>
-              <div className="h-12 w-12 rounded-full bg-yellow-500/10 flex items-center justify-center">
+              <div className="h-12 w-12 border-2 border-foreground bg-yellow-500/10 flex items-center justify-center">
                 <Zap className="h-6 w-6 text-yellow-500" />
               </div>
             </div>
@@ -619,7 +619,7 @@ export default function RunningPage() {
                   {stats.failed_today}
                 </p>
               </div>
-              <div className="h-12 w-12 rounded-full bg-red-500/10 flex items-center justify-center">
+              <div className="h-12 w-12 border-2 border-foreground bg-red-500/10 flex items-center justify-center">
                 <AlertCircle className="h-6 w-6 text-red-500" />
               </div>
             </div>
@@ -639,7 +639,7 @@ export default function RunningPage() {
 
         {/* 노드 상태 */}
         <div className="rounded-lg border border-border bg-card/50 p-4">
-          <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-4">
+          <h2 className="text-lg font-semibold font-head text-foreground flex items-center gap-2 mb-4">
             <Server className="h-5 w-5" />
             노드 상태
           </h2>
@@ -708,7 +708,7 @@ export default function RunningPage() {
             <div className="h-[600px] flex flex-col rounded-lg border border-border bg-card/50">
               <div className="p-4 border-b border-border flex-none">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-semibold text-foreground">
+                  <h2 className="text-lg font-semibold font-head text-foreground">
                     실행 중인 작업 ({runningTasks.length})
                   </h2>
                   <div className="flex items-center gap-2">
@@ -875,7 +875,7 @@ export default function RunningPage() {
           <div className="col-span-1">
             <div className="h-[600px] flex flex-col rounded-lg border border-border bg-card/50">
               <div className="p-4 border-b border-border flex-none">
-                <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                <h2 className="text-lg font-semibold font-head text-foreground flex items-center gap-2">
                   <TrendingUp className="h-5 w-5" />
                   실시간 활동
                 </h2>
@@ -935,7 +935,7 @@ export default function RunningPage() {
                     className="h-20 w-32 rounded object-cover bg-muted"
                   />
                   <div>
-                    <h4 className="font-medium text-foreground">
+                    <h4 className="font-medium font-head text-foreground">
                       {selectedTask.video?.title || selectedTask.video_id}
                     </h4>
                     <p className="text-sm text-muted-foreground">

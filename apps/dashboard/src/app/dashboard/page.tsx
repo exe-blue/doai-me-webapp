@@ -45,15 +45,15 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-head text-foreground">대시보드</h1>
+          <h1 className="text-xl font-head font-bold text-foreground">대시보드</h1>
           <div className="flex items-center gap-2 mt-2">
             <span className={cn(
-              'inline-block h-2 w-2 rounded-full',
+              'inline-block h-2 w-2 border-2 border-foreground',
               isConnected
-                ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]'
-                : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]'
+                ? 'bg-green-500'
+                : 'bg-red-500'
             )} />
-            <span className="font-mono text-xs text-muted-foreground">
+            <span className="text-xs text-muted-foreground">
               {isConnected ? '연결됨' : '연결 끊김'}
             </span>
           </div>
@@ -65,22 +65,21 @@ export default function DashboardPage() {
         {/* Operation Rate - Large Card */}
         <Card className="col-span-2 relative overflow-hidden">
           <CardContent className="p-6">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-green-500/10 to-transparent" />
             <div className="flex items-center justify-between mb-4">
-              <span className="font-mono text-[10px] text-muted-foreground uppercase">가동률</span>
+              <span className="text-[10px] text-muted-foreground uppercase">가동률</span>
               <TrendingUp className="h-4 w-4 text-green-500" />
             </div>
             <div className="flex items-end gap-2">
-              <span className="font-mono text-5xl font-bold text-foreground">{stats.operationRate}</span>
-              <span className="font-mono text-2xl text-muted-foreground mb-1">%</span>
+              <span className="text-5xl font-bold text-foreground">{stats.operationRate}</span>
+              <span className="text-2xl text-muted-foreground mb-1">%</span>
             </div>
-            <div className="mt-4 h-2 bg-muted rounded-full overflow-hidden">
+            <div className="mt-4 h-2 bg-muted border border-border overflow-hidden">
               <div
-                className="h-full bg-gradient-to-r from-green-500 to-green-400 transition-all duration-500"
+                className="h-full bg-green-500 transition-all duration-500"
                 style={{ width: `${stats.operationRate}%` }}
               />
             </div>
-            <p className="font-mono text-xs text-muted-foreground mt-2">
+            <p className="text-xs text-muted-foreground mt-2">
               {stats.online} / {stats.total} 기기 온라인
             </p>
           </CardContent>
@@ -90,11 +89,11 @@ export default function DashboardPage() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="font-mono text-[10px] text-muted-foreground uppercase">총 기기</span>
+              <span className="text-[10px] text-muted-foreground uppercase">총 기기</span>
               <Monitor className="h-3.5 w-3.5 text-muted-foreground" />
             </div>
-            <span className="font-mono text-3xl font-bold text-foreground">{stats.total}</span>
-            <p className="font-mono text-[10px] text-muted-foreground mt-1">
+            <span className="text-3xl font-bold text-foreground">{stats.total}</span>
+            <p className="text-[10px] text-muted-foreground mt-1">
               {stats.pcCount}개 PC 연결됨
             </p>
           </CardContent>
@@ -104,11 +103,11 @@ export default function DashboardPage() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="font-mono text-[10px] text-muted-foreground uppercase">작동중</span>
-              <span className="inline-block h-2 w-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]" />
+              <span className="text-[10px] text-muted-foreground uppercase">작동중</span>
+              <span className="inline-block h-2 w-2 border-2 border-foreground bg-green-500" />
             </div>
-            <span className="font-mono text-3xl font-bold text-green-400">{stats.online}</span>
-            <p className="font-mono text-[10px] text-muted-foreground mt-1">
+            <span className="text-3xl font-bold text-green-400">{stats.online}</span>
+            <p className="text-[10px] text-muted-foreground mt-1">
               {stats.activePCs}개 PC 활성
             </p>
           </CardContent>
@@ -118,11 +117,11 @@ export default function DashboardPage() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="font-mono text-[10px] text-muted-foreground uppercase">작업중</span>
-              <span className="inline-block h-2 w-2 rounded-full bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.5)]" />
+              <span className="text-[10px] text-muted-foreground uppercase">작업중</span>
+              <span className="inline-block h-2 w-2 border-2 border-foreground bg-yellow-500" />
             </div>
-            <span className="font-mono text-3xl font-bold text-yellow-400">{stats.busy}</span>
-            <p className="font-mono text-[10px] text-muted-foreground mt-1">
+            <span className="text-3xl font-bold text-yellow-400">{stats.busy}</span>
+            <p className="text-[10px] text-muted-foreground mt-1">
               작업 실행중
             </p>
           </CardContent>
@@ -132,11 +131,11 @@ export default function DashboardPage() {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="font-mono text-[10px] text-muted-foreground uppercase">오프라인</span>
+              <span className="text-[10px] text-muted-foreground uppercase">오프라인</span>
               <WifiOff className="h-3.5 w-3.5 text-muted-foreground" />
             </div>
-            <span className="font-mono text-3xl font-bold text-muted-foreground">{stats.offline}</span>
-            <p className="font-mono text-[10px] text-muted-foreground mt-1">
+            <span className="text-3xl font-bold text-muted-foreground">{stats.offline}</span>
+            <p className="text-[10px] text-muted-foreground mt-1">
               연결 끊김
             </p>
           </CardContent>
@@ -146,26 +145,26 @@ export default function DashboardPage() {
         <Card className="col-span-2">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-3">
-              <span className="font-mono text-[10px] text-muted-foreground uppercase">시스템 상태</span>
+              <span className="text-[10px] text-muted-foreground uppercase">시스템 상태</span>
               <Activity className="h-4 w-4 text-muted-foreground" />
             </div>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
                 <span className={cn(
-                  'inline-block h-3 w-3 rounded-full',
+                  'inline-block h-3 w-3 border-2 border-foreground',
                   isConnected ? 'bg-green-500' : 'bg-red-500'
                 )} />
-                <span className="font-mono text-sm text-foreground">
+                <span className="text-sm text-foreground">
                   Socket.io: {isConnected ? '연결됨' : '연결 끊김'}
                 </span>
               </div>
               <div className="h-4 w-px bg-border" />
               <div className="flex items-center gap-2">
                 <span className={cn(
-                  'inline-block h-3 w-3 rounded-full',
+                  'inline-block h-3 w-3 border-2 border-foreground',
                   stats.online > 0 ? 'bg-green-500' : 'bg-yellow-500'
                 )} />
-                <span className="font-mono text-sm text-foreground">
+                <span className="text-sm text-foreground">
                   워커: {stats.online > 0 ? '활성' : '대기중'}
                 </span>
               </div>
@@ -183,8 +182,8 @@ export default function DashboardPage() {
                 <div className="flex items-center gap-3">
                   <Smartphone className="h-5 w-5 text-blue-500" />
                   <div>
-                    <h3 className="font-mono text-sm font-bold text-foreground">기기관리</h3>
-                    <p className="font-mono text-[10px] text-muted-foreground">기기 제어 및 브로드캐스트</p>
+                    <h3 className="font-head text-sm font-bold text-foreground">기기관리</h3>
+                    <p className="text-[10px] text-muted-foreground">기기 제어 및 브로드캐스트</p>
                   </div>
                 </div>
                 <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-muted-foreground transition-colors" />
@@ -200,8 +199,8 @@ export default function DashboardPage() {
                 <div className="flex items-center gap-3">
                   <PlayCircle className="h-5 w-5 text-green-500" />
                   <div>
-                    <h3 className="font-mono text-sm font-bold text-foreground">작업관리</h3>
-                    <p className="font-mono text-[10px] text-muted-foreground">작업 생성 및 관리</p>
+                    <h3 className="font-head text-sm font-bold text-foreground">작업관리</h3>
+                    <p className="text-[10px] text-muted-foreground">작업 생성 및 관리</p>
                   </div>
                 </div>
                 <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-muted-foreground transition-colors" />
@@ -217,8 +216,8 @@ export default function DashboardPage() {
                 <div className="flex items-center gap-3">
                   <Wifi className="h-5 w-5 text-purple-500" />
                   <div>
-                    <h3 className="font-mono text-sm font-bold text-foreground">작업등록</h3>
-                    <p className="font-mono text-[10px] text-muted-foreground">채널/영상 등록</p>
+                    <h3 className="font-head text-sm font-bold text-foreground">작업등록</h3>
+                    <p className="text-[10px] text-muted-foreground">채널/영상 등록</p>
                   </div>
                 </div>
                 <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-muted-foreground transition-colors" />
@@ -231,23 +230,23 @@ export default function DashboardPage() {
       {/* Active Jobs Section */}
       <Card className="overflow-hidden">
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-3 text-sm">
+          <CardTitle className="font-head flex items-center gap-3 text-sm">
             <Activity className="h-4 w-4 text-muted-foreground" />
             진행중인 작업
           </CardTitle>
-          <span className="font-mono text-xs text-muted-foreground">{activeJobs.length}개 실행중</span>
+          <span className="text-xs text-muted-foreground">{activeJobs.length}개 실행중</span>
         </CardHeader>
         <CardContent>
           {!isConnected ? (
             <div className="flex flex-col items-center justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-primary mb-3" />
-              <span className="font-mono text-xs text-muted-foreground">연결중...</span>
+              <span className="text-xs text-muted-foreground">연결중...</span>
             </div>
           ) : activeJobs.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8">
               <PlayCircle className="h-8 w-8 text-muted-foreground mb-3" />
-              <span className="font-mono text-sm text-muted-foreground">진행중인 작업 없음</span>
-              <span className="font-mono text-xs text-muted-foreground mt-1">
+              <span className="text-sm text-muted-foreground">진행중인 작업 없음</span>
+              <span className="text-xs text-muted-foreground mt-1">
                 작업을 등록하여 실행을 시작하세요
               </span>
             </div>
@@ -256,19 +255,19 @@ export default function DashboardPage() {
               {activeJobs.slice(0, 10).map((device, index) => (
                 <div
                   key={device.id || index}
-                  className="flex items-center justify-between px-3 py-2 rounded bg-card/50"
+                  className="flex items-center justify-between px-3 py-2 border border-border bg-card/50"
                 >
                   <div className="flex items-center gap-3">
-                    <span className="inline-block h-2 w-2 rounded-full bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.5)]" />
-                    <span className="font-mono text-sm text-foreground">
+                    <span className="inline-block h-2 w-2 border-2 border-foreground bg-yellow-500" />
+                    <span className="text-sm text-foreground">
                       {device.pc_id || device.serial_number?.slice(-6)}
                     </span>
                   </div>
-                  <span className="font-mono text-xs text-muted-foreground">실행중</span>
+                  <span className="text-xs text-muted-foreground">실행중</span>
                 </div>
               ))}
               {activeJobs.length > 10 && (
-                <p className="font-mono text-xs text-muted-foreground text-center pt-2">
+                <p className="text-xs text-muted-foreground text-center pt-2">
                   + {activeJobs.length - 10}개 기기 더보기
                 </p>
               )}

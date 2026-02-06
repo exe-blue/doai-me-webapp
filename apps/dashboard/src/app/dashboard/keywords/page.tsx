@@ -366,7 +366,7 @@ export default function KeywordsPage() {
       {/* 헤더 */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">키워드 관리</h1>
+          <h1 className="text-2xl font-bold font-head text-foreground">키워드 관리</h1>
           <p className="text-sm text-muted-foreground">
             YouTube 검색에 사용할 키워드를 관리합니다
           </p>
@@ -506,7 +506,7 @@ export default function KeywordsPage() {
                   </div>
 
                   <div className="space-y-4 rounded-lg border border-border p-4">
-                    <h4 className="font-medium text-foreground">필터링 조건</h4>
+                    <h4 className="font-medium font-head text-foreground">필터링 조건</h4>
 
                     <div className="space-y-2">
                       <Label>최소 조회수: {newKeyword.min_views.toLocaleString()}</Label>
@@ -821,7 +821,7 @@ export default function KeywordsPage() {
               </div>
 
               <div className="space-y-4 rounded-lg border border-border p-4">
-                <h4 className="font-medium text-foreground">필터링 조건</h4>
+                <h4 className="font-medium font-head text-foreground">필터링 조건</h4>
 
                 <div className="space-y-2">
                   <Label>최소 조회수: {editingKeyword.min_views.toLocaleString()}</Label>

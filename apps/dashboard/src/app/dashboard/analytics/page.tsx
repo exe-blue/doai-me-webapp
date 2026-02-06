@@ -140,7 +140,7 @@ export default function AnalyticsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">진행 보기</h1>
+          <h1 className="text-2xl font-bold font-head">진행 보기</h1>
           <p className="text-muted-foreground">작업 및 기기 통계 모니터링</p>
         </div>
         <div className="flex items-center gap-2">

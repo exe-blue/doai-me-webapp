@@ -331,7 +331,7 @@ export default function ChannelsPage() {
       {/* 헤더 */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">채널 목록</h1>
+          <h1 className="text-2xl font-bold font-head text-foreground">채널 목록</h1>
           <p className="text-sm text-muted-foreground">
             모니터링할 YouTube 채널을 관리합니다
           </p>
@@ -400,7 +400,7 @@ export default function ChannelsPage() {
 
               {/* 기본 시청 설정 */}
               <div className="space-y-4 rounded-lg border border-border p-4">
-                <h4 className="font-medium text-foreground">기본 시청 설정</h4>
+                <h4 className="font-medium font-head text-foreground">기본 시청 설정</h4>
                 <p className="text-xs text-muted-foreground">
                   이 채널에서 수집된 영상에 적용될 기본값
                 </p>

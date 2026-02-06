@@ -264,7 +264,7 @@ export default function VideosPage() {
       {/* 헤더 */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">영상 목록</h1>
+          <h1 className="text-2xl font-bold font-head text-foreground">영상 목록</h1>
           <p className="text-sm text-muted-foreground">
             시청할 YouTube 영상을 관리합니다
           </p>
@@ -362,7 +362,7 @@ export default function VideosPage() {
 
               {/* 행동 확률 */}
               <div className="space-y-4 rounded-lg border border-border p-4">
-                <h4 className="font-medium text-foreground">행동 확률 (%)</h4>
+                <h4 className="font-medium font-head text-foreground">행동 확률 (%)</h4>
                 <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label className="flex items-center gap-1 text-muted-foreground">

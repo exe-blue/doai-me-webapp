@@ -585,7 +585,7 @@ export default function SchedulesPage() {
                   setFormData({ ...formData, cron_expression: e.target.value })
                 }
                 placeholder="0 * * * *"
-                className="font-mono"
+                className="font-sans"
               />
             </div>
             <div className="flex flex-wrap gap-2">
@@ -803,7 +803,7 @@ export default function SchedulesPage() {
         {/* 헤더 */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">스케줄러</h1>
+            <h1 className="text-2xl font-head font-bold text-foreground">스케줄러</h1>
             <p className="text-sm text-muted-foreground">
               자동 작업 스케줄을 관리합니다
             </p>
