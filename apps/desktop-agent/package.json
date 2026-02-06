@@ -27,6 +27,7 @@
     "lint": "eslint src --ext .ts"
   },
   "dependencies": {
+    "@doai/shared": "file:../../packages/shared",
     "socket.io-client": "^4.7.4",
     "systeminformation": "^5.21.22",
     "dotenv": "^16.4.1",

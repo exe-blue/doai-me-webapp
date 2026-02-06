@@ -27,27 +27,15 @@ export const SOCKET_EVENTS = {
 // 워크플로우 타입
 // ============================================
 
+import type { WorkflowStep } from './database';
+export type { WorkflowStep };
+
 export interface WorkflowDefinition {
   id: string;
   name: string;
   version: number;
   timeout: number;
   steps: WorkflowStep[];
-}
-
-export interface WorkflowStep {
-  id: string;
-  action: 'autox' | 'adb' | 'system' | 'wait' | 'condition';
-  script?: string;
-  command?: string;
-  timeout: number;
-  retry: {
-    attempts: number;
-    delay: number;
-    backoff: 'fixed' | 'exponential' | string;
-  };
-  onError: 'fail' | 'skip' | 'goto';
-  nextOnError?: string;
 }
 
 // ============================================

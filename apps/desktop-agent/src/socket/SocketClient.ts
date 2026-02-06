@@ -11,10 +11,13 @@ import { io, Socket } from 'socket.io-client';
 import { EventEmitter } from 'events';
 import { DeviceManager, ManagedDevice } from '../device/DeviceManager';
 import { WorkflowRunner } from '../workflow/WorkflowRunner';
+import type { WorkflowStep } from '@doai/shared/database';
 
 // ============================================
 // 타입 정의
 // ============================================
+
+export type { WorkflowStep };
 
 export interface SocketClientConfig {
   serverUrl: string;
@@ -43,17 +46,6 @@ export interface WorkflowDefinition {
   version: number;
   timeout: number;
   steps: WorkflowStep[];
-}
-
-export interface WorkflowStep {
-  id: string;
-  action: 'adb' | 'system' | 'wait' | 'condition';
-  script?: string;
-  command?: string;
-  timeout: number;
-  retry: { attempts: number; delay: number; backoff: string };
-  onError: 'fail' | 'skip' | 'goto';
-  nextOnError?: string;
 }
 
 // 에이전트 → 서버 이벤트

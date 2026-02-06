@@ -12,10 +12,13 @@
 import { Queue, QueueEvents, Job, JobsOptions } from 'bullmq';
 import Redis from 'ioredis';
 import { EventEmitter } from 'node:events';
+import type { WorkflowStep } from '../db/types';
 
 // ============================================
 // 타입 정의
 // ============================================
+
+export type { WorkflowStep };
 
 export interface WorkflowJobData {
   job_id: string;
@@ -35,21 +38,6 @@ export interface WorkflowDefinition {
   version: number;
   timeout: number;
   steps: WorkflowStep[];
-}
-
-export interface WorkflowStep {
-  id: string;
-  action: 'adb' | 'system' | 'wait' | 'condition' | 'celery' | 'appium';
-  script?: string;
-  command?: string;
-  celery_task?: string;
-  celery_params?: Record<string, unknown>;
-  appium_task?: string;
-  appium_params?: Record<string, unknown>;
-  timeout: number;
-  retry: { attempts: number; delay: number; backoff: string };
-  onError: 'fail' | 'skip' | 'goto';
-  nextOnError?: string;
 }
 
 export interface VideoExecutionJobData {

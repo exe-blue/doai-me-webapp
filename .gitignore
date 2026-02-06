@@ -10,6 +10,7 @@ dist/
 # Config files with credentials
 client-mobile/config.json
 client-pc/config.json
+apps/mobile/config.json
 preflight-config.json
 
 # Temporary files
@@ -22,6 +23,9 @@ test_job.json
 apk/
 .vercel
 .env*.local
+
+# Claude Code local settings (user-specific paths/permissions)
+.claude/settings.local.json
 
 # Docker & Nginx
 nginx/ssl/*.pem

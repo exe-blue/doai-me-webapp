@@ -15,10 +15,13 @@
 
 import { AdbController, getAdbController } from '../device/AdbController';
 import { logger } from '../utils/logger';
+import type { WorkflowStep } from '@doai/shared/database';
 
 // ============================================
 // 타입 정의
 // ============================================
+
+export type { WorkflowStep };
 
 export interface Workflow {
   id: string;
@@ -26,23 +29,6 @@ export interface Workflow {
   version: number;
   timeout: number;
   steps: WorkflowStep[];
-}
-
-export interface WorkflowStep {
-  id: string;
-  action: 'adb' | 'system' | 'wait' | 'condition';
-  script?: string;
-  command?: string;
-  timeout: number;
-  retry: RetryConfig;
-  onError: 'fail' | 'skip' | 'goto';
-  nextOnError?: string;
-}
-
-export interface RetryConfig {
-  attempts: number;
-  delay: number;
-  backoff: 'fixed' | 'exponential' | string;
 }
 
 export interface ExecutionContext {
@@ -243,7 +229,7 @@ export class WorkflowRunner {
     // 재시도 루프
     for (let attempt = 0; attempt <= maxAttempts; attempt++) {
       try {
-        await this.executeAction(step.action, device_id, script, command, step.timeout);
+        await this.executeAction(step.action, device_id, script, command, step.timeout ?? 300000);
         return; // 성공
       } catch (error) {
         lastError = error as Error;

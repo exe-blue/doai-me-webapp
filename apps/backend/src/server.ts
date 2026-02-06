@@ -21,6 +21,7 @@ import { WorkflowWorker } from './queue/WorkflowWorker';
 import { SocketServer } from './socket/index';
 import { MetricsCollector, AlertManager } from './monitor';
 import { SupabaseSyncService } from './queue/SupabaseSync';
+import { logger } from './utils/logger';
 
 // 환경 변수 로드
 dotenv.config({ path: '../../.env' });
@@ -101,16 +102,16 @@ workflowWorker.setSupabaseSync(supabaseSync);
 // 모니터링 시스템 초기화
 // ============================================
 
-// Process logger for Redis events
+// Process logger for Redis events — delegates to structured logger
 const processLogger = {
   error: (message: string, context?: Record<string, unknown>) => {
-    console.error(message, context ? JSON.stringify(context) : '');
+    logger.error(message, context);
   },
   info: (message: string, context?: Record<string, unknown>) => {
-    console.info(message, context ? JSON.stringify(context) : '');
+    logger.info(message, context);
   },
   warn: (message: string, context?: Record<string, unknown>) => {
-    console.warn(message, context ? JSON.stringify(context) : '');
+    logger.warn(message, context);
   },
 };
 
@@ -200,7 +201,7 @@ app.post('/api/workflow/enqueue', async (req, res) => {
       message: `Workflow ${workflow_id} enqueued for ${device_ids.length} devices`,
     });
   } catch (error) {
-    console.error('[API] Enqueue error:', (error as Error).message);
+    logger.error('[API] Enqueue error', { error: (error as Error).message });
     res.status(500).json({ error: (error as Error).message });
   }
 });
@@ -357,12 +358,12 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl) {
-  console.error('[Server] SUPABASE_URL is required but not set');
+  logger.error('[Server] SUPABASE_URL is required but not set');
   process.exit(1);
 }
 
 if (!supabaseKey) {
-  console.error('[Server] SUPABASE_SERVICE_ROLE_KEY is required but not set. Backend cannot run with SUPABASE_ANON_KEY due to permission restrictions.');
+  logger.error('[Server] SUPABASE_SERVICE_ROLE_KEY is required but not set. Backend cannot run with SUPABASE_ANON_KEY due to permission restrictions.');
   process.exit(1);
 }
 
@@ -1624,26 +1625,26 @@ app.get('/api/devices/stats', async (req, res) => {
 // ============================================
 
 async function startServer(): Promise<void> {
-  console.log('[Server] Starting Workflow Server...');
+  logger.info('[Server] Starting Workflow Server...');
 
   // Redis 연결 확인 - fail fast if Redis is unavailable
   try {
     await stateManager.ping();
-    console.log('[Server] Redis connection OK');
+    logger.info('[Server] Redis connection OK');
   } catch (error) {
-    console.error('[Server] Redis connection failed:', (error as Error).message);
-    console.error('[Server] Redis is required for stateManager, queueManager, and workflowWorker.');
-    console.error('[Server] Cannot start server without Redis. Exiting...');
+    logger.error('[Server] Redis connection failed', { error: (error as Error).message });
+    logger.error('[Server] Redis is required for stateManager, queueManager, and workflowWorker.');
+    logger.error('[Server] Cannot start server without Redis. Exiting...');
     process.exit(1);
   }
 
   // WorkflowWorker 이벤트 핸들러
   workflowWorker.on('node:registered', (nodeId: string) => {
-    console.log(`[Server] Node registered: ${nodeId}`);
+    logger.info(`[Server] Node registered: ${nodeId}`);
   });
 
   workflowWorker.on('workflow:complete', (result) => {
-    console.log(`[Server] Workflow complete: ${result.job_id}`);
+    logger.info(`[Server] Workflow complete: ${result.job_id}`);
   });
 
   // 모니터링 시스템 시작
@@ -1652,35 +1653,20 @@ async function startServer(): Promise<void> {
 
   // 알림 이벤트 핸들러
   alertManager.on('alert:fired', ({ level, message }) => {
-    console.log(`[Alert] 🚨 ${level.toUpperCase()}: ${message}`);
+    logger.warn(`[Alert] ${level.toUpperCase()}: ${message}`);
   });
 
   // HTTP 서버 시작
   httpServer.listen(PORT, HOST, () => {
-    console.log('');
-    console.log('╔═══════════════════════════════════════════════════════════════╗');
-    console.log('║        DoAi.Me Workflow Server (BullMQ + Socket.IO)           ║');
-    console.log('╠═══════════════════════════════════════════════════════════════╣');
-    console.log(`║  Environment: ${NODE_ENV.padEnd(47)}║`);
-    console.log(`║  Host: ${HOST.padEnd(54)}║`);
-    console.log(`║  Port: ${String(PORT).padEnd(54)}║`);
-    console.log(`║  Redis: ${REDIS_URL.substring(0, 50).padEnd(53)}║`);
-    console.log('╚═══════════════════════════════════════════════════════════════╝');
-    console.log('');
-    console.log('[Server] Endpoints:');
-    console.log(`  POST /api/workflow/enqueue - 워크플로우 Job 추가`);
-    console.log(`  GET  /api/workflow/:jobId/status - Job 상태 조회`);
-    console.log(`  GET  /api/nodes - 연결된 노드 목록`);
-    console.log(`  GET  /api/devices - 디바이스 상태`);
-    console.log(`  GET  /api/metrics?minutes=60 - 메트릭 히스토리`);
-    console.log(`  GET  /api/metrics/current - 현재 메트릭`);
-    console.log(`  GET  /api/metrics/prometheus - Prometheus 형식`);
-    console.log(`  GET  /api/alerts - 활성 알림`);
-    console.log(`  POST /api/alerts/send - 수동 알림 발송`);
-    console.log(`  GET  /health - 헬스체크`);
-    console.log('');
-    console.log('[Server] Monitoring: Metrics (1min) + Alerts enabled');
-    console.log('[Server] Waiting for Agent connections...');
+    logger.info('[Server] DoAi.Me Workflow Server (BullMQ + Socket.IO) started', {
+      environment: NODE_ENV,
+      host: HOST,
+      port: PORT,
+      redis: REDIS_URL.substring(0, 50),
+    });
+    logger.info('[Server] Endpoints: POST /api/workflow/enqueue, GET /api/workflow/:jobId/status, GET /api/nodes, GET /api/devices, GET /api/metrics, GET /api/alerts, GET /health');
+    logger.info('[Server] Monitoring: Metrics (1min) + Alerts enabled');
+    logger.info('[Server] Waiting for Agent connections...');
   });
 }
 
@@ -1689,7 +1675,7 @@ async function startServer(): Promise<void> {
 // ============================================
 
 async function gracefulShutdown(signal: string): Promise<void> {
-  console.log(`\n[Server] Received ${signal}. Starting graceful shutdown...`);
+  logger.info(`[Server] Received ${signal}. Starting graceful shutdown...`);
 
   try {
     // 모니터링 시스템 종료
@@ -1707,10 +1693,10 @@ async function gracefulShutdown(signal: string): Promise<void> {
     // State Manager 종료
     await stateManager.disconnect();
 
-    console.log('[Server] Graceful shutdown complete');
+    logger.info('[Server] Graceful shutdown complete');
     process.exit(0);
   } catch (error) {
-    console.error('[Server] Shutdown error:', (error as Error).message);
+    logger.error('[Server] Shutdown error', { error: (error as Error).message });
     process.exit(1);
   }
 }
@@ -1719,11 +1705,11 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
 process.on('uncaughtException', (error) => {
-  console.error('[Server] Uncaught exception:', error);
+  logger.error('[Server] Uncaught exception', { error: error.message || String(error) });
 });
 
 process.on('unhandledRejection', (reason) => {
-  console.error('[Server] Unhandled rejection:', reason);
+  logger.error('[Server] Unhandled rejection', { error: reason instanceof Error ? reason.message : String(reason) });
 });
 
 // 서버 시작

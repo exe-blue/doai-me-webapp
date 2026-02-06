@@ -16,6 +16,7 @@ import Redis from 'ioredis';
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import { EventEmitter } from 'node:events';
 import { CeleryBridge, CeleryTaskResult } from './CeleryBridge';
+import type { WorkflowStep } from '../db/types';
 
 // Forward-declared to avoid circular dependency
 import type { SupabaseSyncService } from './SupabaseSync';
@@ -23,6 +24,8 @@ import type { SupabaseSyncService } from './SupabaseSync';
 // ============================================
 // 타입 정의
 // ============================================
+
+export type { WorkflowStep };
 
 export interface WorkflowJobData {
   job_id: string;
@@ -41,21 +44,6 @@ export interface WorkflowDefinition {
   version: number;
   timeout: number;
   steps: WorkflowStep[];
-}
-
-export interface WorkflowStep {
-  id: string;
-  action: 'adb' | 'system' | 'wait' | 'condition' | 'celery' | 'appium';
-  script?: string;
-  command?: string;
-  celery_task?: string;
-  celery_params?: Record<string, unknown>;
-  appium_task?: string;
-  appium_params?: Record<string, unknown>;
-  timeout: number;
-  retry: { attempts: number; delay: number; backoff: string };
-  onError: 'fail' | 'skip' | 'goto';
-  nextOnError?: string;
 }
 
 export interface WorkflowJobResult {

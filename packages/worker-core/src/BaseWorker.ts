@@ -438,7 +438,7 @@ export abstract class BaseWorker extends EventEmitter {
       workerId: this.config.workerId,
       workerType: this.type,
       capabilities: this.capabilities,
-      version: '1.0.0', // TODO: Get from package.json
+      version: this.config.version ?? '1.0.0',
       host: {
         hostname: os.hostname(),
         platform: os.platform(),

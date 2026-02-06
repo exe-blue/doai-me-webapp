@@ -79,6 +79,8 @@ export interface WorkerConfig {
   defaultJobTimeoutMs: number;
   /** Worker capabilities */
   capabilities: WorkerCapability[];
+  /** Worker version (from package.json) */
+  version?: string;
   /** Optional metadata */
   metadata?: Record<string, unknown>;
 }
