@@ -37,12 +37,12 @@ const MOCK_NODE: Node = {
   name: 'Office PC 1',
   status: 'online',
   ip_address: '192.168.1.10',
-  os_info: 'Windows 11',
   cpu_usage: 45.2,
   memory_usage: 62.1,
   device_capacity: 10,
   connected_devices: 3,
   last_seen: '2026-02-06T00:00:00Z',
+  metadata: {},
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z',
 };
