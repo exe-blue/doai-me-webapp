@@ -26,8 +26,11 @@ interface CommandResult {
   error?: string;
 }
 
-// Socket.io server URL from environment or default to localhost:3001
-const SOCKET_SERVER_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
+// Socket.io server URL from environment, production default, or localhost fallback
+const SOCKET_SERVER_URL = process.env.NEXT_PUBLIC_SOCKET_URL
+  || (typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+    ? 'http://158.247.210.152:4000'
+    : 'http://localhost:3001');
 
 // Strict naming convention: P01-001, P02-015 etc.
 const VALID_PC_ID_PATTERN = /^P\d{1,2}-\d{3}$/;

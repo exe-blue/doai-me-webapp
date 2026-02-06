@@ -23,7 +23,7 @@ import { AutoUpdater, getAutoUpdater } from './updater/AutoUpdater';
 import { DeviceRecovery } from './recovery/DeviceRecovery';
 import { NodeRecovery, getNodeRecovery, SavedState } from './recovery/NodeRecovery';
 import { logger } from './utils/logger';
-import { loadAppConfig, getResourcePath } from './config/AppConfig';
+import { loadAppConfig, getAppConfig, getResourcePath } from './config/AppConfig';
 import fs from 'fs';
 
 // Manager components for Worker orchestration
@@ -41,7 +41,7 @@ import {
 // ============================================
 
 const NODE_ID = process.env.NODE_ID || process.env.DOAIME_NODE_ID || `node_${os.hostname()}`;
-const SERVER_URL = process.env.SERVER_URL || process.env.DOAIME_SERVER_URL || 'https://api.doai.me';
+let SERVER_URL = process.env.SERVER_URL || process.env.DOAIME_SERVER_URL || 'https://api.doai.me';
 const IS_DEV = process.env.NODE_ENV === 'development';
 const WORKER_SERVER_PORT = parseInt(process.env.WORKER_SERVER_PORT || '3001', 10);
 
@@ -965,7 +965,11 @@ app.on('ready', async () => {
 
   try {
     // 설정 로드 (v1.2.0)
-    loadAppConfig();
+    const appConfig = loadAppConfig();
+    // config.json의 backendBaseUrl을 SERVER_URL에 반영
+    if (appConfig.backendBaseUrl) {
+      SERVER_URL = appConfig.backendBaseUrl;
+    }
   } catch (err) {
     logger.error('loadAppConfig failed', { error: (err as Error).message });
   }
