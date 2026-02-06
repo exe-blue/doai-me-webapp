@@ -82,20 +82,19 @@ export function Header({
 
         {/* Login / User Menu */}
         {!user && (
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/auth/signin">
-              <LogIn className="mr-2 h-4 w-4" />
-              로그인
+          <Button variant="ghost" size="icon" asChild>
+            <Link href="/auth/signin" aria-label="로그인">
+              <LogIn className="h-5 w-5" />
             </Link>
           </Button>
         )}
         {user && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-9 w-9 rounded-full">
-                <Avatar className="h-9 w-9">
+              <Button variant="ghost" size="icon" className="rounded-full">
+                <Avatar className="h-7 w-7">
                   <AvatarImage src={user.avatar} alt={user.name} />
-                  <AvatarFallback>
+                  <AvatarFallback className="text-xs">
                     {user.name.slice(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
