@@ -37,11 +37,31 @@ import {
 } from './manager';
 
 // ============================================
+// 단일 인스턴스 잠금
+// ============================================
+
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  console.log('[App] Another instance is already running. Quitting.');
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    // 두 번째 인스턴스가 실행되면 기존 윈도우를 표시
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+}
+
+// ============================================
 // 환경 변수
 // ============================================
 
 const NODE_ID = process.env.NODE_ID || process.env.DOAIME_NODE_ID || `node_${os.hostname()}`;
-let SERVER_URL = process.env.SERVER_URL || process.env.DOAIME_SERVER_URL || 'https://api.doai.me';
+let SERVER_URL = process.env.SERVER_URL || process.env.DOAIME_SERVER_URL || 'http://158.247.210.152:4000';
 const IS_DEV = process.env.NODE_ENV === 'development';
 const WORKER_SERVER_PORT = parseInt(process.env.WORKER_SERVER_PORT || '3001', 10);
 
@@ -433,6 +453,10 @@ async function startAgent(): Promise<void> {
     updateTrayMenu('connected');
     sendToRenderer('agent:connected');
     sendToRenderer('server-status', { connected: true, message: '연결됨' });
+    // renderer 초기화 완료 후에도 상태를 받을 수 있도록 재전송
+    setTimeout(() => {
+      sendToRenderer('server-status', { connected: true, message: '연결됨' });
+    }, 2000);
     pushLog({ timestamp: Date.now(), level: 'info', message: '서버 연결 성공', source: 'system' });
     recordActivity();
 
