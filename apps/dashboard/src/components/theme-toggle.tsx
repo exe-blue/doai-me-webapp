@@ -22,7 +22,7 @@ export function ThemeToggle() {
     <Button
       variant="outline"
       size="icon"
-      className="fixed bottom-4 right-4 rounded-full shadow-lg z-50"
+      className="rounded-full"
       onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
       aria-label="테마 변경"
     >

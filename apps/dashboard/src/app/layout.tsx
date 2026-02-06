@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { ThemeProvider } from "@/components/theme-provider";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { Toaster } from "@/components/ui/sonner";
 import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
 import "./globals.css";
@@ -54,7 +53,6 @@ export default function RootLayout({
             본문으로 바로가기
           </a>
           {children}
-          <ThemeToggle />
           <Toaster position="top-center" />
         </ThemeProvider>
       </body>

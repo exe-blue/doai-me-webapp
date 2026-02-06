@@ -12,7 +12,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Bell, Search, Settings, LogOut, User, Menu } from 'lucide-react';
+import { Bell, Search, Settings, LogOut, LogIn, User, Menu } from 'lucide-react';
+import Link from 'next/link';
 import { useSidebar } from './sidebar-context';
 
 interface HeaderProps {
@@ -79,7 +80,15 @@ export function Header({
         {/* Theme Toggle */}
         <ThemeToggle />
 
-        {/* User Menu */}
+        {/* Login / User Menu */}
+        {!user && (
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/auth/signin">
+              <LogIn className="mr-2 h-4 w-4" />
+              로그인
+            </Link>
+          </Button>
+        )}
         {user && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
