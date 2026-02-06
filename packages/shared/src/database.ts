@@ -592,6 +592,139 @@ export type DbCommentUpdate = {
 };
 
 // ============================================
+// 스크립트 (Script)
+// ============================================
+
+export type ScriptType = 'adb_shell' | 'python' | 'uiautomator2' | 'javascript';
+export type ScriptStatus = 'draft' | 'active' | 'archived';
+
+export type Script = {
+  id: string;
+  name: string;
+  description: string | null;
+  type: ScriptType;
+  content: string;
+  version: number;
+  target_group: string | null;
+  tags: string[];
+  params_schema: Json;
+  default_params: Json;
+  timeout_ms: number;
+  status: ScriptStatus;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ScriptInsert = {
+  name: string;
+  type: ScriptType;
+  content: string;
+  description?: string | null;
+  version?: number;
+  target_group?: string | null;
+  tags?: string[];
+  params_schema?: Json;
+  default_params?: Json;
+  timeout_ms?: number;
+  status?: ScriptStatus;
+  created_by?: string | null;
+};
+
+export type ScriptUpdate = {
+  name?: string;
+  description?: string | null;
+  type?: ScriptType;
+  content?: string;
+  version?: number;
+  target_group?: string | null;
+  tags?: string[];
+  params_schema?: Json;
+  default_params?: Json;
+  timeout_ms?: number;
+  status?: ScriptStatus;
+};
+
+// ============================================
+// 스크립트 실행 (Script Execution)
+// ============================================
+
+export type ScriptExecutionStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled' | 'partial';
+
+export type ScriptExecution = {
+  id: string;
+  script_id: string;
+  script_version: number;
+  device_ids: string[];
+  pc_ids: string[];
+  params: Json;
+  status: ScriptExecutionStatus;
+  total_devices: number;
+  completed_devices: number;
+  failed_devices: number;
+  triggered_by: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ScriptExecutionInsert = {
+  script_id: string;
+  script_version: number;
+  device_ids?: string[];
+  pc_ids?: string[];
+  params?: Json;
+  status?: ScriptExecutionStatus;
+  total_devices?: number;
+  triggered_by?: string | null;
+};
+
+export type ScriptExecutionUpdate = {
+  status?: ScriptExecutionStatus;
+  completed_devices?: number;
+  failed_devices?: number;
+  started_at?: string | null;
+  completed_at?: string | null;
+};
+
+// ============================================
+// 스크립트 디바이스 결과 (Script Device Result)
+// ============================================
+
+export type ScriptDeviceResultStatus = 'pending' | 'running' | 'completed' | 'failed' | 'skipped';
+
+export type ScriptDeviceResult = {
+  id: string;
+  execution_id: string;
+  device_id: string;
+  management_code: string | null;
+  status: ScriptDeviceResultStatus;
+  output: string | null;
+  error_message: string | null;
+  duration_ms: number | null;
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+};
+
+export type ScriptDeviceResultInsert = {
+  execution_id: string;
+  device_id: string;
+  management_code?: string | null;
+  status?: ScriptDeviceResultStatus;
+};
+
+export type ScriptDeviceResultUpdate = {
+  status?: ScriptDeviceResultStatus;
+  output?: string | null;
+  error_message?: string | null;
+  duration_ms?: number | null;
+  started_at?: string | null;
+  completed_at?: string | null;
+};
+
+// ============================================
 // 모니터링 채널 (Legacy)
 // ============================================
 
@@ -743,6 +876,24 @@ export type Database = {
         Update: Partial<MonitoredChannel>;
         Relationships: [];
       };
+      scripts: {
+        Row: Script;
+        Insert: ScriptInsert;
+        Update: ScriptUpdate;
+        Relationships: [];
+      };
+      script_executions: {
+        Row: ScriptExecution;
+        Insert: ScriptExecutionInsert;
+        Update: ScriptExecutionUpdate;
+        Relationships: [];
+      };
+      script_device_results: {
+        Row: ScriptDeviceResult;
+        Insert: ScriptDeviceResultInsert;
+        Update: ScriptDeviceResultUpdate;
+        Relationships: [];
+      };
     };
     Views: {
       system_overview: {
@@ -782,6 +933,14 @@ export type Database = {
       increment_workflow_version: {
         Args: { workflow_id: string };
         Returns: { version: number }[];
+      };
+      increment_script_version: {
+        Args: { p_script_id: string };
+        Returns: { version: number }[];
+      };
+      increment_script_exec_count: {
+        Args: { p_execution_id: string; p_count_type: string };
+        Returns: undefined;
       };
     };
     Enums: {

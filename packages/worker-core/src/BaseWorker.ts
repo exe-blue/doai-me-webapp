@@ -38,6 +38,8 @@ import type {
 import { AdbController } from './AdbController';
 import { DeviceManager, ManagedDevice } from './DeviceManager';
 import { Logger, defaultLogger } from './Logger';
+import { InternalQueue } from './InternalQueue';
+import type { InternalQueueStore } from './InternalQueueStore';
 
 // ============================================================================
 // Type Definitions
@@ -105,6 +107,9 @@ export abstract class BaseWorker extends EventEmitter {
   protected readonly deviceManager: DeviceManager;
   protected readonly logger: Logger;
 
+  // InternalQueue (opt-in: subclass calls enableInternalQueue() in constructor)
+  protected internalQueue?: InternalQueue;
+
   // Private properties
   private readonly jobHandlers: Map<string, JobHandler> = new Map();
   private readonly activeJobs: Map<string, ActiveJob> = new Map();
@@ -138,6 +143,51 @@ export abstract class BaseWorker extends EventEmitter {
       workerId: config.workerId,
       managerUrl: config.managerUrl,
     });
+  }
+
+  // ============================================================================
+  // InternalQueue (Opt-in)
+  // ============================================================================
+
+  /**
+   * Enable internal queue for job buffering.
+   * Call in subclass constructor to opt-in.
+   * @param store Optional persistent store (default: in-memory only)
+   */
+  protected enableInternalQueue(store?: InternalQueueStore): void {
+    this.internalQueue = new InternalQueue({
+      store,
+      saveDebounceMs: 1000,
+    });
+    this.logger.info('InternalQueue enabled', { persistent: !!store });
+  }
+
+  /**
+   * Process the next queued job for a device that just became idle.
+   * Called automatically after job completion when InternalQueue is enabled.
+   */
+  private async processNextQueuedJob(deviceSerial: string): Promise<void> {
+    if (!this.internalQueue) return;
+
+    const nextJob = await this.internalQueue.dequeue(deviceSerial);
+    if (!nextJob) return;
+
+    this.logger.info('Processing queued job', {
+      jobId: nextJob.id,
+      deviceId: nextJob.deviceId,
+      workflowId: nextJob.workflowId,
+    });
+
+    // Synthesize a CmdExecuteJob payload
+    const payload: CmdExecuteJob = {
+      jobId: nextJob.id,
+      workflowId: nextJob.workflowId,
+      deviceId: nextJob.deviceId,
+      params: nextJob.params,
+      timeoutMs: nextJob.timeoutMs,
+    };
+
+    await this.handleExecuteJob(payload);
   }
 
   // ============================================================================
@@ -467,7 +517,7 @@ export abstract class BaseWorker extends EventEmitter {
         cpuUsage,
         memoryUsage,
         activeJobs: this.activeJobs.size,
-        queuedJobs: 0, // BaseWorker doesn't have a queue
+        queuedJobs: this.internalQueue?.getTotalQueuedJobs() ?? 0,
         uptimeSeconds,
       },
       devices: deviceStates,
@@ -709,6 +759,13 @@ export abstract class BaseWorker extends EventEmitter {
           this.logger.errorWithStack('Handler cleanup error', cleanupError as Error, { jobId });
         }
       }
+
+      // Process next queued job for this device (if InternalQueue is enabled)
+      if (this.internalQueue) {
+        this.processNextQueuedJob(deviceId).catch(err => {
+          this.logger.error('Failed to process next queued job', { deviceId, error: (err as Error).message });
+        });
+      }
     }
   }
 
@@ -852,7 +909,7 @@ export abstract class BaseWorker extends EventEmitter {
       connectionState: this.connectionState,
       lastHeartbeat: this.lastHeartbeat,
       activeJobs: this.activeJobs.size,
-      queuedJobs: 0,
+      queuedJobs: this.internalQueue?.getTotalQueuedJobs() ?? 0,
       registeredHandlers: Array.from(this.jobHandlers.keys()),
     };
   }

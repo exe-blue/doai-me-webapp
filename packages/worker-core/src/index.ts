@@ -49,6 +49,22 @@ export {
   type BaseWorkerEvents,
 } from './BaseWorker';
 
+// InternalQueue exports
+export {
+  InternalQueue,
+  type QueuedJob,
+  type InternalQueueEvents,
+  type EnqueueOptions,
+} from './InternalQueue';
+
+// InternalQueueStore exports
+export {
+  type InternalQueueStore,
+  type StoredJob,
+  MemoryQueueStore,
+  JsonFileQueueStore,
+} from './InternalQueueStore';
+
 // HumanSimulator exports
 export {
   HumanSimulator,

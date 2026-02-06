@@ -14,6 +14,8 @@ export const QUEUE_NAMES = {
   METADATA_FETCH: "metadata-fetch",
   SCHEDULED_TASK: "scheduled-task",
   CLEANUP: "cleanup",
+  SCRIPT_EXECUTION: "script-execution",
+  DEVICE_REGISTRATION: "device-registration",
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
@@ -156,6 +158,54 @@ export interface CleanupJobResult {
 }
 
 // ============================================
+// Script Execution Job
+// ============================================
+
+export type ScriptType = 'adb_shell' | 'python' | 'uiautomator2' | 'javascript';
+
+export interface ScriptExecutionJobData {
+  executionId: string;
+  scriptId: string;
+  scriptContent: string;
+  scriptType: ScriptType;
+  deviceId: string;
+  deviceSerial: string;
+  params: Record<string, unknown>;
+  timeoutMs: number;
+}
+
+export interface ScriptExecutionJobResult {
+  executionId: string;
+  deviceId: string;
+  success: boolean;
+  output?: string;
+  errorMessage?: string;
+  durationMs: number;
+}
+
+// ============================================
+// Device Registration Job
+// ============================================
+
+export interface DeviceRegistrationJobData {
+  pcId: string;
+  deviceSerial: string;
+  connectionType: 'usb' | 'wifi';
+  deviceInfo?: {
+    model?: string;
+    androidVersion?: string;
+    ipAddress?: string;
+  };
+}
+
+export interface DeviceRegistrationJobResult {
+  deviceId: string;
+  managementCode: string;
+  success: boolean;
+  errorMessage?: string;
+}
+
+// ============================================
 // Job Options 기본값
 // ============================================
 
@@ -196,6 +246,24 @@ export const DEFAULT_JOB_OPTIONS = {
     attempts: 1,
     removeOnComplete: { count: 50 },
     removeOnFail: { count: 50 },
+  },
+  [QUEUE_NAMES.SCRIPT_EXECUTION]: {
+    attempts: 2,
+    backoff: {
+      type: "fixed" as const,
+      delay: 5000,
+    },
+    removeOnComplete: { count: 500 },
+    removeOnFail: { count: 1000 },
+  },
+  [QUEUE_NAMES.DEVICE_REGISTRATION]: {
+    attempts: 3,
+    backoff: {
+      type: "exponential" as const,
+      delay: 2000,
+    },
+    removeOnComplete: { count: 200 },
+    removeOnFail: { count: 500 },
   },
 } as const;
 
