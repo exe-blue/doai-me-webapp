@@ -34,6 +34,7 @@ import {
   PlusCircle,
   Globe,
   Bot,
+  SlidersHorizontal,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -109,8 +110,9 @@ const navigation: NavigationGroup[] = [
     ],
   },
   {
-    title: '기타',
+    title: '추가설정',
     items: [
+      { label: '시청설정', href: '/dashboard/watch-settings', icon: SlidersHorizontal },
       { label: '기술 소개', href: '/tech', icon: Globe },
       { label: 'Why Not Bot', href: '/why-not-bot', icon: Bot },
     ],
