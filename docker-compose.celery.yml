@@ -1,0 +1,167 @@
+version: '3.8'
+
+services:
+  # ============================================
+  # Redis - Celery Broker & Result Backend
+  # ============================================
+  redis:
+    image: redis:7-alpine
+    container_name: doai-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: >
+      redis-server 
+      --appendonly yes 
+      --maxmemory 512mb 
+      --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - celery-network
+
+  # ============================================
+  # Flower - Celery 실시간 모니터링
+  # ============================================
+  flower:
+    image: mher/flower:2.0
+    container_name: doai-flower
+    restart: unless-stopped
+    ports:
+      - "5555:5555"
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - FLOWER_BASIC_AUTH=${FLOWER_USER:-admin}:${FLOWER_PASSWORD:-doai2024!}
+      - FLOWER_PORT=5555
+      - FLOWER_PERSISTENT=true
+      - FLOWER_DB=/data/flower.db
+      - FLOWER_PURGE_OFFLINE_WORKERS=60
+    volumes:
+      - flower_data:/data
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - celery-network
+
+  # ============================================
+  # FastAPI Server - REST API
+  # ============================================
+  api:
+    build:
+      context: ./apps/server
+      dockerfile: Dockerfile
+    container_name: doai-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=true
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - CORS_ORIGINS=["http://localhost:3000","https://doai.me"]
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - celery-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ============================================
+  # Appium Server - UIAutomator2 자동화
+  # ============================================
+  appium:
+    image: appium/appium:v2.5.1
+    container_name: doai-appium
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      - APPIUM_LOG_LEVEL=info
+    volumes:
+      - /tmp/appium:/tmp/appium
+    command: >
+      appium server
+      --address 0.0.0.0
+      --port 4723
+      --use-drivers uiautomator2
+      --relaxed-security
+      --log-timestamp
+      --log-no-colors
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4723/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ============================================
+  # Celery Beat - 주기적 스케줄러 (선택적)
+  # ============================================
+  celery-beat:
+    build:
+      context: ./apps/worker
+      dockerfile: Dockerfile
+    container_name: doai-celery-beat
+    restart: unless-stopped
+    command: celery -A celery_app beat --loglevel=info
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+    volumes:
+      - ./apps/worker:/app
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - celery-network
+    profiles:
+      - scheduler
+
+volumes:
+  redis_data:
+    driver: local
+  flower_data:
+    driver: local
+
+networks:
+  celery-network:
+    driver: bridge
+
+# ============================================
+# 사용법
+# ============================================
+# 기본 실행 (Redis + Flower + API):
+#   docker-compose -f docker-compose.celery.yml up -d
+#
+# 스케줄러 포함:
+#   docker-compose -f docker-compose.celery.yml --profile scheduler up -d
+#
+# 환경변수 설정:
+#   export FLOWER_USER=admin
+#   export FLOWER_PASSWORD=your_password
+#   export SUPABASE_URL=https://xxx.supabase.co
+#   export SUPABASE_SERVICE_ROLE_KEY=xxx
+#
+# 접속:
+#   - API: http://localhost:8000 (Swagger: /docs)
+#   - Redis: localhost:6379
+#   - Flower: http://localhost:5555 (admin/doai2024!)
+#   - Appium: http://localhost:4723 (REST API)
+#
+# Appium 서버 (network_mode: host):
+#   - 포트 4723: Appium REST API
+#   - 디바이스 WiFi IP로 직접 접근 (adb connect <ip>:5555)
+#   - UIAutomator2 systemPort 범위: 8200-8300

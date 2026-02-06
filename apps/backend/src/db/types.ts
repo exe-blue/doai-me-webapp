@@ -146,12 +146,16 @@ export interface DeviceStateRecord {
 
 export interface WorkflowStep {
   id: string;
-  action: 'autox' | 'adb' | 'wait' | 'system' | 'condition' | 'celery';
+  action: 'adb' | 'system' | 'wait' | 'condition' | 'celery' | 'appium';
   script?: string;
   command?: string;
   params?: Record<string, unknown>;
   celery_task?: string;
   celery_params?: Record<string, unknown>;
+  /** Appium task name (e.g. 'youtube_watch', 'youtube_search_and_watch') */
+  appium_task?: string;
+  /** Appium task parameters */
+  appium_params?: Record<string, unknown>;
   timeout?: number;
   retry?: { attempts: number; delay: number; backoff: string };
   onError?: 'fail' | 'skip' | 'goto';

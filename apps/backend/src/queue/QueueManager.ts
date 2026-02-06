@@ -39,11 +39,13 @@ export interface WorkflowDefinition {
 
 export interface WorkflowStep {
   id: string;
-  action: 'autox' | 'adb' | 'system' | 'wait' | 'condition' | 'celery';
+  action: 'adb' | 'system' | 'wait' | 'condition' | 'celery' | 'appium';
   script?: string;
   command?: string;
   celery_task?: string;
   celery_params?: Record<string, unknown>;
+  appium_task?: string;
+  appium_params?: Record<string, unknown>;
   timeout: number;
   retry: { attempts: number; delay: number; backoff: string };
   onError: 'fail' | 'skip' | 'goto';

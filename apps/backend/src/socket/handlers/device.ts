@@ -37,6 +37,8 @@ export interface DeviceStatus {
   current_workflow?: string;
   current_step?: string;
   progress?: number;
+  ip_address?: string;
+  adb_port?: number;
 }
 
 // ============================================

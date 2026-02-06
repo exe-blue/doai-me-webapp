@@ -45,11 +45,13 @@ export interface WorkflowDefinition {
 
 export interface WorkflowStep {
   id: string;
-  action: 'autox' | 'adb' | 'system' | 'wait' | 'condition' | 'celery';
+  action: 'adb' | 'system' | 'wait' | 'condition' | 'celery' | 'appium';
   script?: string;
   command?: string;
   celery_task?: string;
   celery_params?: Record<string, unknown>;
+  appium_task?: string;
+  appium_params?: Record<string, unknown>;
   timeout: number;
   retry: { attempts: number; delay: number; backoff: string };
   onError: 'fail' | 'skip' | 'goto';
@@ -114,6 +116,7 @@ export interface WorkflowErrorEvent {
   device_id: string;
   step_id: string;
   error: string;
+  error_code?: string;
   retry_count: number;
 }
 
@@ -299,9 +302,10 @@ export class WorkflowWorker extends EventEmitter {
     // 이벤트: 워크플로우 시작
     this.emit('workflow:start', { job_id, workflow_id, device_ids, node_id });
 
-    // 스텝을 celery / agent로 분리
-    const celerySteps = workflow.steps.filter((s) => s.action === 'celery');
-    const agentSteps = workflow.steps.filter((s) => s.action !== 'celery');
+    // 스텝을 celery(+appium) / agent로 분리
+    // 'appium' 스텝도 서버사이드 Celery를 통해 실행
+    const celerySteps = workflow.steps.filter((s) => s.action === 'celery' || s.action === 'appium');
+    const agentSteps = workflow.steps.filter((s) => s.action !== 'celery' && s.action !== 'appium');
 
     const celeryResults: Array<{ stepId: string; success: boolean; error?: string }> = [];
 
@@ -434,20 +438,28 @@ export class WorkflowWorker extends EventEmitter {
   }
 
   /**
-   * 단일 Celery 스텝 실행
+   * 단일 Celery/Appium 스텝 실행
    */
   private async executeCeleryStep(
     jobId: string,
     step: WorkflowStep,
     params: Record<string, unknown>,
   ): Promise<CeleryTaskResult> {
-    if (!step.celery_task) {
-      throw new Error(`Step ${step.id} has action=celery but no celery_task specified`);
+    // 'appium' 스텝은 appium_task를 celery_task로 매핑
+    const taskName = step.action === 'appium'
+      ? (step.appium_task || step.celery_task)
+      : step.celery_task;
+
+    if (!taskName) {
+      throw new Error(
+        `Step ${step.id} has action=${step.action} but no ${step.action === 'appium' ? 'appium_task' : 'celery_task'} specified`
+      );
     }
 
-    const mergedParams = { ...params, ...step.celery_params };
+    const stepParams = step.action === 'appium' ? step.appium_params : step.celery_params;
+    const mergedParams = { ...params, ...stepParams };
 
-    return this.celeryBridge.executeTask(step.celery_task, mergedParams, {
+    return this.celeryBridge.executeTask(taskName, mergedParams, {
       timeout: step.timeout || 300000,
       onProgress: (result) => {
         if (result.progress !== undefined) {
@@ -456,7 +468,7 @@ export class WorkflowWorker extends EventEmitter {
             device_id: 'server',
             current_step: step.id,
             progress: result.progress,
-            message: `Celery ${step.celery_task}: ${result.status}`,
+            message: `${step.action} ${taskName}: ${result.status}`,
           });
         }
       },

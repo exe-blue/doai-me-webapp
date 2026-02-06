@@ -1,0 +1,35 @@
+# Celery Worker Requirements
+# Python 3.11+
+
+# Celery & Redis
+celery[redis]==5.3.6
+redis==5.0.1
+kombu==5.3.4
+
+# ADB Control
+adbutils==2.2.2
+pure-python-adb==0.3.0.dev0
+
+# Supabase
+supabase==2.3.4
+postgrest-py==0.13.0
+
+# HTTP Client
+httpx==0.26.0
+aiohttp==3.9.3
+
+# Config & Environment
+python-dotenv==1.0.0
+pydantic==2.5.3
+pydantic-settings==2.1.0
+
+# Logging
+structlog==24.1.0
+
+# Appium
+Appium-Python-Client==4.0.0
+selenium==4.18.1
+
+# Utilities
+tenacity==8.2.3  # Retry logic
+orjson==3.9.10   # Fast JSON

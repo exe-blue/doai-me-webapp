@@ -47,7 +47,7 @@ export interface WorkflowDefinition {
 
 export interface WorkflowStep {
   id: string;
-  action: 'autox' | 'adb' | 'system' | 'wait' | 'condition';
+  action: 'adb' | 'system' | 'wait' | 'condition';
   script?: string;
   command?: string;
   timeout: number;

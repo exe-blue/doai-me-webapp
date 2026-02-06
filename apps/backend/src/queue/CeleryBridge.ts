@@ -43,11 +43,15 @@ export interface CeleryBridgeConfig {
 const TASK_ENDPOINT_MAP: Record<string, string> = {
   install_apk: '/api/tasks/install',
   health_check: '/api/tasks/health-check',
-  run_youtube_bot: '/api/tasks/run-bot',
+  run_youtube_bot: '/api/tasks/run-bot',  // DEPRECATED: use run_youtube_appium
   stop_bot: '/api/tasks/stop-bot',
   scan_devices: '/api/tasks/scan-devices',
   batch_install: '/api/tasks/batch-install',
   batch_health_check: '/api/tasks/batch-health-check',
+  // Appium tasks
+  run_youtube_appium: '/api/tasks/run-appium-bot',
+  stop_appium_session: '/api/tasks/stop-appium-session',
+  appium_health_check: '/api/tasks/appium-health-check',
 };
 
 // ============================================

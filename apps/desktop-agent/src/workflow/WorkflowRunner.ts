@@ -30,7 +30,7 @@ export interface Workflow {
 
 export interface WorkflowStep {
   id: string;
-  action: 'autox' | 'adb' | 'system' | 'wait' | 'condition';
+  action: 'adb' | 'system' | 'wait' | 'condition';
   script?: string;
   command?: string;
   timeout: number;
@@ -62,67 +62,9 @@ export interface ExecutionOptions {
 // 기본 워크플로우 정의 (fallback)
 // ============================================
 
-const DEFAULT_WORKFLOWS: Record<string, Workflow> = {
-  youtube_watch: {
-    id: 'youtube_watch',
-    name: '유튜브 영상 시청',
-    version: 2,
-    timeout: 300000,
-    steps: [
-      {
-        id: 'open_app',
-        action: 'autox',
-        script: 'launchApp("com.google.android.youtube");',
-        timeout: 10000,
-        retry: { attempts: 3, delay: 1000, backoff: 'exponential' },
-        onError: 'fail',
-      },
-      {
-        id: 'wait_load',
-        action: 'wait',
-        script: '2000',
-        timeout: 3000,
-        retry: { attempts: 1, delay: 0, backoff: 'fixed' },
-        onError: 'skip',
-      },
-      {
-        id: 'search',
-        action: 'autox',
-        script: `
-          click(desc("Search").findOne(5000));
-          sleep(500);
-          let searchBox = className("EditText").findOne(3000);
-          if (searchBox) searchBox.setText("{{keyword}}");
-          sleep(300);
-          KeyEvent("enter");
-        `,
-        timeout: 10000,
-        retry: { attempts: 2, delay: 1000, backoff: 'fixed' },
-        onError: 'fail',
-      },
-      {
-        id: 'play_video',
-        action: 'autox',
-        script: `
-          sleep(2000);
-          let video = className("android.widget.TextView").textContains("{{keyword}}").findOne(5000);
-          if (video) click(video);
-        `,
-        timeout: 10000,
-        retry: { attempts: 3, delay: 2000, backoff: 'exponential' },
-        onError: 'fail',
-      },
-      {
-        id: 'watch_duration',
-        action: 'wait',
-        script: '{{duration}}',
-        timeout: 600000,
-        retry: { attempts: 1, delay: 0, backoff: 'fixed' },
-        onError: 'skip',
-      },
-    ],
-  },
-};
+// Default workflows are now handled server-side via Appium.
+// Desktop Agent only handles 'adb', 'wait', 'condition', 'system' steps.
+const DEFAULT_WORKFLOWS: Record<string, Workflow> = {};
 
 // ============================================
 // 실행 중인 워크플로우 추적
@@ -338,13 +280,6 @@ export class WorkflowRunner {
     _timeout: number
   ): Promise<void> {
     switch (action) {
-      case 'autox': {
-        // AutoX 스크립트 실행
-        logger.info('AutoX script execution', { deviceId, script: script?.substring(0, 100) });
-        await this.executeAutoxScript(deviceId, script, _timeout);
-        break;
-      }
-
       case 'adb': {
         const cmd = command || script;
         const result = await this.adbController.execute(deviceId, cmd.startsWith('shell') ? cmd : `shell ${cmd}`);
@@ -375,106 +310,6 @@ export class WorkflowRunner {
 
       default:
         throw new Error(`Unknown action: ${action}`);
-    }
-  }
-
-  /**
-   * AutoX 스크립트 실행
-   * 
-   * 흐름:
-   * 1. 스크립트와 파라미터를 디바이스에 푸시
-   * 2. Intent Broadcast로 AutoX.js 실행
-   * 3. completion.json 파일 폴링으로 완료 대기
-   */
-  private async executeAutoxScript(
-    deviceId: string,
-    scriptContent: string,
-    timeout: number
-  ): Promise<void> {
-    const fs = await import('fs');
-    const path = await import('path');
-    const os = await import('os');
-
-    // 원격 경로
-    const remoteDir = '/sdcard/DoAiScript';
-    const scriptRemotePath = `${remoteDir}/script.js`;
-    const jobConfigPath = `${remoteDir}/job.json`;
-    const completionPath = `${remoteDir}/completion.json`;
-
-    try {
-      // 1. 디렉토리 생성 확인
-      await this.adbController.execute(deviceId, `shell mkdir -p ${remoteDir}`);
-
-      // 2. 기존 completion 파일 삭제
-      await this.adbController.execute(deviceId, `shell rm -f ${completionPath}`);
-
-      // 3. 스크립트 파일 푸시 (로컬 스크립트 파일 경로가 있다면)
-      // 현재 컨텍스트에서 params를 사용할 수 없으므로 스크립트를 직접 처리
-      if (scriptContent && scriptContent.startsWith('/')) {
-        // 스크립트 경로인 경우
-        await this.adbController.execute(deviceId, `push "${scriptContent}" "${scriptRemotePath}"`);
-      } else {
-        // 인라인 스크립트인 경우 - 임시 파일 생성
-        const tempScriptPath = path.default.join(os.default.tmpdir(), `autox_script_${Date.now()}.js`);
-        fs.default.writeFileSync(tempScriptPath, scriptContent || '// empty script');
-        try {
-          await this.adbController.execute(deviceId, `push "${tempScriptPath}" "${scriptRemotePath}"`);
-        } finally {
-          // Ensure temp file cleanup even if execute throws
-          try {
-            fs.default.unlinkSync(tempScriptPath);
-          } catch {
-            // Ignore cleanup errors
-          }
-        }
-      }
-
-      // 4. Intent Broadcast로 AutoX.js 실행
-      const intentAction = 'com.stardust.autojs.action.RUN_SCRIPT';
-      const broadcastCmd = `shell am broadcast -a ${intentAction} --es path "${scriptRemotePath}"`;
-      
-      logger.info('Executing AutoX broadcast', { deviceId, cmd: broadcastCmd });
-      await this.adbController.execute(deviceId, broadcastCmd);
-
-      // 5. 완료 대기 (polling)
-      const pollInterval = 2000;
-      const startTime = Date.now();
-
-      while (Date.now() - startTime < timeout) {
-        try {
-          const result = await this.adbController.execute(deviceId, `shell cat "${completionPath}"`);
-          
-          if (result && result.trim()) {
-            const parsed = JSON.parse(result.trim());
-            
-            if (parsed.status === 'completed') {
-              logger.info('AutoX script completed', { deviceId, data: parsed.data });
-              // 완료 파일 삭제
-              await this.adbController.execute(deviceId, `shell rm -f ${completionPath}`);
-              return;
-            }
-            
-            if (parsed.status === 'failed') {
-              await this.adbController.execute(deviceId, `shell rm -f ${completionPath}`);
-              throw new Error(`AutoX script failed: ${parsed.error || 'Unknown error'}`);
-            }
-          }
-        } catch (err) {
-          // 파일이 없거나 파싱 실패 - 계속 대기
-          if (err instanceof SyntaxError) {
-            // JSON 파싱 실패 - 파일이 아직 완성되지 않음
-          } else if (err instanceof Error && err.message.includes('failed')) {
-            throw err;
-          }
-        }
-
-        await this.sleep(pollInterval);
-      }
-
-      throw new Error(`AutoX script timeout after ${timeout}ms`);
-    } catch (err) {
-      logger.error('AutoX script execution failed', { deviceId, error: err });
-      throw err;
     }
   }
 

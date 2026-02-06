@@ -288,6 +288,87 @@ export class AdbController {
   }
 
   /**
+   * WiFi ADB 활성화
+   * USB 연결된 디바이스를 TCP/IP 모드로 전환하고 WiFi IP로 연결
+   *
+   * @returns WiFi ADB 연결 정보 { ip, port } 또는 실패 시 null
+   */
+  async enableWifiAdb(serial: string, port: number = 5555): Promise<{ ip: string; port: number } | null> {
+    try {
+      // 1. TCP/IP 모드 활성화
+      logger.info('Enabling WiFi ADB', { serial, port });
+      await this.execute(serial, `tcpip ${port}`);
+
+      // 잠시 대기 (TCP/IP 전환 시간)
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // 2. WiFi IP 주소 추출
+      const ip = await this.getDeviceWifiIp(serial);
+      if (!ip) {
+        logger.warn('Could not determine device WiFi IP', { serial });
+        return null;
+      }
+
+      // 3. WiFi 주소로 연결
+      const connectAddr = `${ip}:${port}`;
+      try {
+        await this.execute('', `connect ${connectAddr}`);
+        logger.info('WiFi ADB connected', { serial, address: connectAddr });
+      } catch (err) {
+        logger.warn('WiFi ADB connect attempt returned error (may still succeed)', {
+          serial,
+          address: connectAddr,
+          error: (err as Error).message,
+        });
+      }
+
+      return { ip, port };
+    } catch (error) {
+      logger.error('Failed to enable WiFi ADB', { serial, error });
+      return null;
+    }
+  }
+
+  /**
+   * 디바이스 WiFi IP 주소 조회
+   */
+  async getDeviceWifiIp(serial: string): Promise<string | null> {
+    try {
+      const output = await this.execute(serial, 'shell ip route');
+      // "... src 192.168.x.x ..." 패턴에서 IP 추출
+      const match = output.match(/src\s+(\d+\.\d+\.\d+\.\d+)/);
+      if (match) return match[1];
+
+      // fallback: wlan0 인터페이스에서 추출
+      const ifconfig = await this.execute(serial, 'shell ifconfig wlan0');
+      const ipMatch = ifconfig.match(/inet\s+addr:(\d+\.\d+\.\d+\.\d+)/);
+      return ipMatch ? ipMatch[1] : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * WiFi ADB 재연결 (연결 끊김 시)
+   */
+  async reconnectWifiAdb(ip: string, port: number = 5555): Promise<boolean> {
+    const address = `${ip}:${port}`;
+    try {
+      const result = await this.execute('', `connect ${address}`);
+      const connected = result.includes('connected') || result.includes('already');
+      if (connected) {
+        logger.info('WiFi ADB reconnected', { address });
+      } else {
+        logger.warn('WiFi ADB reconnect unclear result', { address, result });
+      }
+      return connected;
+    } catch (error) {
+      logger.error('WiFi ADB reconnect failed', { address, error });
+      return false;
+    }
+  }
+
+  /**
    * ADB 서버 재시작
    */
   async restartServer(): Promise<void> {
@@ -303,6 +384,58 @@ export class AdbController {
       logger.error('Failed to restart ADB server', { error });
       throw error;
     }
+  }
+
+  /**
+   * 모든 USB 디바이스에 WiFi ADB 활성화 (부팅 시 호출)
+   *
+   * @returns 성공한 디바이스 목록 [{serial, ip, port}]
+   */
+  async enableWifiAdbForAll(): Promise<Array<{ serial: string; ip: string; port: number }>> {
+    const devices = await this.getConnectedDevices();
+    const results: Array<{ serial: string; ip: string; port: number }> = [];
+
+    for (const serial of devices) {
+      // WiFi 주소 형식(ip:port) 디바이스는 스킵
+      if (serial.includes(':')) continue;
+
+      const result = await this.enableWifiAdb(serial);
+      if (result) {
+        results.push({ serial, ...result });
+      }
+    }
+
+    logger.info('WiFi ADB enabled for %d/%d devices', results.length, devices.length);
+    return results;
+  }
+
+  /**
+   * WiFi ADB 연결 상태 모니터링 + 자동 재연결
+   *
+   * @param knownDevices 이전에 연결 성공한 디바이스 목록
+   * @returns 재연결 성공한 디바이스 수
+   */
+  async monitorAndReconnectWifiAdb(
+    knownDevices: Array<{ serial: string; ip: string; port: number }>
+  ): Promise<number> {
+    const connectedDevices = await this.getConnectedDevices();
+    let reconnected = 0;
+
+    for (const device of knownDevices) {
+      const wifiAddr = `${device.ip}:${device.port}`;
+
+      // 이미 연결되어 있으면 스킵
+      if (connectedDevices.includes(wifiAddr)) continue;
+
+      // 재연결 시도
+      logger.info('WiFi ADB disconnected, reconnecting', { device: wifiAddr });
+      const success = await this.reconnectWifiAdb(device.ip, device.port);
+      if (success) {
+        reconnected++;
+      }
+    }
+
+    return reconnected;
   }
 
   /**
