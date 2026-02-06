@@ -160,6 +160,9 @@ function getHeatmapData(): HeatmapData {
 // ============================================
 
 function createWindow(): void {
+  const iconPath = getIconPath();
+  logger.info('Creating window', { iconPath, isPackaged: app.isPackaged });
+
   mainWindow = new BrowserWindow({
     width: 800,
     height: 600,
@@ -171,7 +174,7 @@ function createWindow(): void {
       contextIsolation: true,
       nodeIntegration: false,
     },
-    icon: getIconPath(),
+    icon: iconPath,
   });
 
   if (IS_DEV) {
@@ -181,8 +184,17 @@ function createWindow(): void {
   mainWindow.loadFile(path.join(__dirname, 'index.html'));
 
   mainWindow.once('ready-to-show', () => {
+    logger.info('Window ready-to-show');
     mainWindow?.show();
   });
+
+  // 안전장치: 5초 후에도 윈도우가 안 보이면 강제 표시
+  setTimeout(() => {
+    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+      logger.warn('Window not visible after 5s, forcing show');
+      mainWindow.show();
+    }
+  }, 5000);
 
   mainWindow.on('close', (event) => {
     if (!isAppQuitting) {
@@ -201,17 +213,30 @@ function createWindow(): void {
 // ============================================
 
 function createTray(): void {
-  const iconPath = getIconPath();
-  const icon = nativeImage.createFromPath(iconPath);
-  
-  tray = new Tray(icon.resize({ width: 16, height: 16 }));
-  tray.setToolTip(`DOAI Agent (${NODE_ID})`);
+  try {
+    const iconPath = getIconPath();
+    logger.info('Creating tray', { iconPath });
+    const icon = nativeImage.createFromPath(iconPath);
 
-  updateTrayMenu('disconnected');
+    if (icon.isEmpty()) {
+      logger.warn('Tray icon is empty, skipping tray creation', { iconPath });
+      return;
+    }
 
-  tray.on('double-click', () => {
-    mainWindow?.show();
-  });
+    tray = new Tray(icon.resize({ width: 16, height: 16 }));
+    tray.setToolTip(`DOAI Agent (${NODE_ID})`);
+
+    updateTrayMenu('disconnected');
+
+    tray.on('double-click', () => {
+      mainWindow?.show();
+    });
+
+    logger.info('Tray created successfully');
+  } catch (error) {
+    logger.error('Failed to create tray', { error: (error as Error).message });
+    // 트레이 실패해도 앱은 계속 실행
+  }
 }
 
 function updateTrayMenu(status: 'connected' | 'disconnected' | 'running' | 'error'): void {
@@ -936,10 +961,14 @@ function sendToRenderer(channel: string, data?: unknown): void {
 // ============================================
 
 app.on('ready', async () => {
-  logger.info('App ready');
+  logger.info('App ready', { isPackaged: app.isPackaged, resourcesPath: process.resourcesPath });
 
-  // 설정 로드 (v1.2.0)
-  loadAppConfig();
+  try {
+    // 설정 로드 (v1.2.0)
+    loadAppConfig();
+  } catch (err) {
+    logger.error('loadAppConfig failed', { error: (err as Error).message });
+  }
 
   createWindow();
   createTray();
@@ -947,7 +976,9 @@ app.on('ready', async () => {
 
   // 약간의 딜레이 후 에이전트 시작
   setTimeout(() => {
-    startAgent();
+    startAgent().catch((err) => {
+      logger.error('startAgent failed', { error: (err as Error).message });
+    });
   }, 1000);
 });
 
