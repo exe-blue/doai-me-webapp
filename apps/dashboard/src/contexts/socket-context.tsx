@@ -2,6 +2,7 @@
 
 import { createContext, useContext, ReactNode } from 'react';
 import { useSocket } from '@/hooks/use-socket';
+import { useAuth } from '@/contexts/auth-context';
 import type { Device } from '@/lib/supabase';
 import type { Socket } from 'socket.io-client';
 
@@ -32,7 +33,8 @@ interface SocketContextValue {
 const SocketContext = createContext<SocketContextValue | null>(null);
 
 export function SocketProvider({ children }: { children: ReactNode }) {
-  const baseSocket = useSocket();
+  const { session } = useAuth();
+  const baseSocket = useSocket({ authToken: session?.access_token });
   
   const contextValue: SocketContextValue = {
     ...baseSocket,
