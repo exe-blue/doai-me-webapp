@@ -65,41 +65,13 @@ jobs:
         continue-on-error: true
 
   # ===========================================
-  # 2. Build Docker Images
-  # Note: 현재 이미지를 레지스트리에 push하지 않고
-  # VPS에서 docker compose build --no-cache로 직접 빌드하므로
-  # 이 job은 빌드 검증용으로만 사용됩니다.
-  # 추후 레지스트리 push가 필요하면 docker/login-action과
-  # docker push를 추가하세요.
-  # ===========================================
-  build:
-    name: Build Docker Images (Validation)
-    runs-on: ubuntu-latest
-    needs: test
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build Backend Image (validation only)
-        run: |
-          docker build -t doai-backend:${{ github.sha }} -f apps/backend/Dockerfile apps/backend
-          echo "Backend image built successfully (not pushed - VPS rebuilds directly)"
-
-      - name: Build Frontend Image (validation only)
-        run: |
-          docker build -t doai-frontend:${{ github.sha }} -f apps/dashboard/Dockerfile .
-          echo "Frontend image built successfully (not pushed - VPS rebuilds directly)"
-
-  # ===========================================
   # 3. Deploy to VPS
   # ===========================================
   deploy:
     name: Deploy to Vultr VPS
     runs-on: ubuntu-latest
-    needs: build
+    # [중요!] build가 사라졌으니 test가 끝나면 바로 실행되게 변경
+    needs: test   # <--- 여기를 'build'에서 'test'로 꼭 바꿔주세요!
     environment: production
     steps:
       - name: Checkout code
@@ -218,3 +190,4 @@ jobs:
           else
             echo "⚠️ API health check returned HTTP $API_STATUS"
           fi
+
