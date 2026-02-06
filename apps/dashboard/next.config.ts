@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  output: 'standalone',
   reactStrictMode: false, // 소켓 중복 연결 방지 (개발 모드)
   transpilePackages: ["@doai/shared", "@doai/ui"],
   
