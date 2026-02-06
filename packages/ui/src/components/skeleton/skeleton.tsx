@@ -3,7 +3,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@packages/ui/lib/utils";
 
 const skeletonVariants = cva(
-  "border-2 border-foreground",
+  "border-2 border-border",
   {
     variants: {
       variant: {
