@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { ThumbsUp, MessageSquare, UserPlus, Clock } from 'lucide-react';
 
 interface WatchDefaults {
@@ -22,18 +22,16 @@ const FALLBACK: WatchDefaults = {
 };
 
 export function WatchSettingsReadonly() {
-  const [defaults, setDefaults] = useState<WatchDefaults>(FALLBACK);
-
-  useEffect(() => {
+  const [defaults] = useState<WatchDefaults>(() => {
+    if (typeof window === 'undefined') return FALLBACK;
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        setDefaults({ ...FALLBACK, ...JSON.parse(stored) });
-      }
+      if (stored) return { ...FALLBACK, ...JSON.parse(stored) };
     } catch {
       // keep fallback
     }
-  }, []);
+    return FALLBACK;
+  });
 
   return (
     <div className="rounded-lg border border-border p-4 bg-card/50 space-y-3">

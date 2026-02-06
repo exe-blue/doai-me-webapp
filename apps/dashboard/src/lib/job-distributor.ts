@@ -286,8 +286,8 @@ export async function getPendingAssignmentsForPc(
   // 활성 작업의 assignments만 반환
   const result: Array<Assignment & { jobs: JobConfig }> = [];
   for (const a of assignments || []) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const jobData = a.jobs as any;
+    // Supabase join returns jobs with extra fields (e.g. status) beyond JobConfig
+    const jobData = a.jobs as unknown as (JobConfig & { status?: string }) | null;
     if (jobData && jobData.status === 'active') {
       result.push({
         id: a.id,
@@ -297,7 +297,7 @@ export async function getPendingAssignmentsForPc(
         status: a.status,
         progress_pct: a.progress_pct,
         assigned_at: a.assigned_at,
-        jobs: jobData as JobConfig,
+        jobs: jobData,
       });
     }
   }

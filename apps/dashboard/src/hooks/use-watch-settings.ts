@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 
 export interface WatchSettings {
   defaultLikeRate: number;
@@ -56,13 +56,12 @@ function loadSettings(): WatchSettings {
 }
 
 export function useWatchSettings() {
-  const [settings, setSettings] = useState<WatchSettings>(DEFAULT_WATCH_SETTINGS);
+  const [settings, setSettings] = useState<WatchSettings>(() => {
+    if (typeof window === 'undefined') return DEFAULT_WATCH_SETTINGS;
+    return loadSettings();
+  });
   const [hasChanges, setHasChanges] = useState(false);
   const [saved, setSaved] = useState(false);
-
-  useEffect(() => {
-    setSettings(loadSettings());
-  }, []);
 
   const updateSetting = useCallback(<K extends keyof WatchSettings>(key: K, value: WatchSettings[K]) => {
     setSettings(prev => ({ ...prev, [key]: value }));
