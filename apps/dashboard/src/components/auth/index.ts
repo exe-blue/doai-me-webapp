@@ -2,3 +2,4 @@
 export { AuthForm } from "./auth-form";
 export { OAuthButtons } from "./oauth-buttons";
 export { AuthLayout } from "./auth-layout";
+export { LoginButton } from "./login-button";

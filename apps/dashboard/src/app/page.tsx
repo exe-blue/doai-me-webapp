@@ -1,3 +1,5 @@
+import { ThemeToggle } from '@/components/theme-toggle';
+import { LoginButton } from '@/components/auth/login-button';
 import Link from 'next/link';
 import Image from 'next/image';
 import {
@@ -52,6 +54,12 @@ const placeholderCount = 4;
 export default function BentoPage() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4 sm:p-6 lg:p-10">
+      {/* Top toolbar */}
+      <div className="fixed top-4 right-4 z-50 flex items-center gap-2">
+        <ThemeToggle />
+        <LoginButton />
+      </div>
+
       <div className="flex w-full max-w-6xl flex-col gap-5 lg:flex-row">
         {/* Left Sidebar - Profile / Branding */}
         <aside className="flex w-full flex-col gap-5 lg:w-[320px] lg:shrink-0">
