@@ -10,7 +10,7 @@ import {
   Video,
   Users,
   Search,
-  ListTodo,
+  Eye,
   Clock,
   Activity,
   Calendar,
@@ -20,7 +20,6 @@ import {
   BarChart3,
   FileText,
   CheckCircle,
-  ScrollText,
   Settings,
   Server,
   Cpu,
@@ -54,15 +53,15 @@ const navigation: NavigationGroup[] = [
   {
     items: [
       {
-        label: '작업',
-        href: '/dashboard/queue',
-        icon: ListTodo,
+        label: '시청관리',
+        href: '/dashboard/watch',
+        icon: Eye,
         children: [
-          { label: '작업 관리', href: '/dashboard/jobs', icon: ListTodo },
+          { label: '시청관리', href: '/dashboard/watch', icon: Eye },
           { label: '대기열', href: '/dashboard/queue', icon: Clock },
           { label: '진행 중', href: '/dashboard/running', icon: Activity },
           { label: '스케줄러', href: '/dashboard/schedules', icon: Calendar },
-          { label: '작업 등록', href: '/dashboard/register', icon: PlusCircle },
+          { label: '시청 등록', href: '/dashboard/register', icon: PlusCircle },
         ],
       },
     ],
@@ -99,7 +98,6 @@ const navigation: NavigationGroup[] = [
   },
   {
     items: [
-      { label: '로그', href: '/dashboard/logs', icon: ScrollText },
       { label: '설정', href: '/dashboard/settings', icon: Settings },
     ],
   },

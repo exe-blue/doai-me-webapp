@@ -30,6 +30,8 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { normalizeYouTubeUrl } from '@/lib/youtube';
+import { checkDuplicateVideo } from '@/lib/watch-api';
 
 export default function RegisterPage() {
   // Tab state
@@ -71,8 +73,10 @@ export default function RegisterPage() {
       return;
     }
 
-    if (!validateYouTubeVideoUrl(videoUrl)) {
-      toast.error('올바른 YouTube 영상 URL을 입력해주세요');
+    // URL normalization
+    const normalized = normalizeYouTubeUrl(videoUrl);
+    if (!normalized) {
+      toast.error('유효한 유튜브 영상 링크가 아닙니다.');
       return;
     }
 
@@ -95,7 +99,18 @@ export default function RegisterPage() {
       .map((c) => c.trim())
       .filter((c) => c.length > 0);
 
+    // Duplicate video check
     setIsSubmitting(true);
+    try {
+      const isDuplicate = await checkDuplicateVideo(normalized.videoId);
+      if (isDuplicate) {
+        toast.error('이미 등록된 영상입니다.');
+        setIsSubmitting(false);
+        return;
+      }
+    } catch {
+      // Continue if check fails - server will catch duplicates
+    }
 
     try {
       const response = await fetch('/api/jobs', {
@@ -103,7 +118,7 @@ export default function RegisterPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           job_type: 'VIDEO_URL',
-          video_url: videoUrl.trim(),
+          video_url: normalized.canonicalUrl,
           display_name: displayName.trim() || undefined,
           target_views: target,
           prob_like: likeProb[0],
@@ -118,7 +133,7 @@ export default function RegisterPage() {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || '작업 등록에 실패했습니다');
+        throw new Error(result.error || '시청 등록에 실패했습니다');
       }
 
       // Toast 메시지: AI 자동 생성 댓글 수 표시
@@ -126,12 +141,12 @@ export default function RegisterPage() {
       const manualCount = result.commentCount || 0;
       
       if (aiGenerated > 0) {
-        toast.success('작업 등록 완료!', {
+        toast.success('시청 등록 완료!', {
           description: `AI 댓글 ${aiGenerated}개 자동 생성됨`,
         });
       } else {
-        toast.success('작업 등록 완료!', {
-          description: manualCount > 0 
+        toast.success('시청 등록 완료!', {
+          description: manualCount > 0
             ? `댓글 ${manualCount}개 등록됨`
             : '댓글 없이 등록됨',
         });
@@ -147,7 +162,7 @@ export default function RegisterPage() {
       setCommentProb([5]);
       setSubscribeProb([10]);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : '작업 등록 중 오류가 발생했습니다');
+      toast.error(error instanceof Error ? error.message : '시청 등록 중 오류가 발생했습니다');
     } finally {
       setIsSubmitting(false);
     }
@@ -190,7 +205,7 @@ export default function RegisterPage() {
       }
 
       toast.success('채널이 등록되었습니다', {
-        description: `채널명: ${channelName} | 새 영상이 감지되면 자동으로 작업이 생성됩니다`,
+        description: `채널명: ${channelName} | 새 영상이 감지되면 자동으로 시청이 생성됩니다`,
       });
 
       // Reset form
@@ -209,10 +224,10 @@ export default function RegisterPage() {
       <div className="text-center">
         <h1 className="text-2xl font-head text-foreground flex items-center justify-center gap-2">
           <Sparkles className="h-6 w-6 text-primary" />
-          작업등록
+          시청 등록
         </h1>
         <p className="font-sans text-sm text-muted-foreground mt-2">
-          YouTube 영상 또는 채널을 등록하여 자동 작업을 시작합니다
+          YouTube 영상 또는 채널을 등록하여 자동 시청을 시작합니다
         </p>
       </div>
 
@@ -282,7 +297,7 @@ export default function RegisterPage() {
                 <div className="space-y-2">
                   <Label className="font-sans text-xs text-muted-foreground uppercase flex items-center gap-2">
                     <FileText className="h-3 w-3 text-purple-500" />
-                    작업명 (비워두면 자동 생성)
+                    시청명 (비워두면 자동 생성)
                   </Label>
                   <Input
                     type="text"
@@ -447,7 +462,7 @@ export default function RegisterPage() {
           <Button
             onClick={handleVideoSubmit}
             disabled={isSubmitting || !videoUrl.trim()}
-            className="w-full font-sans bg-blue-600 hover:bg-blue-700 disabled:opacity-50 h-12 text-base"
+            className="w-full font-sans bg-primary text-primary-foreground hover:bg-primary/90 border-2 border-foreground shadow-[3px_3px_0px_0px] shadow-foreground disabled:opacity-50 h-12 text-base font-bold"
             size="lg"
           >
             {isSubmitting ? (
@@ -458,7 +473,7 @@ export default function RegisterPage() {
             ) : (
               <>
                 <PlusCircle className="h-5 w-5 mr-2" />
-                작업 등록하기
+                시청 등록하기
               </>
             )}
           </Button>
@@ -474,7 +489,7 @@ export default function RegisterPage() {
                 <div>
                   <p className="font-sans text-sm text-green-400 font-bold">채널 자동 모니터링</p>
                   <p className="font-sans text-xs text-muted-foreground mt-1">
-                    등록된 채널에서 새 영상이 업로드되면 자동으로 작업이 생성됩니다.
+                    등록된 채널에서 새 영상이 업로드되면 자동으로 시청이 생성됩니다.
                     채널 확인 주기는 약 30분입니다.
                   </p>
                 </div>
