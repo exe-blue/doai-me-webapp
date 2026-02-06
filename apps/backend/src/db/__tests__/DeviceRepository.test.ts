@@ -126,8 +126,6 @@ describe('DeviceRepository', () => {
     it('should throw on error', async () => {
       const dbError = { message: 'query failed' };
       const chain = chainBuilder({ data: null, error: dbError });
-      // Override then to reject for non-single() paths
-      chain.then = (_resolve: any, reject: any) => reject?.(dbError) ?? Promise.reject(dbError);
       mockFrom.mockReturnValue(chain);
 
       await expect(repo.findByPcId('pc-001')).rejects.toEqual(dbError);
