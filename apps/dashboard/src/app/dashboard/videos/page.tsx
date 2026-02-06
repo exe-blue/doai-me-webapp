@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
+import { useSocketContext } from "@/contexts/socket-context";
 import {
   Plus,
   Search,
@@ -13,6 +14,8 @@ import {
   ThumbsUp,
   MessageSquare,
   UserPlus,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,7 +53,9 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
+import { VideoKpiStrip } from "@/components/video/video-kpi-strip";
 
 interface Video {
   id: string;
@@ -70,6 +75,9 @@ interface Video {
   prob_subscribe: number;
   status: "active" | "paused" | "completed" | "archived";
   priority: "urgent" | "high" | "normal" | "low";
+  priority_enabled?: boolean;
+  priority_updated_at?: string;
+  registration_method?: string;
   search_keyword: string;
   tags: string[];
   created_at: string;
@@ -89,19 +97,7 @@ const statusLabels: Record<string, string> = {
   archived: "보관",
 };
 
-const priorityColors: Record<string, string> = {
-  urgent: "bg-red-400 text-red-900 border-red-900",
-  high: "bg-orange-400 text-orange-900 border-orange-900",
-  normal: "bg-blue-400 text-blue-900 border-blue-900",
-  low: "bg-gray-400 text-gray-900 border-gray-900",
-};
-
-const priorityLabels: Record<string, string> = {
-  urgent: "긴급",
-  high: "높음",
-  normal: "보통",
-  low: "낮음",
-};
+const PAGE_SIZE = 20;
 
 export default function VideosPage() {
   const [videos, setVideos] = useState<Video[]>([]);
@@ -110,11 +106,20 @@ export default function VideosPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
 
+  // Pagination
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+
+  // Socket for device data
+  const { devices } = useSocketContext();
+
   // 새 영상 등록 폼
   const [newVideo, setNewVideo] = useState({
     url: "",
     target_views: 100,
-    watch_duration_sec: 60,
+    watch_duration_min_pct: 30,
+    watch_duration_max_pct: 100,
     prob_like: 0,
     prob_comment: 0,
     prob_subscribe: 0,
@@ -122,36 +127,51 @@ export default function VideosPage() {
     search_keyword: "",
   });
 
-  useEffect(() => {
-    fetchVideos();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter]);
-
-  async function fetchVideos() {
+  const fetchVideos = useCallback(async () => {
     setLoading(true);
     try {
-      let query = supabase
-        .from("videos")
-        .select("*")
-        .order("created_at", { ascending: false });
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: String(PAGE_SIZE),
+        sortBy: "created_at",
+        sortOrder: "desc",
+      });
 
       if (statusFilter !== "all") {
-        query = query.eq("status", statusFilter);
+        params.set("status", statusFilter);
+      }
+      if (searchQuery.trim()) {
+        params.set("search", searchQuery.trim());
       }
 
-      const { data, error } = await query;
+      const response = await fetch(`/api/videos?${params.toString()}`);
+      const result = await response.json();
 
-      if (error) {
-        console.error("영상 목록 로드 실패:", error);
+      if (result.success && result.data) {
+        setVideos(result.data.items || []);
+        setTotalCount(result.data.total || 0);
       } else {
-        setVideos(data || []);
+        console.error("영상 목록 로드 실패:", result.error);
+        setVideos([]);
+        setTotalCount(0);
       }
     } catch (err) {
       console.error("영상 목록 로드 실패:", err);
+      setVideos([]);
+      setTotalCount(0);
     } finally {
       setLoading(false);
     }
-  }
+  }, [page, statusFilter, searchQuery]);
+
+  useEffect(() => {
+    fetchVideos();
+  }, [fetchVideos]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [statusFilter, searchQuery]);
 
   // YouTube URL에서 Video ID 추출
   function extractVideoId(url: string): string | null {
@@ -179,13 +199,15 @@ export default function VideosPage() {
         title: "영상 정보 로딩 중...",
         thumbnail_url: `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`,
         target_views: newVideo.target_views,
-        watch_duration_sec: newVideo.watch_duration_sec,
+        watch_duration_min_pct: newVideo.watch_duration_min_pct,
+        watch_duration_max_pct: newVideo.watch_duration_max_pct,
         prob_like: newVideo.prob_like,
         prob_comment: newVideo.prob_comment,
         prob_subscribe: newVideo.prob_subscribe,
         priority: newVideo.priority,
-        search_keyword: newVideo.search_keyword || null, // 빈 값이면 트리거가 자동 채움
+        search_keyword: newVideo.search_keyword || null,
         status: "active",
+        registration_method: "manual",
       });
 
       if (error) {
@@ -201,7 +223,8 @@ export default function VideosPage() {
       setNewVideo({
         url: "",
         target_views: 100,
-        watch_duration_sec: 60,
+        watch_duration_min_pct: 30,
+        watch_duration_max_pct: 100,
         prob_like: 0,
         prob_comment: 0,
         prob_subscribe: 0,
@@ -229,6 +252,27 @@ export default function VideosPage() {
     }
   }
 
+  async function handlePriorityToggle(videoId: string, enabled: boolean) {
+    const updateData: Record<string, unknown> = {
+      priority_enabled: enabled,
+    };
+    if (enabled) {
+      updateData.priority_updated_at = new Date().toISOString();
+    }
+
+    const { error } = await supabase
+      .from("videos")
+      .update(updateData)
+      .eq("id", videoId);
+
+    if (error) {
+      console.error("우선순위 변경 실패:", error);
+      alert(`우선순위 변경에 실패했습니다: ${error.message}`);
+    } else {
+      fetchVideos();
+    }
+  }
+
   async function deleteVideo(videoId: string) {
     if (!confirm("정말 삭제하시겠습니까?")) return;
 
@@ -241,23 +285,6 @@ export default function VideosPage() {
       fetchVideos();
     }
   }
-
-  const filteredVideos = videos.filter(
-    (v) =>
-      v.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      v.channel_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      v.search_keyword?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      v.id.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  // 통계
-  const stats = {
-    total: videos.length,
-    active: videos.filter((v) => v.status === "active").length,
-    completed: videos.filter((v) => v.status === "completed").length,
-    totalTarget: videos.reduce((sum, v) => sum + (v.target_views || 0), 0),
-    totalCompleted: videos.reduce((sum, v) => sum + (v.completed_views || 0), 0),
-  };
 
   return (
     <div className="space-y-6">
@@ -325,18 +352,29 @@ export default function VideosPage() {
                 />
               </div>
 
-              {/* 시청 시간 */}
+              {/* 시청 비율 범위 */}
               <div className="space-y-2">
-                <Label>시청 시간: {newVideo.watch_duration_sec}초</Label>
+                <Label>
+                  시청 비율: {newVideo.watch_duration_min_pct}% ~ {newVideo.watch_duration_max_pct}%
+                </Label>
                 <Slider
-                  value={[newVideo.watch_duration_sec]}
-                  onValueChange={([v]) =>
-                    setNewVideo({ ...newVideo, watch_duration_sec: v })
+                  value={[newVideo.watch_duration_min_pct, newVideo.watch_duration_max_pct]}
+                  onValueChange={([min, max]) =>
+                    setNewVideo({
+                      ...newVideo,
+                      watch_duration_min_pct: min,
+                      watch_duration_max_pct: max,
+                    })
                   }
-                  min={30}
-                  max={600}
-                  step={10}
+                  min={10}
+                  max={100}
+                  step={5}
+                  minStepsBetweenThumbs={1}
+                  aria-label="시청 비율 범위"
                 />
+                <p className="text-xs text-muted-foreground">
+                  영상 전체 길이 대비 시청 비율입니다 (10% ~ 100%)
+                </p>
               </div>
 
               {/* 우선순위 */}
@@ -352,10 +390,10 @@ export default function VideosPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="urgent">🔴 긴급</SelectItem>
-                    <SelectItem value="high">🟠 높음</SelectItem>
-                    <SelectItem value="normal">🔵 보통</SelectItem>
-                    <SelectItem value="low">⚪ 낮음</SelectItem>
+                    <SelectItem value="urgent">긴급</SelectItem>
+                    <SelectItem value="high">높음</SelectItem>
+                    <SelectItem value="normal">보통</SelectItem>
+                    <SelectItem value="low">낮음</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -430,30 +468,8 @@ export default function VideosPage() {
         </Dialog>
       </div>
 
-      {/* 통계 카드 */}
-      <div className="grid grid-cols-4 gap-4">
-        <div className="rounded-lg border border-border bg-card/50 p-4">
-          <div className="text-sm text-muted-foreground">전체 영상</div>
-          <div className="text-2xl font-bold text-foreground">{stats.total}</div>
-        </div>
-        <div className="rounded-lg border border-border bg-card/50 p-4">
-          <div className="text-sm text-muted-foreground">진행중</div>
-          <div className="text-2xl font-bold text-green-500">{stats.active}</div>
-        </div>
-        <div className="rounded-lg border border-border bg-card/50 p-4">
-          <div className="text-sm text-muted-foreground">완료</div>
-          <div className="text-2xl font-bold text-blue-500">{stats.completed}</div>
-        </div>
-        <div className="rounded-lg border border-border bg-card/50 p-4">
-          <div className="text-sm text-muted-foreground">전체 진행률</div>
-          <div className="text-2xl font-bold text-foreground">
-            {stats.totalTarget > 0
-              ? Math.round((stats.totalCompleted / stats.totalTarget) * 100)
-              : 0}
-            %
-          </div>
-        </div>
-      </div>
+      {/* KPI Strip */}
+      <VideoKpiStrip videos={videos} devices={devices} loading={loading} />
 
       {/* 필터 & 검색 */}
       <div className="flex items-center gap-4">
@@ -485,31 +501,35 @@ export default function VideosPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[400px]">영상</TableHead>
+              <TableHead className="w-[350px]">영상</TableHead>
               <TableHead>검색 키워드</TableHead>
               <TableHead>진행률</TableHead>
               <TableHead>시청시간</TableHead>
               <TableHead>상태</TableHead>
               <TableHead>우선순위</TableHead>
+              <TableHead>등록방법</TableHead>
               <TableHead className="w-[50px]"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                   로딩중...
                 </TableCell>
               </TableRow>
-            ) : filteredVideos.length === 0 ? (
+            ) : videos.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                   등록된 영상이 없습니다
                 </TableCell>
               </TableRow>
             ) : (
-              filteredVideos.map((video) => (
-                <TableRow key={video.id}>
+              videos.map((video) => (
+                <TableRow
+                  key={video.id}
+                  className={video.priority_enabled ? "bg-primary/5" : ""}
+                >
                   {/* 영상 정보 */}
                   <TableCell>
                     <div className="flex items-center gap-3">
@@ -549,7 +569,13 @@ export default function VideosPage() {
                   </TableCell>
 
                   {/* 시청 시간 */}
-                  <TableCell className="text-muted-foreground">{video.watch_duration_sec || 60}초</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {video.watch_duration_min_pct && video.watch_duration_max_pct
+                      ? `${video.watch_duration_min_pct}%~${video.watch_duration_max_pct}%`
+                      : video.watch_duration_sec
+                        ? `${video.watch_duration_sec}초`
+                        : "60초"}
+                  </TableCell>
 
                   {/* 상태 */}
                   <TableCell>
@@ -560,13 +586,27 @@ export default function VideosPage() {
                     </Badge>
                   </TableCell>
 
-                  {/* 우선순위 */}
+                  {/* 우선순위 토글 */}
                   <TableCell>
-                    <Badge
-                      className={`${priorityColors[video.priority]} border-2 font-bold`}
-                    >
-                      {priorityLabels[video.priority]}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={video.priority_enabled || false}
+                        onCheckedChange={(checked) => handlePriorityToggle(video.id, checked)}
+                        aria-label={`${video.title} 우선순위 토글`}
+                      />
+                      {video.priority_enabled && (
+                        <Badge className="bg-primary text-primary-foreground border-2 border-foreground font-bold text-xs">
+                          우선
+                        </Badge>
+                      )}
+                    </div>
+                  </TableCell>
+
+                  {/* 등록방법 */}
+                  <TableCell>
+                    <span className="text-sm text-muted-foreground">
+                      {video.registration_method === "API" ? "API 등록" : "직접 등록"}
+                    </span>
                   </TableCell>
 
                   {/* 액션 */}
@@ -627,6 +667,38 @@ export default function VideosPage() {
           </TableBody>
         </Table>
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between border-t border-border pt-4">
+          <div className="text-sm text-muted-foreground">
+            전체 {totalCount}건 중 {(page - 1) * PAGE_SIZE + 1}-{Math.min(page * PAGE_SIZE, totalCount)}건
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1}
+            >
+              <ChevronLeft className="h-4 w-4 mr-1" />
+              이전
+            </Button>
+            <span className="text-sm text-muted-foreground px-2">
+              {page} / {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+            >
+              다음
+              <ChevronRight className="h-4 w-4 ml-1" />
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

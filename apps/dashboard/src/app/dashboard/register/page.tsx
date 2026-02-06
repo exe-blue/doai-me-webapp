@@ -42,8 +42,8 @@ export default function RegisterPage() {
   const [likeProb, setLikeProb] = useState([30]);
   const [commentProb, setCommentProb] = useState([5]);
   const [subscribeProb, setSubscribeProb] = useState([10]);
-  // Dual-thumb slider로 변경: [min, max]
-  const [watchDuration, setWatchDuration] = useState([60, 180]);
+  // 시청 비율 퍼센트 범위 [min%, max%]
+  const [watchPct, setWatchPct] = useState([30, 100]);
   const [comments, setComments] = useState('');
 
   // Channel mode states
@@ -82,9 +82,9 @@ export default function RegisterPage() {
       return;
     }
 
-    const [minDuration, maxDuration] = watchDuration;
-    if (minDuration < 0 || maxDuration < minDuration) {
-      toast.error('시청 시간 범위를 올바르게 설정해주세요');
+    const [minPct, maxPct] = watchPct;
+    if (minPct < 10 || maxPct < minPct) {
+      toast.error('시청 비율 범위를 올바르게 설정해주세요');
       return;
     }
 
@@ -109,8 +109,8 @@ export default function RegisterPage() {
           prob_like: likeProb[0],
           prob_comment: commentProb[0],
           prob_subscribe: subscribeProb[0],
-          watch_duration_min: minDuration,
-          watch_duration_max: maxDuration,
+          watch_duration_min_pct: minPct,
+          watch_duration_max_pct: maxPct,
           comments: commentList.length > 0 ? commentList : undefined,
         }),
       });
@@ -142,7 +142,7 @@ export default function RegisterPage() {
       setDisplayName('');
       setTargetViews('100');
       setComments('');
-      setWatchDuration([60, 180]);
+      setWatchPct([30, 100]);
       setLikeProb([30]);
       setCommentProb([5]);
       setSubscribeProb([10]);
@@ -201,14 +201,6 @@ export default function RegisterPage() {
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  // 시청 시간을 포맷팅하는 헬퍼 함수
-  const formatDuration = (seconds: number) => {
-    if (seconds < 60) return `${seconds}초`;
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return secs > 0 ? `${mins}분 ${secs}초` : `${mins}분`;
   };
 
   return (
@@ -318,27 +310,29 @@ export default function RegisterPage() {
                 </CardHeader>
                 <AccordionContent>
                   <CardContent className="space-y-6 pt-4">
-                    {/* Watch Duration - Dual Thumb Slider */}
+                    {/* Watch Duration Percentage Range Slider */}
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <Label className="font-sans text-xs text-muted-foreground uppercase flex items-center gap-2">
                           <Clock className="h-3 w-3 text-cyan-500" />
-                          시청 시간 범위
+                          시청 비율 범위
                         </Label>
                         <span className="font-sans text-xs text-cyan-400">
-                          {formatDuration(watchDuration[0])} ~ {formatDuration(watchDuration[1])}
+                          {watchPct[0]}% ~ {watchPct[1]}%
                         </span>
                       </div>
                       <Slider
-                        value={watchDuration}
-                        onValueChange={setWatchDuration}
+                        value={watchPct}
+                        onValueChange={setWatchPct}
                         min={10}
-                        max={600}
-                        step={10}
+                        max={100}
+                        step={5}
+                        minStepsBetweenThumbs={1}
+                        aria-label="시청 비율 범위"
                         className="w-full"
                       />
                       <p className="font-sans text-[10px] text-muted-foreground">
-                        각 기기가 무작위로 이 범위 내에서 시청합니다 (10초 ~ 10분)
+                        영상 전체 길이 대비 시청 비율입니다 (10% ~ 100%)
                       </p>
                     </div>
 

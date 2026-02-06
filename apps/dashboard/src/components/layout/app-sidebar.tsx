@@ -84,12 +84,13 @@ export function AppSidebar({ navigation, logo, footer }: AppSidebarProps) {
             onClick={() => toggleExpanded(item.label)}
             className={cn(
               'flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-              'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
-              isActive && 'text-sidebar-primary',
+              'hover:bg-primary/20 hover:text-sidebar-foreground',
+              'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+              isActive ? 'bg-primary text-primary-foreground font-bold' : 'text-sidebar-foreground',
               isCollapsed && 'justify-center px-2'
             )}
           >
-            <Icon className={cn('h-5 w-5 shrink-0', isActive && 'text-sidebar-primary')} />
+            <Icon className={cn('h-5 w-5 shrink-0', isActive && 'text-primary-foreground')} />
             <AnimatePresence mode="wait">
               {!isCollapsed && (
                 <motion.span
@@ -139,14 +140,19 @@ export function AppSidebar({ navigation, logo, footer }: AppSidebarProps) {
         className={cn(
           'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
           'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
-          isActive && 'bg-sidebar-accent text-sidebar-primary',
+          'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+          isActive
+            ? depth > 0
+              ? 'bg-primary/20 text-foreground font-bold border-l-2 border-primary'
+              : 'bg-primary text-primary-foreground font-bold'
+            : '',
           isCollapsed && 'justify-center px-2',
           depth > 0 && 'py-1.5 text-sm'
         )}
       >
         <Icon className={cn(
-          'shrink-0', 
-          isActive && 'text-sidebar-primary',
+          'shrink-0',
+          isActive && (depth > 0 ? 'text-primary' : 'text-primary-foreground'),
           depth === 0 ? 'h-5 w-5' : 'h-4 w-4'
         )} />
         <AnimatePresence mode="wait">
