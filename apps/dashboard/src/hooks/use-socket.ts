@@ -26,11 +26,11 @@ interface CommandResult {
   error?: string;
 }
 
-// Socket.io server URL from environment, production default, or localhost fallback
+// Socket.io server URL: env var → same-origin fallback → localhost dev
 const SOCKET_SERVER_URL = process.env.NEXT_PUBLIC_SOCKET_URL
   || (typeof window !== 'undefined' && window.location.hostname !== 'localhost'
-    ? 'http://158.247.210.152:4000'
-    : 'http://localhost:3001');
+    ? `${window.location.protocol}//${window.location.host}`
+    : 'http://localhost:4000');
 
 // Strict naming convention: P01-001, P02-015 etc.
 const VALID_PC_ID_PATTERN = /^P\d{1,2}-\d{3}$/;
