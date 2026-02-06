@@ -15,6 +15,9 @@ import os from 'os';
 import { SocketClient } from './socket/SocketClient';
 import { DeviceManager, getDeviceManager } from './device/DeviceManager';
 import { getAdbController } from './device/AdbController';
+import { getAppiumController } from './device/AppiumController';
+import { getScrcpyController } from './device/ScrcpyController';
+import { getInfraHealthChecker, InfraHealthChecker } from './infra/InfraHealthChecker';
 import { WorkflowRunner } from './workflow/WorkflowRunner';
 import { AutoUpdater, getAutoUpdater } from './updater/AutoUpdater';
 import { DeviceRecovery } from './recovery/DeviceRecovery';
@@ -52,6 +55,7 @@ let workflowRunner: WorkflowRunner | null = null;
 let autoUpdater: AutoUpdater | null = null;
 let deviceRecovery: DeviceRecovery | null = null;
 let nodeRecovery: NodeRecovery | null = null;
+let infraHealthChecker: InfraHealthChecker | null = null;
 let isAppQuitting = false;
 
 // Manager components for Worker orchestration
@@ -59,6 +63,87 @@ let workerRegistry: WorkerRegistry | null = null;
 let taskDispatcher: TaskDispatcher | null = null;
 let workerServer: WorkerServer | null = null;
 let screenStreamProxy: ScreenStreamProxy | null = null;
+
+// ============================================
+// 로그 링 버퍼 (v1.1.0)
+// ============================================
+
+interface LogEntry {
+  timestamp: number;
+  level: string;
+  message: string;
+  source?: string;
+  context?: Record<string, unknown>;
+}
+
+const LOG_BUFFER_SIZE = 2000;
+const logBuffer: LogEntry[] = [];
+
+function pushLog(entry: LogEntry): void {
+  logBuffer.push(entry);
+  if (logBuffer.length > LOG_BUFFER_SIZE) logBuffer.shift();
+  sendToRenderer('log-entry', entry);
+}
+
+// ============================================
+// 히트맵 데이터 집계 (v1.1.0)
+// ============================================
+
+interface HeatmapCell {
+  hour: number;
+  day: number;
+  value: number;
+}
+
+interface HeatmapData {
+  hourly: HeatmapCell[];
+  deviceHourly: Array<{ deviceId: string; hours: number[] }>;
+  errorHourly: number[];
+}
+
+// 시간대별 활동 카운터 (24시간 × 7일)
+const activityGrid: number[][] = Array.from({ length: 7 }, () => Array(24).fill(0));
+const errorHourly: number[] = Array(24).fill(0);
+const deviceActivity: Map<string, number[]> = new Map();
+
+function recordActivity(deviceId?: string, isError = false): void {
+  const now = new Date();
+  const hour = now.getHours();
+  const day = now.getDay(); // 0=Sun, 6=Sat
+
+  activityGrid[day][hour]++;
+
+  if (isError) {
+    errorHourly[hour]++;
+  }
+
+  if (deviceId) {
+    if (!deviceActivity.has(deviceId)) {
+      deviceActivity.set(deviceId, Array(24).fill(0));
+    }
+    deviceActivity.get(deviceId)![hour]++;
+  }
+}
+
+function getHeatmapData(): HeatmapData {
+  const hourly: HeatmapCell[] = [];
+  for (let day = 0; day < 7; day++) {
+    for (let hour = 0; hour < 24; hour++) {
+      hourly.push({ hour, day, value: activityGrid[day][hour] });
+    }
+  }
+
+  const deviceHourly: Array<{ deviceId: string; hours: number[] }> = [];
+  for (const [deviceId, hours] of deviceActivity.entries()) {
+    deviceHourly.push({ deviceId, hours: [...hours] });
+  }
+
+  return {
+    hourly,
+    deviceHourly,
+    errorHourly: [...errorHourly],
+  };
+}
 
 // ============================================
 // 메인 윈도우
@@ -209,6 +294,9 @@ async function startAgent(): Promise<void> {
       });
     }
     sendToRenderer('device:disconnected', { deviceId });
+    pushLog({ timestamp: Date.now(), level: 'warn', message: `디바이스 연결 해제: ${deviceId}`, source: 'device' });
+    recordActivity(deviceId, true);
+    broadcastDeviceUpdate();
   });
 
   deviceRecovery.on('device:reconnected', (deviceId: string) => {
@@ -221,9 +309,15 @@ async function startAgent(): Promise<void> {
       });
     }
     sendToRenderer('device:reconnected', { deviceId });
+    pushLog({ timestamp: Date.now(), level: 'info', message: `디바이스 재연결 성공: ${deviceId}`, source: 'device' });
+    recordActivity(deviceId);
+    broadcastDeviceUpdate();
   });
 
   deviceRecovery.start();
+
+  // 인프라 헬스체커 초기화
+  infraHealthChecker = getInfraHealthChecker(SERVER_URL);
 
   // 노드 복구 초기화
   nodeRecovery = getNodeRecovery();
@@ -243,6 +337,9 @@ async function startAgent(): Promise<void> {
     logger.info('Connected to server');
     updateTrayMenu('connected');
     sendToRenderer('agent:connected');
+    sendToRenderer('server-status', { connected: true, message: '연결됨' });
+    pushLog({ timestamp: Date.now(), level: 'info', message: '서버 연결 성공', source: 'system' });
+    recordActivity();
 
     // 이전 상태 복구 시도
     if (nodeRecovery) {
@@ -254,12 +351,17 @@ async function startAgent(): Promise<void> {
     logger.warn('Disconnected from server', { reason });
     updateTrayMenu('disconnected');
     sendToRenderer('agent:disconnected', { reason });
+    sendToRenderer('server-status', { connected: false, message: '연결 끊김' });
+    pushLog({ timestamp: Date.now(), level: 'warn', message: `서버 연결 끊김: ${reason}`, source: 'system' });
   });
 
   socketClient.on('error', (error: Error) => {
     logger.error('Socket error', { error: error.message });
     updateTrayMenu('error');
     sendToRenderer('agent:error', { error: error.message });
+    sendToRenderer('server-status', { connected: false, message: '오류' });
+    pushLog({ timestamp: Date.now(), level: 'error', message: `소켓 오류: ${error.message}`, source: 'system' });
+    recordActivity(undefined, true);
   });
 
   // 연결 시작
@@ -278,7 +380,45 @@ async function startAgent(): Promise<void> {
   
   await initializeManagerComponents();
 
+  // 디바이스 상태 변경 시 renderer에 브로드캐스트
+  deviceManager.on('device:connected', (device: { serial: string }) => {
+    pushLog({ timestamp: Date.now(), level: 'info', message: `디바이스 연결: ${device.serial}`, source: 'device' });
+    recordActivity(device.serial);
+    broadcastDeviceUpdate();
+  });
+
+  deviceManager.on('device:disconnected', (device: { serial: string }) => {
+    pushLog({ timestamp: Date.now(), level: 'warn', message: `디바이스 연결 해제: ${device.serial}`, source: 'device' });
+    recordActivity(device.serial, true);
+    broadcastDeviceUpdate();
+  });
+
+  deviceManager.on('device:stateChanged', (device: { serial: string; state: string }) => {
+    pushLog({ timestamp: Date.now(), level: 'info', message: `디바이스 상태 변경: ${device.serial} → ${device.state}`, source: 'device' });
+    recordActivity(device.serial);
+    broadcastDeviceUpdate();
+  });
+
+  pushLog({ timestamp: Date.now(), level: 'info', message: 'Desktop Agent 시작 완료', source: 'system' });
   logger.info('Desktop Agent started successfully');
+}
+
+// ============================================
+// 디바이스 상태 브로드캐스트 (v1.1.0)
+// ============================================
+
+function broadcastDeviceUpdate(): void {
+  const devices = (deviceManager?.getAllDevices() || []).map(d => ({
+    id: d.serial,
+    serial: d.serial,
+    name: d.model || d.serial,
+    model: d.model || 'Unknown',
+    status: d.state?.toLowerCase() || 'offline',
+    battery: d.battery ?? 0,
+    lastActivity: d.lastSeen || Date.now(),
+    state: d.state,
+  }));
+  sendToRenderer('device-update', devices);
 }
 
 // ============================================
@@ -415,7 +555,7 @@ async function initializeManagerComponents(): Promise<void> {
 // ============================================
 
 function setupIPC(): void {
-  // 에이전트 상태 조회
+  // 에이전트 상태 조회 (기존 채널 유지)
   ipcMain.handle('agent:getStatus', () => {
     return {
       nodeId: NODE_ID,
@@ -425,15 +565,171 @@ function setupIPC(): void {
     };
   });
 
-  // 디바이스 목록 조회
+  // 디바이스 목록 조회 (기존 채널 유지)
   ipcMain.handle('devices:list', () => {
     return deviceManager?.getAllDevices() || [];
   });
 
-  // 로그 조회
+  // 로그 조회 (기존 채널 유지)
   ipcMain.handle('logs:get', () => {
-    // TODO: 로그 저장 및 조회 구현
-    return [];
+    return [...logBuffer];
+  });
+
+  // ============================================
+  // v1.1.0: preload.js `api` 네임스페이스 대응 IPC 핸들러
+  // ============================================
+
+  // 설정 조회
+  ipcMain.handle('get-config', () => {
+    return {
+      nodeId: NODE_ID,
+      serverUrl: SERVER_URL,
+      connected: socketClient?.connected || false,
+    };
+  });
+
+  // 디바이스 목록 조회
+  ipcMain.handle('get-devices', () => {
+    const devices = deviceManager?.getAllDevices() || [];
+    return devices.map(d => ({
+      id: d.serial,
+      serial: d.serial,
+      name: d.model || d.serial,
+      model: d.model || 'Unknown',
+      status: d.state?.toLowerCase() || 'offline',
+      battery: d.battery ?? 0,
+      lastActivity: d.lastSeen || Date.now(),
+      state: d.state,
+    }));
+  });
+
+  // 로그 조회
+  ipcMain.handle('get-logs', () => {
+    return [...logBuffer];
+  });
+
+  // 서버 연결 상태 조회
+  ipcMain.handle('get-server-status', () => {
+    return {
+      connected: socketClient?.connected || false,
+      message: socketClient?.connected ? '연결됨' : '연결 끊김',
+    };
+  });
+
+  // 워크플로우 상태 조회
+  ipcMain.handle('get-workflow-status', () => {
+    const running = workflowRunner?.getRunningWorkflows() || [];
+    return {
+      running: running.map(w => ({
+        workflowId: w.workflowId,
+        executionId: w.executionId,
+        deviceId: w.deviceId,
+        currentStep: w.currentStep,
+        progress: w.progress,
+        startedAt: w.startedAt,
+      })),
+      count: running.length,
+    };
+  });
+
+  // 서버 재연결
+  ipcMain.handle('reconnect-server', () => {
+    if (socketClient) {
+      socketClient.disconnect();
+      socketClient.connect();
+      return { success: true, message: '재연결 시도 중...' };
+    }
+    return { success: false, message: 'Socket client not initialized' };
+  });
+
+  // 디바이스 상세 조회
+  ipcMain.handle('get-device-detail', async (_event, serial: string) => {
+    const device = deviceManager?.getDevice(serial);
+    if (!device) return null;
+
+    const adb = getAdbController();
+    let battery = 0;
+    let screenOn = false;
+    try {
+      battery = await adb.getBatteryLevel(serial);
+      screenOn = await adb.isScreenOn(serial);
+    } catch {
+      // 디바이스 응답 없을 수 있음
+    }
+
+    return {
+      serial: device.serial,
+      model: device.model || 'Unknown',
+      state: device.state,
+      battery,
+      screenOn,
+      lastSeen: device.lastSeen || Date.now(),
+    };
+  });
+
+  // 디바이스 명령 실행
+  ipcMain.handle('execute-device-action', async (_event, serial: string, action: string) => {
+    const adb = getAdbController();
+    try {
+      switch (action) {
+        case 'reboot':
+          await adb.execute(serial, 'reboot');
+          pushLog({ timestamp: Date.now(), level: 'info', message: `디바이스 재부팅: ${serial}`, source: 'device' });
+          return { success: true, message: '재부팅 명령 전송됨' };
+        case 'reconnect':
+          await adb.reconnect(serial);
+          pushLog({ timestamp: Date.now(), level: 'info', message: `디바이스 재연결: ${serial}`, source: 'device' });
+          return { success: true, message: '재연결 완료' };
+        case 'wake':
+          await adb.wakeUp(serial);
+          return { success: true, message: '화면 켜기 완료' };
+        case 'sleep':
+          await adb.sleep(serial);
+          return { success: true, message: '화면 끄기 완료' };
+        default:
+          return { success: false, message: `알 수 없는 명령: ${action}` };
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      pushLog({ timestamp: Date.now(), level: 'error', message: `디바이스 명령 실패 (${action}): ${msg}`, source: 'device' });
+      return { success: false, message: msg };
+    }
+  });
+
+  // 히트맵 데이터 조회
+  ipcMain.handle('get-heatmap-data', () => {
+    return getHeatmapData();
+  });
+
+  // ============================================
+  // 인프라 헬스체크 IPC 핸들러
+  // ============================================
+
+  // 인프라 헬스 조회 (캐시된 결과)
+  ipcMain.handle('get-infra-health', async () => {
+    if (!infraHealthChecker) return null;
+    try {
+      return await infraHealthChecker.check(false);
+    } catch (error) {
+      logger.error('get-infra-health failed', { error: (error as Error).message });
+      return null;
+    }
+  });
+
+  // 인프라 점검 실행 (강제 갱신)
+  ipcMain.handle('run-infra-check', async () => {
+    if (!infraHealthChecker) return null;
+    try {
+      pushLog({ timestamp: Date.now(), level: 'info', message: '인프라 점검 시작', source: 'system' });
+      const result = await infraHealthChecker.check(true);
+      pushLog({ timestamp: Date.now(), level: 'info', message: '인프라 점검 완료', source: 'system' });
+      return result;
+    } catch (error) {
+      const msg = (error as Error).message;
+      pushLog({ timestamp: Date.now(), level: 'error', message: `인프라 점검 실패: ${msg}`, source: 'system' });
+      logger.error('run-infra-check failed', { error: msg });
+      return null;
+    }
   });
 
   // ============================================
@@ -579,6 +875,19 @@ app.on('before-quit', async (event) => {
     }
 
     // Note: ScreenStreamProxy doesn't have cleanup method - streams are terminated when workers disconnect
+
+    // Appium 서버 종료 + scrcpy 스트림 정리
+    try {
+      const appiumCtrl = getAppiumController();
+      if (appiumCtrl.isServerRunning()) {
+        logger.info('Stopping Appium server...');
+        appiumCtrl.stopServer();
+      }
+      const scrcpyCtrl = getScrcpyController();
+      scrcpyCtrl.stopAllStreams();
+    } catch (cleanupErr) {
+      logger.error('Error cleaning up Appium/scrcpy', { error: (cleanupErr as Error).message });
+    }
 
     // 복구 모니터 중지
     if (deviceRecovery) {

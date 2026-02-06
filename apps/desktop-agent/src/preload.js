@@ -135,4 +135,27 @@ contextBridge.exposeInMainWorld('api', {
   
   // 수동 재연결
   reconnectServer: () => ipcRenderer.invoke('reconnect-server'),
+
+  // ========================================================================
+  // v1.1.0: 디바이스 상세 + 히트맵
+  // ========================================================================
+
+  // 디바이스 상세 조회
+  getDeviceDetail: (serial) => ipcRenderer.invoke('get-device-detail', serial),
+
+  // 디바이스 명령 실행 (reboot, reconnect, wake, sleep)
+  executeDeviceAction: (serial, action) => ipcRenderer.invoke('execute-device-action', serial, action),
+
+  // 히트맵 데이터 (시간대별 활동 집계)
+  getHeatmapData: () => ipcRenderer.invoke('get-heatmap-data'),
+
+  // ========================================================================
+  // v1.2.0: 인프라 헬스체크
+  // ========================================================================
+
+  // 인프라 헬스 조회 (캐시된 결과)
+  getInfraHealth: () => ipcRenderer.invoke('get-infra-health'),
+
+  // 인프라 점검 실행 (강제 갱신)
+  runInfraCheck: () => ipcRenderer.invoke('run-infra-check'),
 });

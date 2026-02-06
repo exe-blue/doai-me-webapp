@@ -17,6 +17,7 @@
       --warning: #f59e0b;
       --error: #ef4444;
       --border: #334155;
+      --sidebar-width: 200px;
     }
 
     * {
@@ -79,6 +80,7 @@
       background: var(--bg-card);
       padding: 4px 8px;
       border-radius: 4px;
+      font-family: 'SF Mono', Monaco, monospace;
     }
 
     .header-right {
@@ -130,23 +132,126 @@
       50% { opacity: 0.5; }
     }
 
-    /* Main Content */
-    .main {
+    /* Main Layout */
+    .main-container {
       flex: 1;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      grid-template-rows: auto 1fr;
-      gap: 12px;
-      padding: 12px;
+      display: flex;
       overflow: hidden;
     }
 
-    /* Stats Cards */
-    .stats-row {
-      grid-column: span 2;
+    /* Sidebar */
+    .sidebar {
+      width: var(--sidebar-width);
+      background: var(--bg-secondary);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+
+    .nav-group {
+      margin-bottom: 16px;
+    }
+
+    .nav-group-title {
+      padding: 12px 16px 8px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px;
+      cursor: pointer;
+      transition: background 0.15s;
+      border-left: 3px solid transparent;
+      font-size: 13px;
+      -webkit-app-region: no-drag;
+    }
+
+    .nav-item:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .nav-item.active {
+      background: rgba(59, 130, 246, 0.15);
+      border-left-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .nav-item-icon {
+      font-size: 16px;
+    }
+
+    /* Content Area */
+    .content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* Section Headers */
+    .section-title {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .section-subtitle {
+      font-size: 14px;
+      font-weight: 600;
+      margin: 24px 0 12px;
+      color: var(--text-secondary);
+    }
+
+    /* Cards */
+    .card {
+      background: var(--bg-card);
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .card-title {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .card-content {
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    /* Stats Grid */
+    .stats-grid {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
       gap: 12px;
+      margin-bottom: 20px;
     }
 
     .stat-card {
@@ -167,97 +272,87 @@
       font-weight: 700;
     }
 
-    .stat-value.online { color: var(--success); }
-    .stat-value.busy { color: var(--warning); }
+    .stat-value.success { color: var(--success); }
+    .stat-value.warning { color: var(--warning); }
     .stat-value.error { color: var(--error); }
 
-    /* Device List */
-    .panel {
-      background: var(--bg-card);
-      border-radius: 8px;
-      border: 1px solid var(--border);
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
-
-    .panel-header {
-      padding: 12px 16px;
-      border-bottom: 1px solid var(--border);
-      font-weight: 600;
-      font-size: 14px;
-      display: flex;
+    /* Buttons */
+    .btn {
+      display: inline-flex;
       align-items: center;
-      justify-content: space-between;
-    }
-
-    .panel-content {
-      flex: 1;
-      overflow-y: auto;
-      padding: 8px;
-    }
-
-    /* Device Item */
-    .device-item {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 10px 12px;
+      gap: 6px;
+      padding: 8px 16px;
+      border: none;
       border-radius: 6px;
-      margin-bottom: 4px;
-      cursor: pointer;
-      transition: background 0.15s;
-    }
-
-    .device-item:hover {
-      background: rgba(255, 255, 255, 0.05);
-    }
-
-    .device-icon {
-      width: 36px;
-      height: 36px;
-      background: var(--bg-secondary);
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 18px;
-    }
-
-    .device-info {
-      flex: 1;
-      min-width: 0;
-    }
-
-    .device-name {
       font-size: 13px;
       font-weight: 500;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: inherit;
+      -webkit-app-region: no-drag;
     }
 
-    .device-serial {
-      font-size: 11px;
-      color: var(--text-secondary);
+    .btn-primary {
+      background: var(--accent);
+      color: white;
     }
 
-    .device-status {
+    .btn-primary:hover {
+      background: #2563eb;
+    }
+
+    .btn-secondary {
+      background: var(--bg-card);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      background: var(--bg-secondary);
+    }
+
+    .btn-group {
       display: flex;
-      align-items: center;
       gap: 8px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
     }
 
-    .battery {
-      font-size: 11px;
+    /* Filter Buttons */
+    .filter-btn {
+      padding: 6px 12px;
+      font-size: 12px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
       color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: inherit;
+      -webkit-app-region: no-drag;
     }
 
-    /* Log Panel */
-    .log-list {
+    .filter-btn:hover {
+      background: var(--bg-secondary);
+    }
+
+    .filter-btn.active {
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
+    }
+
+    /* Log Container */
+    .log-container {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      max-height: calc(100vh - 300px);
+      overflow-y: auto;
       font-family: 'SF Mono', Monaco, monospace;
       font-size: 11px;
-      line-height: 1.5;
+      line-height: 1.6;
     }
 
     .log-entry {
@@ -275,22 +370,327 @@
     .log-time {
       color: var(--text-secondary);
       flex-shrink: 0;
+      min-width: 80px;
     }
 
-    .log-level {
-      width: 40px;
-      flex-shrink: 0;
+    .log-level-badge {
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-size: 10px;
       font-weight: 600;
+      flex-shrink: 0;
+      min-width: 50px;
+      text-align: center;
     }
 
-    .log-level.error { color: var(--error); }
-    .log-level.warn { color: var(--warning); }
-    .log-level.info { color: var(--accent); }
-    .log-level.debug { color: var(--text-secondary); }
+    .log-level-badge.INFO {
+      background: rgba(59, 130, 246, 0.2);
+      color: var(--accent);
+    }
+
+    .log-level-badge.WARN {
+      background: rgba(245, 158, 11, 0.2);
+      color: var(--warning);
+    }
+
+    .log-level-badge.ERROR {
+      background: rgba(239, 68, 68, 0.2);
+      color: var(--error);
+    }
+
+    .log-category {
+      color: var(--text-secondary);
+      flex-shrink: 0;
+      min-width: 80px;
+      font-size: 10px;
+    }
 
     .log-message {
       flex: 1;
-      word-break: break-all;
+      word-break: break-word;
+    }
+
+    /* Table */
+    .table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .table thead {
+      background: var(--bg-secondary);
+    }
+
+    .table th {
+      padding: 10px 12px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 12px;
+      color: var(--text-secondary);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .table tbody tr:hover {
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    /* Status Badges in Table */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    .badge.online {
+      background: rgba(34, 197, 94, 0.15);
+      color: var(--success);
+    }
+
+    .badge.busy {
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--warning);
+    }
+
+    .badge.error {
+      background: rgba(239, 68, 68, 0.15);
+      color: var(--error);
+    }
+
+    .badge.offline {
+      background: rgba(148, 163, 184, 0.15);
+      color: var(--text-secondary);
+    }
+
+    .badge.running {
+      background: rgba(34, 197, 94, 0.15);
+      color: var(--success);
+    }
+
+    .badge.idle {
+      background: rgba(148, 163, 184, 0.15);
+      color: var(--text-secondary);
+    }
+
+    .badge-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    /* Health Check Cards */
+    .health-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 12px;
+    }
+
+    .health-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+
+    .health-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .health-card-title {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .health-status {
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .health-status.ok {
+      background: rgba(34, 197, 94, 0.15);
+      color: var(--success);
+    }
+
+    .health-status.error {
+      background: rgba(239, 68, 68, 0.15);
+      color: var(--error);
+    }
+
+    .health-status.missing {
+      background: rgba(148, 163, 184, 0.15);
+      color: var(--text-secondary);
+    }
+
+    .health-card-body {
+      font-size: 12px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
+    .health-card-body div {
+      margin-bottom: 4px;
+    }
+
+    /* Pipeline Stepper */
+    .pipeline-stepper {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 20px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 20px;
+      overflow-x: auto;
+    }
+
+    .pipeline-step {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      min-width: 100px;
+    }
+
+    .pipeline-step-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: var(--bg-secondary);
+      border: 2px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .pipeline-step.active .pipeline-step-icon {
+      background: var(--accent);
+      border-color: var(--accent);
+      animation: pulse 2s infinite;
+    }
+
+    .pipeline-step-label {
+      font-size: 11px;
+      color: var(--text-secondary);
+      text-align: center;
+    }
+
+    .pipeline-arrow {
+      font-size: 20px;
+      color: var(--text-secondary);
+      margin: 0 -8px;
+    }
+
+    /* Bot Catalog */
+    .bot-catalog-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 12px;
+    }
+
+    .bot-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+
+    .bot-card-header {
+      display: flex;
+      align-items: start;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .bot-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      background: var(--bg-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+
+    .bot-info {
+      flex: 1;
+    }
+
+    .bot-name {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+
+    .bot-category {
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+
+    .bot-description {
+      font-size: 12px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+      margin-bottom: 12px;
+    }
+
+    .bot-capabilities {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-bottom: 8px;
+    }
+
+    .bot-tag {
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-size: 10px;
+      background: var(--bg-secondary);
+      color: var(--text-secondary);
+    }
+
+    /* Empty State */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 48px 24px;
+      color: var(--text-secondary);
+      text-align: center;
+    }
+
+    .empty-state-icon {
+      font-size: 48px;
+      margin-bottom: 12px;
+      opacity: 0.5;
+    }
+
+    .empty-state-text {
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+
+    .empty-state-subtext {
+      font-size: 12px;
+      opacity: 0.7;
     }
 
     /* Footer */
@@ -307,6 +707,7 @@
     /* Scrollbar */
     ::-webkit-scrollbar {
       width: 6px;
+      height: 6px;
     }
 
     ::-webkit-scrollbar-track {
@@ -320,24 +721,6 @@
 
     ::-webkit-scrollbar-thumb:hover {
       background: #475569;
-    }
-
-    /* Empty State */
-    .empty-state {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100%;
-      color: var(--text-secondary);
-      text-align: center;
-      padding: 24px;
-    }
-
-    .empty-state-icon {
-      font-size: 48px;
-      margin-bottom: 12px;
-      opacity: 0.5;
     }
   </style>
 </head>
@@ -358,61 +741,290 @@
       </div>
     </header>
 
-    <!-- Main Content -->
-    <main class="main">
-      <!-- Stats Row -->
-      <div class="stats-row">
-        <div class="stat-card">
-          <div class="stat-label">연결된 디바이스</div>
-          <div class="stat-value" id="totalDevices">0</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">온라인</div>
-          <div class="stat-value online" id="onlineDevices">0</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">작업 중</div>
-          <div class="stat-value busy" id="busyDevices">0</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">오류</div>
-          <div class="stat-value error" id="errorDevices">0</div>
-        </div>
-      </div>
-
-      <!-- Device List Panel -->
-      <div class="panel">
-        <div class="panel-header">
-          <span>📱 디바이스 목록</span>
-          <span id="deviceCount">0개</span>
-        </div>
-        <div class="panel-content" id="deviceList">
-          <div class="empty-state">
-            <div class="empty-state-icon">📱</div>
-            <div>연결된 디바이스가 없습니다</div>
-            <div style="font-size: 11px; margin-top: 8px;">ADB로 디바이스를 연결해주세요</div>
+    <!-- Main Container -->
+    <div class="main-container">
+      <!-- Sidebar Navigation -->
+      <nav class="sidebar">
+        <div class="nav-group">
+          <div class="nav-group-title">운영</div>
+          <div class="nav-item active" data-tab="logging" onclick="switchTab('logging')">
+            <span class="nav-item-icon">📋</span>
+            <span>실시간 로깅</span>
+          </div>
+          <div class="nav-item" data-tab="heatmap" onclick="switchTab('heatmap')">
+            <span class="nav-item-icon">📊</span>
+            <span>히트맵</span>
+          </div>
+          <div class="nav-item" data-tab="devices" onclick="switchTab('devices')">
+            <span class="nav-item-icon">📱</span>
+            <span>기기관리</span>
           </div>
         </div>
-      </div>
 
-      <!-- Log Panel -->
-      <div class="panel">
-        <div class="panel-header">
-          <span>📋 로그</span>
-          <span id="logCount">0개</span>
-        </div>
-        <div class="panel-content log-list" id="logList">
-          <div class="empty-state">
-            <div class="empty-state-icon">📋</div>
-            <div>로그가 없습니다</div>
+        <div class="nav-group">
+          <div class="nav-group-title">인프라</div>
+          <div class="nav-item" data-tab="clients" onclick="switchTab('clients')">
+            <span class="nav-item-icon">🤖</span>
+            <span>클라이언트</span>
+          </div>
+          <div class="nav-item" data-tab="infra" onclick="switchTab('infra')">
+            <span class="nav-item-icon">🔧</span>
+            <span>인프라</span>
           </div>
         </div>
-      </div>
-    </main>
+      </nav>
+
+      <!-- Content Area -->
+      <main class="content">
+        <!-- Tab 1: 실시간 로깅 -->
+        <div id="tab-logging" class="tab-content active">
+          <div class="section-title">📋 실시간 로깅</div>
+
+          <div class="btn-group">
+            <button class="filter-btn active" data-filter-type="level" data-filter-value="ALL" onclick="setLogFilter('level', 'ALL', this)">전체</button>
+            <button class="filter-btn" data-filter-type="level" data-filter-value="INFO" onclick="setLogFilter('level', 'INFO', this)">INFO</button>
+            <button class="filter-btn" data-filter-type="level" data-filter-value="WARN" onclick="setLogFilter('level', 'WARN', this)">WARN</button>
+            <button class="filter-btn" data-filter-type="level" data-filter-value="ERROR" onclick="setLogFilter('level', 'ERROR', this)">ERROR</button>
+          </div>
+
+          <div class="btn-group">
+            <button class="filter-btn active" data-filter-type="category" data-filter-value="ALL" onclick="setLogFilter('category', 'ALL', this)">전체</button>
+            <button class="filter-btn" data-filter-type="category" data-filter-value="MANAGER" onclick="setLogFilter('category', 'MANAGER', this)">MANAGER</button>
+            <button class="filter-btn" data-filter-type="category" data-filter-value="BOT" onclick="setLogFilter('category', 'BOT', this)">BOT</button>
+            <button class="filter-btn" data-filter-type="category" data-filter-value="DEVICE" onclick="setLogFilter('category', 'DEVICE', this)">DEVICE</button>
+            <button class="filter-btn" data-filter-type="category" data-filter-value="WATCH" onclick="setLogFilter('category', 'WATCH', this)">WATCH</button>
+            <button class="filter-btn" data-filter-type="category" data-filter-value="SYSTEM" onclick="setLogFilter('category', 'SYSTEM', this)">SYSTEM</button>
+          </div>
+
+          <div class="log-container" id="logContainer">
+            <div class="empty-state">
+              <div class="empty-state-icon">📋</div>
+              <div class="empty-state-text">로그가 없습니다</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 2: 히트맵 -->
+        <div id="tab-heatmap" class="tab-content">
+          <div class="section-title">📊 히트맵</div>
+
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-label">연결된 기기</div>
+              <div class="stat-value success" id="heatmap-connected">0</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">시청중 기기</div>
+              <div class="stat-value warning" id="heatmap-watching">0</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">종료된 기기</div>
+              <div class="stat-value" id="heatmap-ended">0</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">기기 활동 현황</div>
+            </div>
+            <div class="card-content" id="heatmapData">
+              <div class="empty-state">
+                <div class="empty-state-icon">📊</div>
+                <div class="empty-state-text">히트맵 데이터를 불러오는 중...</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 3: 기기관리 -->
+        <div id="tab-devices" class="tab-content">
+          <div class="section-title">📱 기기관리</div>
+
+          <div class="card">
+            <table class="table" id="deviceTable">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>이름</th>
+                  <th>시리얼</th>
+                  <th>상태</th>
+                  <th>배터리</th>
+                  <th>노드</th>
+                  <th>마지막 확인</th>
+                  <th>동작</th>
+                </tr>
+              </thead>
+              <tbody id="deviceTableBody">
+                <tr>
+                  <td colspan="8">
+                    <div class="empty-state">
+                      <div class="empty-state-icon">📱</div>
+                      <div class="empty-state-text">연결된 기기가 없습니다</div>
+                      <div class="empty-state-subtext">ADB로 기기를 연결해주세요</div>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Tab 4: 클라이언트 -->
+        <div id="tab-clients" class="tab-content">
+          <div class="section-title">🤖 클라이언트</div>
+
+          <div class="section-subtitle">Manager 상태</div>
+          <div class="card">
+            <div class="card-content" id="managerStatus">
+              <div>상태: <span id="managerConnected">연결 끊김</span></div>
+              <div>노드 ID: <span id="managerNodeId">-</span></div>
+              <div>가동시간: <span id="managerUptime">-</span></div>
+            </div>
+          </div>
+
+          <div class="section-subtitle">Bot Fleet</div>
+          <div class="card">
+            <table class="table" id="botFleetTable">
+              <thead>
+                <tr>
+                  <th>Key</th>
+                  <th>이름</th>
+                  <th>카테고리</th>
+                  <th>상태</th>
+                  <th>마지막 활동</th>
+                </tr>
+              </thead>
+              <tbody id="botFleetBody">
+                <tr>
+                  <td colspan="5">
+                    <div class="empty-state">
+                      <div class="empty-state-icon">🤖</div>
+                      <div class="empty-state-text">Bot 정보를 불러오는 중...</div>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="section-subtitle">Bot Pipeline</div>
+          <div class="pipeline-stepper">
+            <div class="pipeline-step">
+              <div class="pipeline-step-icon">📋</div>
+              <div class="pipeline-step-label">캠페인</div>
+            </div>
+            <div class="pipeline-arrow">→</div>
+            <div class="pipeline-step">
+              <div class="pipeline-step-icon">🔍</div>
+              <div class="pipeline-step-label">키워드</div>
+            </div>
+            <div class="pipeline-arrow">→</div>
+            <div class="pipeline-step active">
+              <div class="pipeline-step-icon">🔎</div>
+              <div class="pipeline-step-label">검색</div>
+            </div>
+            <div class="pipeline-arrow">→</div>
+            <div class="pipeline-step">
+              <div class="pipeline-step-icon">⚙️</div>
+              <div class="pipeline-step-label">준비</div>
+            </div>
+            <div class="pipeline-arrow">→</div>
+            <div class="pipeline-step">
+              <div class="pipeline-step-icon">👀</div>
+              <div class="pipeline-step-label">시청</div>
+            </div>
+            <div class="pipeline-arrow">→</div>
+            <div class="pipeline-step">
+              <div class="pipeline-step-icon">✨</div>
+              <div class="pipeline-step-label">액션</div>
+            </div>
+            <div class="pipeline-arrow">→</div>
+            <div class="pipeline-step">
+              <div class="pipeline-step-icon">✅</div>
+              <div class="pipeline-step-label">종료</div>
+            </div>
+          </div>
+
+          <div class="section-subtitle">🤖 봇 카탈로그</div>
+          <div class="bot-catalog-grid" id="botCatalog">
+            <div class="empty-state">
+              <div class="empty-state-icon">🤖</div>
+              <div class="empty-state-text">봇 카탈로그를 불러오는 중...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 5: 인프라 -->
+        <div id="tab-infra" class="tab-content">
+          <div class="section-title">🔧 인프라</div>
+
+          <div style="margin-bottom: 16px;">
+            <button class="btn btn-primary" id="runInfraCheck" onclick="runInfraCheck()">점검 실행</button>
+          </div>
+
+          <div class="health-grid" id="healthGrid">
+            <div class="health-card">
+              <div class="health-card-header">
+                <div class="health-card-title">ADB</div>
+                <div class="health-status missing">확인중</div>
+              </div>
+              <div class="health-card-body">
+                <div>마지막 점검: -</div>
+                <div>버전: -</div>
+              </div>
+            </div>
+
+            <div class="health-card">
+              <div class="health-card-header">
+                <div class="health-card-title">UIAutomator2</div>
+                <div class="health-status missing">확인중</div>
+              </div>
+              <div class="health-card-body">
+                <div>마지막 점검: -</div>
+                <div>버전: -</div>
+              </div>
+            </div>
+
+            <div class="health-card">
+              <div class="health-card-header">
+                <div class="health-card-title">Appium</div>
+                <div class="health-status missing">확인중</div>
+              </div>
+              <div class="health-card-body">
+                <div>마지막 점검: -</div>
+                <div>버전: -</div>
+              </div>
+            </div>
+
+            <div class="health-card">
+              <div class="health-card-header">
+                <div class="health-card-title">scrcpy</div>
+                <div class="health-status missing">확인중</div>
+              </div>
+              <div class="health-card-body">
+                <div>마지막 점검: -</div>
+                <div>버전: -</div>
+              </div>
+            </div>
+
+            <div class="health-card">
+              <div class="health-card-header">
+                <div class="health-card-title">Backend</div>
+                <div class="health-status missing">확인중</div>
+              </div>
+              <div class="health-card-body">
+                <div>마지막 점검: -</div>
+                <div>상태: -</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
 
     <!-- Footer -->
     <footer class="footer">
-      <span>DoAi.Me v1.0.0</span>
+      <span>DoAi.Me v1.1.0</span>
       <span id="lastUpdate">마지막 업데이트: -</span>
     </footer>
   </div>
@@ -424,27 +1036,19 @@
     const state = {
       nodeId: 'NODE-1',
       serverConnected: false,
+      currentTab: 'logging',
       devices: [],
       logs: [],
-      maxLogs: 200,
-    };
-
-    // ============================================
-    // DOM Elements
-    // ============================================
-    const elements = {
-      nodeId: document.getElementById('nodeId'),
-      serverStatus: document.getElementById('serverStatus'),
-      serverStatusText: document.getElementById('serverStatusText'),
-      totalDevices: document.getElementById('totalDevices'),
-      onlineDevices: document.getElementById('onlineDevices'),
-      busyDevices: document.getElementById('busyDevices'),
-      errorDevices: document.getElementById('errorDevices'),
-      deviceCount: document.getElementById('deviceCount'),
-      deviceList: document.getElementById('deviceList'),
-      logCount: document.getElementById('logCount'),
-      logList: document.getElementById('logList'),
-      lastUpdate: document.getElementById('lastUpdate'),
+      maxLogs: 500,
+      filters: {
+        level: 'ALL',
+        category: 'ALL'
+      },
+      heatmapData: null,
+      botRegistry: [],
+      infraHealth: null,
+      managerStatus: null,
+      botFleetStatus: []
     };
 
     // ============================================
@@ -457,101 +1061,387 @@
       onDeviceUpdate: () => {},
       onLogEntry: () => {},
       onServerStatus: () => {},
+      getBotRegistry: () => Promise.resolve([]),
+      getHeatmapData: () => Promise.resolve(null),
+      getInfraHealth: () => Promise.resolve(null),
+      getManagerStatus: () => Promise.resolve(null),
+      getBotFleetStatus: () => Promise.resolve([]),
+      runInfraCheck: () => Promise.resolve(null)
     };
 
     // ============================================
-    // Render Functions
+    // Tab Navigation
     // ============================================
-    function updateServerStatus(connected, message) {
-      state.serverConnected = connected;
-      
-      elements.serverStatus.className = 'status-badge ' + 
-        (connected ? 'connected' : message === '연결 중...' ? 'connecting' : 'disconnected');
-      elements.serverStatusText.textContent = message || (connected ? '연결됨' : '연결 끊김');
-      
-      const dot = elements.serverStatus.querySelector('.status-dot');
-      dot.className = 'status-dot' + (message === '연결 중...' ? ' pulse' : '');
+    function switchTab(tabName) {
+      state.currentTab = tabName;
+
+      // Update nav items
+      document.querySelectorAll('.nav-item').forEach(item => {
+        item.classList.toggle('active', item.dataset.tab === tabName);
+      });
+
+      // Update tab content
+      document.querySelectorAll('.tab-content').forEach(content => {
+        content.classList.toggle('active', content.id === `tab-${tabName}`);
+      });
+
+      // Load tab data
+      loadTabData(tabName);
     }
 
-    function updateStats() {
-      const devices = state.devices;
-      const total = devices.length;
-      const online = devices.filter(d => d.status === 'online' || d.status === 'idle').length;
-      const busy = devices.filter(d => d.status === 'busy' || d.status === 'running').length;
-      const error = devices.filter(d => d.status === 'error' || d.status === 'offline').length;
-
-      elements.totalDevices.textContent = total;
-      elements.onlineDevices.textContent = online;
-      elements.busyDevices.textContent = busy;
-      elements.errorDevices.textContent = error;
-      elements.deviceCount.textContent = `${total}개`;
+    // ============================================
+    // Tab Data Loading
+    // ============================================
+    async function loadTabData(tabName) {
+      try {
+        switch (tabName) {
+          case 'logging':
+            renderLogs();
+            break;
+          case 'heatmap':
+            await loadHeatmapData();
+            break;
+          case 'devices':
+            renderDeviceTable();
+            break;
+          case 'clients':
+            await loadClientData();
+            break;
+          case 'infra':
+            await loadInfraHealth();
+            break;
+        }
+      } catch (err) {
+        console.error(`Failed to load ${tabName} data:`, err);
+      }
     }
 
-    function renderDevices() {
-      if (state.devices.length === 0) {
-        elements.deviceList.innerHTML = `
+    // ============================================
+    // Logging Tab
+    // ============================================
+    function addLog(log) {
+      state.logs.unshift({
+        timestamp: log.timestamp || Date.now(),
+        level: log.level || 'INFO',
+        category: log.category || 'SYSTEM',
+        message: log.message || ''
+      });
+
+      if (state.logs.length > state.maxLogs) {
+        state.logs = state.logs.slice(0, state.maxLogs);
+      }
+
+      if (state.currentTab === 'logging') {
+        renderLogs();
+      }
+    }
+
+    function setLogFilter(filterType, filterValue, btnElement) {
+      state.filters[filterType] = filterValue;
+
+      // Update button states
+      document.querySelectorAll(`[data-filter-type="${filterType}"]`).forEach(btn => {
+        btn.classList.remove('active');
+      });
+      btnElement.classList.add('active');
+
+      renderLogs();
+    }
+
+    function renderLogs() {
+      const filteredLogs = state.logs.filter(log => {
+        const levelMatch = state.filters.level === 'ALL' || log.level === state.filters.level;
+        const categoryMatch = state.filters.category === 'ALL' || log.category === state.filters.category;
+        return levelMatch && categoryMatch;
+      });
+
+      const container = document.getElementById('logContainer');
+
+      if (filteredLogs.length === 0) {
+        container.innerHTML = `
           <div class="empty-state">
-            <div class="empty-state-icon">📱</div>
-            <div>연결된 디바이스가 없습니다</div>
-            <div style="font-size: 11px; margin-top: 8px;">ADB로 디바이스를 연결해주세요</div>
+            <div class="empty-state-icon">📋</div>
+            <div class="empty-state-text">필터와 일치하는 로그가 없습니다</div>
           </div>
         `;
         return;
       }
 
-      elements.deviceList.innerHTML = state.devices.map(device => {
-        const statusColor = {
-          online: 'var(--success)',
-          idle: 'var(--success)',
-          busy: 'var(--warning)',
-          running: 'var(--warning)',
-          error: 'var(--error)',
-          offline: 'var(--text-secondary)',
-        }[device.status] || 'var(--text-secondary)';
+      container.innerHTML = filteredLogs.map(log => `
+        <div class="log-entry">
+          <span class="log-time">${formatTime(log.timestamp)}</span>
+          <span class="log-level-badge ${log.level}">${log.level}</span>
+          <span class="log-category">${log.category}</span>
+          <span class="log-message">${escapeHtml(log.message)}</span>
+        </div>
+      `).join('');
+
+      // Auto-scroll to top (most recent)
+      container.scrollTop = 0;
+    }
+
+    // ============================================
+    // Heatmap Tab
+    // ============================================
+    async function loadHeatmapData() {
+      try {
+        if (api.getHeatmapData) {
+          state.heatmapData = await api.getHeatmapData();
+        }
+        renderHeatmap();
+      } catch (err) {
+        console.error('Failed to load heatmap data:', err);
+        renderHeatmap();
+      }
+    }
+
+    function renderHeatmap() {
+      if (!state.heatmapData) {
+        // Show placeholder data from devices
+        const connected = state.devices.filter(d => d.status === 'online' || d.status === 'idle').length;
+        const watching = state.devices.filter(d => d.status === 'busy' || d.status === 'running').length;
+        const ended = state.devices.filter(d => d.status === 'offline').length;
+
+        document.getElementById('heatmap-connected').textContent = connected;
+        document.getElementById('heatmap-watching').textContent = watching;
+        document.getElementById('heatmap-ended').textContent = ended;
+
+        document.getElementById('heatmapData').innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">📊</div>
+            <div class="empty-state-text">히트맵 데이터가 없습니다</div>
+            <div class="empty-state-subtext">기기가 연결되면 활동 데이터가 표시됩니다</div>
+          </div>
+        `;
+        return;
+      }
+
+      // Render actual heatmap data
+      document.getElementById('heatmap-connected').textContent = state.heatmapData.connected || 0;
+      document.getElementById('heatmap-watching').textContent = state.heatmapData.watching || 0;
+      document.getElementById('heatmap-ended').textContent = state.heatmapData.ended || 0;
+
+      document.getElementById('heatmapData').innerHTML = '<pre style="font-size: 11px; line-height: 1.5;">' +
+        JSON.stringify(state.heatmapData, null, 2) + '</pre>';
+    }
+
+    // ============================================
+    // Devices Tab
+    // ============================================
+    function renderDeviceTable() {
+      const tbody = document.getElementById('deviceTableBody');
+
+      if (state.devices.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="8">
+              <div class="empty-state">
+                <div class="empty-state-icon">📱</div>
+                <div class="empty-state-text">연결된 기기가 없습니다</div>
+                <div class="empty-state-subtext">ADB로 기기를 연결해주세요</div>
+              </div>
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = state.devices.map((device, index) => {
+        const statusClass = {
+          online: 'online',
+          idle: 'online',
+          busy: 'busy',
+          running: 'busy',
+          error: 'error',
+          offline: 'offline'
+        }[device.status] || 'offline';
+
+        const statusText = {
+          online: 'ONLINE',
+          idle: 'ONLINE',
+          busy: 'BUSY',
+          running: 'BUSY',
+          error: 'ERROR',
+          offline: 'OFFLINE'
+        }[device.status] || 'OFFLINE';
 
         return `
-          <div class="device-item" data-id="${device.id}">
-            <div class="device-icon">📱</div>
-            <div class="device-info">
-              <div class="device-name">${device.name || device.id}</div>
-              <div class="device-serial">${device.serial || device.id}</div>
+          <tr>
+            <td>${index + 1}</td>
+            <td>${escapeHtml(device.name || device.id)}</td>
+            <td style="font-family: monospace; font-size: 11px;">${escapeHtml(device.serial || device.id)}</td>
+            <td><span class="badge ${statusClass}"><span class="badge-dot"></span>${statusText}</span></td>
+            <td>🔋 ${device.battery || 0}%</td>
+            <td>${escapeHtml(state.nodeId)}</td>
+            <td>${formatTime(device.lastSeen || Date.now())}</td>
+            <td><button class="btn btn-secondary" onclick="refreshDevice('${escapeAttr(device.id)}')">새로고침</button></td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    window.refreshDevice = function(deviceId) {
+      addLog({ level: 'INFO', category: 'DEVICE', message: `기기 새로고침: ${deviceId}` });
+    };
+
+    // ============================================
+    // Clients Tab
+    // ============================================
+    async function loadClientData() {
+      try {
+        if (api.getManagerStatus) {
+          state.managerStatus = await api.getManagerStatus();
+        }
+        if (api.getBotFleetStatus) {
+          state.botFleetStatus = await api.getBotFleetStatus();
+        }
+        if (api.getBotRegistry) {
+          state.botRegistry = await api.getBotRegistry();
+        }
+        renderClientData();
+      } catch (err) {
+        console.error('Failed to load client data:', err);
+        renderClientData();
+      }
+    }
+
+    function renderClientData() {
+      // Manager Status
+      if (state.managerStatus) {
+        document.getElementById('managerConnected').textContent = state.managerStatus.connected ? '연결됨' : '연결 끊김';
+        document.getElementById('managerConnected').style.color = state.managerStatus.connected ? 'var(--success)' : 'var(--error)';
+        document.getElementById('managerNodeId').textContent = state.managerStatus.nodeId || '-';
+        document.getElementById('managerUptime').textContent = state.managerStatus.uptime || '-';
+      } else {
+        document.getElementById('managerConnected').textContent = '연결 끊김';
+        document.getElementById('managerConnected').style.color = 'var(--error)';
+        document.getElementById('managerNodeId').textContent = '-';
+        document.getElementById('managerUptime').textContent = '-';
+      }
+
+      // Bot Fleet
+      const botFleetBody = document.getElementById('botFleetBody');
+      if (state.botFleetStatus.length === 0) {
+        botFleetBody.innerHTML = `
+          <tr>
+            <td colspan="5">
+              <div class="empty-state">
+                <div class="empty-state-icon">🤖</div>
+                <div class="empty-state-text">실행 중인 Bot이 없습니다</div>
+              </div>
+            </td>
+          </tr>
+        `;
+      } else {
+        botFleetBody.innerHTML = state.botFleetStatus.map(bot => `
+          <tr>
+            <td>${escapeHtml(bot.key)}</td>
+            <td>${escapeHtml(bot.nameKo || bot.name)}</td>
+            <td>${escapeHtml(bot.category || '-')}</td>
+            <td><span class="badge ${bot.status}">${bot.status}</span></td>
+            <td>${formatTime(bot.lastActivity || Date.now())}</td>
+          </tr>
+        `).join('');
+      }
+
+      // Bot Catalog
+      const botCatalog = document.getElementById('botCatalog');
+      if (state.botRegistry.length === 0) {
+        botCatalog.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">🤖</div>
+            <div class="empty-state-text">봇 카탈로그가 비어있습니다</div>
+          </div>
+        `;
+      } else {
+        botCatalog.innerHTML = state.botRegistry.map(bot => `
+          <div class="bot-card">
+            <div class="bot-card-header">
+              <div class="bot-icon">🤖</div>
+              <div class="bot-info">
+                <div class="bot-name">${escapeHtml(bot.nameKo || bot.name)}</div>
+                <div class="bot-category">${escapeHtml(bot.category || 'General')}</div>
+              </div>
             </div>
-            <div class="device-status">
-              <span class="battery">🔋 ${device.battery || 0}%</span>
-              <span class="status-dot" style="background: ${statusColor}"></span>
+            <div class="bot-description">${escapeHtml(bot.description || '설명 없음')}</div>
+            <div class="bot-capabilities">
+              ${(bot.capabilities || []).map(cap => `<span class="bot-tag">${escapeHtml(cap)}</span>`).join('')}
+            </div>
+          </div>
+        `).join('');
+      }
+    }
+
+    // ============================================
+    // Infra Tab
+    // ============================================
+    async function loadInfraHealth() {
+      try {
+        if (api.getInfraHealth) {
+          state.infraHealth = await api.getInfraHealth();
+        }
+        renderInfraHealth();
+      } catch (err) {
+        console.error('Failed to load infra health:', err);
+        renderInfraHealth();
+      }
+    }
+
+    function renderInfraHealth() {
+      if (!state.infraHealth) {
+        // Keep default placeholders
+        return;
+      }
+
+      const services = ['adb', 'uiautomator2', 'appium', 'scrcpy', 'backend'];
+      const healthGrid = document.getElementById('healthGrid');
+
+      healthGrid.innerHTML = services.map(service => {
+        const health = state.infraHealth[service] || {};
+        const statusClass = health.status === 'ok' ? 'ok' : health.status === 'error' ? 'error' : 'missing';
+        const statusText = health.status === 'ok' ? '정상' : health.status === 'error' ? '오류' : '미설치';
+
+        return `
+          <div class="health-card">
+            <div class="health-card-header">
+              <div class="health-card-title">${service === 'uiautomator2' ? 'UIAutomator2' : service.toUpperCase()}</div>
+              <div class="health-status ${statusClass}">${statusText}</div>
+            </div>
+            <div class="health-card-body">
+              <div>마지막 점검: ${health.lastCheck ? formatTime(health.lastCheck) : '-'}</div>
+              <div>버전: ${health.version || '-'}</div>
             </div>
           </div>
         `;
       }).join('');
     }
 
-    function addLog(log) {
-      state.logs.unshift(log);
-      if (state.logs.length > state.maxLogs) {
-        state.logs.pop();
+    async function runInfraCheck() {
+      try {
+        if (api.runInfraCheck) {
+          addLog({ level: 'INFO', category: 'SYSTEM', message: '인프라 점검 시작...' });
+          state.infraHealth = await api.runInfraCheck();
+          renderInfraHealth();
+          addLog({ level: 'INFO', category: 'SYSTEM', message: '인프라 점검 완료' });
+        }
+      } catch (err) {
+        addLog({ level: 'ERROR', category: 'SYSTEM', message: `인프라 점검 실패: ${err.message}` });
       }
-      renderLogs();
     }
 
-    function renderLogs() {
-      if (state.logs.length === 0) {
-        elements.logList.innerHTML = `
-          <div class="empty-state">
-            <div class="empty-state-icon">📋</div>
-            <div>로그가 없습니다</div>
-          </div>
-        `;
-        return;
-      }
+    // ============================================
+    // Server Status
+    // ============================================
+    function updateServerStatus(connected, message) {
+      state.serverConnected = connected;
 
-      elements.logCount.textContent = `${state.logs.length}개`;
-      elements.logList.innerHTML = state.logs.map(log => `
-        <div class="log-entry">
-          <span class="log-time">${formatTime(log.timestamp)}</span>
-          <span class="log-level ${log.level}">${log.level.toUpperCase()}</span>
-          <span class="log-message">${escapeHtml(log.message)}</span>
-        </div>
-      `).join('');
+      const statusEl = document.getElementById('serverStatus');
+      statusEl.className = 'status-badge ' +
+        (connected ? 'connected' : message === '연결 중...' ? 'connecting' : 'disconnected');
+      document.getElementById('serverStatusText').textContent = message || (connected ? '연결됨' : '연결 끊김');
+
+      const dot = statusEl.querySelector('.status-dot');
+      dot.className = 'status-dot' + (message === '연결 중...' ? ' pulse' : '');
     }
 
     // ============================================
@@ -564,12 +1454,16 @@
 
     function escapeHtml(text) {
       const div = document.createElement('div');
-      div.textContent = text;
+      div.textContent = String(text);
       return div.innerHTML;
     }
 
+    function escapeAttr(text) {
+      return String(text).replace(/'/g, "\\'");
+    }
+
     function updateLastUpdate() {
-      elements.lastUpdate.textContent = `마지막 업데이트: ${formatTime(Date.now())}`;
+      document.getElementById('lastUpdate').textContent = `마지막 업데이트: ${formatTime(Date.now())}`;
     }
 
     // ============================================
@@ -577,12 +1471,12 @@
     // ============================================
     async function init() {
       try {
-        // Config 가져오기
+        // Get config
         const config = await api.getConfig();
         state.nodeId = config.nodeId || 'NODE-1';
-        elements.nodeId.textContent = state.nodeId;
+        document.getElementById('nodeId').textContent = state.nodeId;
 
-        // 이벤트 리스너 등록
+        // Register event listeners
         if (api.onServerStatus) {
           api.onServerStatus((event, { connected, message }) => {
             updateServerStatus(connected, message);
@@ -592,8 +1486,12 @@
         if (api.onDeviceUpdate) {
           api.onDeviceUpdate((event, devices) => {
             state.devices = devices;
-            updateStats();
-            renderDevices();
+            if (state.currentTab === 'devices') {
+              renderDeviceTable();
+            }
+            if (state.currentTab === 'heatmap') {
+              renderHeatmap();
+            }
             updateLastUpdate();
           });
         }
@@ -604,21 +1502,22 @@
           });
         }
 
-        // 초기 데이터 로드
+        // Load initial data
         const devices = await api.getDevices();
         state.devices = devices || [];
-        updateStats();
-        renderDevices();
 
         const logs = await api.getLogs();
         state.logs = logs || [];
-        renderLogs();
 
-        // 시작 로그
+        // Load current tab data
+        await loadTabData(state.currentTab);
+
+        // Startup log
         addLog({
           timestamp: Date.now(),
-          level: 'info',
-          message: 'Desktop Agent UI 초기화 완료'
+          level: 'INFO',
+          category: 'SYSTEM',
+          message: 'Desktop Agent UI v1.1.0 초기화 완료'
         });
 
         updateLastUpdate();
@@ -627,7 +1526,8 @@
         console.error('Init error:', err);
         addLog({
           timestamp: Date.now(),
-          level: 'error',
+          level: 'ERROR',
+          category: 'SYSTEM',
           message: `초기화 오류: ${err.message}`
         });
       }
