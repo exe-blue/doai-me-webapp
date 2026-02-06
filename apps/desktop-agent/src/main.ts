@@ -23,6 +23,7 @@ import { AutoUpdater, getAutoUpdater } from './updater/AutoUpdater';
 import { DeviceRecovery } from './recovery/DeviceRecovery';
 import { NodeRecovery, getNodeRecovery, SavedState } from './recovery/NodeRecovery';
 import { logger } from './utils/logger';
+import { loadAppConfig, getAppConfig, type AppConfig } from './config/AppConfig';
 
 // Manager components for Worker orchestration
 import {
@@ -47,6 +48,7 @@ const WORKER_SERVER_PORT = parseInt(process.env.WORKER_SERVER_PORT || '3001', 10
 // 전역 변수
 // ============================================
 
+let appConfig: AppConfig | null = null;
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let socketClient: SocketClient | null = null;
@@ -376,9 +378,14 @@ async function startAgent(): Promise<void> {
 
   // ============================================
   // Manager Components 초기화 (Worker 오케스트레이션)
+  // appRole === 'manager' 일 때만 시작
   // ============================================
-  
-  await initializeManagerComponents();
+
+  if (appConfig?.appRole === 'manager') {
+    await initializeManagerComponents();
+  } else {
+    logger.info('[Manager] Skipping Manager components (appRole is not "manager")');
+  }
 
   // 디바이스 상태 변경 시 renderer에 브로드캐스트
   deviceManager.on('device:connected', (device: { serial: string }) => {
@@ -588,6 +595,11 @@ function setupIPC(): void {
     };
   });
 
+  // 앱 역할 조회 (v1.2.0)
+  ipcMain.handle('get-app-role', () => {
+    return { role: appConfig?.appRole || 'bot' };
+  });
+
   // 디바이스 목록 조회
   ipcMain.handle('get-devices', () => {
     const devices = deviceManager?.getAllDevices() || [];
@@ -733,6 +745,44 @@ function setupIPC(): void {
   });
 
   // ============================================
+  // scrcpy IPC 핸들러
+  // ============================================
+
+  // scrcpy 시작
+  ipcMain.handle('start-scrcpy', async (_event, serial: string) => {
+    try {
+      const scrcpy = getScrcpyController();
+      scrcpy.startStream(serial);
+      pushLog({ timestamp: Date.now(), level: 'info', message: `scrcpy 시작: ${serial}`, source: 'device' });
+      return { success: true };
+    } catch (error) {
+      const msg = (error as Error).message;
+      pushLog({ timestamp: Date.now(), level: 'error', message: `scrcpy 시작 실패: ${msg}`, source: 'device' });
+      return { success: false, message: msg };
+    }
+  });
+
+  // scrcpy 중지
+  ipcMain.handle('stop-scrcpy', async (_event, serial: string) => {
+    try {
+      const scrcpy = getScrcpyController();
+      scrcpy.stopStream(serial);
+      pushLog({ timestamp: Date.now(), level: 'info', message: `scrcpy 종료: ${serial}`, source: 'device' });
+      return { success: true };
+    } catch (error) {
+      const msg = (error as Error).message;
+      pushLog({ timestamp: Date.now(), level: 'error', message: `scrcpy 종료 실패: ${msg}`, source: 'device' });
+      return { success: false, message: msg };
+    }
+  });
+
+  // scrcpy 활성 상태 조회
+  ipcMain.handle('is-scrcpy-active', (_event, serial: string) => {
+    const scrcpy = getScrcpyController();
+    return scrcpy.isStreaming(serial);
+  });
+
+  // ============================================
   // Manager IPC 핸들러
   // ============================================
 
@@ -819,6 +869,9 @@ function sendToRenderer(channel: string, data?: unknown): void {
 
 app.on('ready', async () => {
   logger.info('App ready');
+
+  // 역할 기반 설정 로드 (v1.2.0)
+  appConfig = loadAppConfig();
 
   createWindow();
   createTray();

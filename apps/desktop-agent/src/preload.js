@@ -150,6 +150,26 @@ contextBridge.exposeInMainWorld('api', {
   getHeatmapData: () => ipcRenderer.invoke('get-heatmap-data'),
 
   // ========================================================================
+  // v1.2.0: 역할 조회
+  // ========================================================================
+
+  // 앱 역할 (manager | bot)
+  getAppRole: () => ipcRenderer.invoke('get-app-role'),
+
+  // ========================================================================
+  // v1.2.0: scrcpy 화면 제어
+  // ========================================================================
+
+  // scrcpy 시작 (디바이스 화면 미러링 + 제어)
+  startScrcpy: (serial) => ipcRenderer.invoke('start-scrcpy', serial),
+
+  // scrcpy 중지
+  stopScrcpy: (serial) => ipcRenderer.invoke('stop-scrcpy', serial),
+
+  // scrcpy 활성 상태 조회
+  isScrcpyActive: (serial) => ipcRenderer.invoke('is-scrcpy-active', serial),
+
+  // ========================================================================
   // v1.2.0: 인프라 헬스체크
   // ========================================================================
 
