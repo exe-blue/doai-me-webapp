@@ -196,6 +196,108 @@
   },
   "hotPaths": [
     {
+      "path": "apps/backend/socketio-server.js",
+      "accessCount": 10,
+      "lastAccessed": 1770396755300,
+      "type": "directory"
+    },
+    {
+      "path": "apps/backend",
+      "accessCount": 5,
+      "lastAccessed": 1770396766986,
+      "type": "directory"
+    },
+    {
+      "path": "apps/dashboard/src",
+      "accessCount": 5,
+      "lastAccessed": 1770396783618,
+      "type": "directory"
+    },
+    {
+      "path": "apps/dashboard/Dockerfile",
+      "accessCount": 3,
+      "lastAccessed": 1770389431454,
+      "type": "file"
+    },
+    {
+      "path": "apps/dashboard/src/app/dashboard/layout.tsx",
+      "accessCount": 3,
+      "lastAccessed": 1770396940448,
+      "type": "file"
+    },
+    {
+      "path": "apps/dashboard/src/hooks/use-socket.ts",
+      "accessCount": 3,
+      "lastAccessed": 1770396948369,
+      "type": "file"
+    },
+    {
+      "path": "apps/dashboard/next.config.ts",
+      "accessCount": 2,
+      "lastAccessed": 1770389038875,
+      "type": "file"
+    },
+    {
+      "path": "apps/backend/handlers/protocolHandlers.js",
+      "accessCount": 2,
+      "lastAccessed": 1770395828337,
+      "type": "file"
+    },
+    {
+      "path": "",
+      "accessCount": 2,
+      "lastAccessed": 1770396725370,
+      "type": "directory"
+    },
+    {
+      "path": "apps/dashboard/src/app/globals.css",
+      "accessCount": 2,
+      "lastAccessed": 1770396764002,
+      "type": "file"
+    },
+    {
+      "path": "apps/dashboard/src/components/ui/table.tsx",
+      "accessCount": 2,
+      "lastAccessed": 1770396779845,
+      "type": "file"
+    },
+    {
+      "path": "apps/dashboard/src/app/dashboard/videos/page.tsx",
+      "accessCount": 2,
+      "lastAccessed": 1770396930886,
+      "type": "file"
+    },
+    {
+      "path": "apps/dashboard/src/app/dashboard/register/page.tsx",
+      "accessCount": 2,
+      "lastAccessed": 1770396931293,
+      "type": "file"
+    },
+    {
+      "path": "apps/dashboard/src/components/layout/app-sidebar.tsx",
+      "accessCount": 2,
+      "lastAccessed": 1770396932145,
+      "type": "file"
+    },
+    {
+      "path": "apps/dashboard/src/components/ui/slider.tsx",
+      "accessCount": 2,
+      "lastAccessed": 1770396941231,
+      "type": "file"
+    },
+    {
+      "path": "apps/dashboard/src/components/ui/switch.tsx",
+      "accessCount": 2,
+      "lastAccessed": 1770396941537,
+      "type": "file"
+    },
+    {
+      "path": "apps/dashboard/src/app/api/videos/route.ts",
+      "accessCount": 2,
+      "lastAccessed": 1770396947787,
+      "type": "file"
+    },
+    {
       "path": "apps/dashboard/vercel.json",
       "accessCount": 1,
       "lastAccessed": 1770381920681,
@@ -211,6 +313,126 @@
       "path": "apps/dashboard/package.json",
       "accessCount": 1,
       "lastAccessed": 1770381921563,
+      "type": "file"
+    },
+    {
+      "path": "apps/backend/Dockerfile",
+      "accessCount": 1,
+      "lastAccessed": 1770389322833,
+      "type": "file"
+    },
+    {
+      "path": "apps/backend/services/stateService.js",
+      "accessCount": 1,
+      "lastAccessed": 1770395666814,
+      "type": "file"
+    },
+    {
+      "path": "apps/dashboard",
+      "accessCount": 1,
+      "lastAccessed": 1770396699173,
+      "type": "directory"
+    },
+    {
+      "path": "apps/dashboard/src/components/data-display/data-table.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1770396720248,
+      "type": "file"
+    },
+    {
+      "path": "packages/ui/styles/globals.css",
+      "accessCount": 1,
+      "lastAccessed": 1770396739338,
+      "type": "file"
+    },
+    {
+      "path": "apps/backend/socket_service.ts",
+      "accessCount": 1,
+      "lastAccessed": 1770396742714,
+      "type": "file"
+    },
+    {
+      "path": "apps/dashboard/src/app/api/devices/route.ts",
+      "accessCount": 1,
+      "lastAccessed": 1770396752095,
+      "type": "file"
+    },
+    {
+      "path": "apps/dashboard/src/contexts/socket-context.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1770396762377,
+      "type": "file"
+    },
+    {
+      "path": "apps/dashboard/src/app/api/jobs/route.ts",
+      "accessCount": 1,
+      "lastAccessed": 1770396763432,
+      "type": "file"
+    },
+    {
+      "path": "apps/dashboard/src/app/dashboard/jobs/page.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1770396764747,
+      "type": "file"
+    },
+    {
+      "path": "apps/backend/services/supabaseService.js",
+      "accessCount": 1,
+      "lastAccessed": 1770396772587,
+      "type": "file"
+    },
+    {
+      "path": "apps/dashboard/src/components/ui/card.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1770396779553,
+      "type": "file"
+    },
+    {
+      "path": "apps/dashboard/src/components/ui/stats-card.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1770396779703,
+      "type": "file"
+    },
+    {
+      "path": "apps/dashboard/src/components/ui/badge.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1770396780065,
+      "type": "file"
+    },
+    {
+      "path": "apps/dashboard/src/app/api/queue/route.ts",
+      "accessCount": 1,
+      "lastAccessed": 1770396781898,
+      "type": "file"
+    },
+    {
+      "path": "packages/shared/package.json",
+      "accessCount": 1,
+      "lastAccessed": 1770396786728,
+      "type": "file"
+    },
+    {
+      "path": "packages/shared/src/types.ts",
+      "accessCount": 1,
+      "lastAccessed": 1770396789983,
+      "type": "file"
+    },
+    {
+      "path": "packages/shared/src/device.types.ts",
+      "accessCount": 1,
+      "lastAccessed": 1770396790591,
+      "type": "file"
+    },
+    {
+      "path": "packages/shared/src/socket-events.ts",
+      "accessCount": 1,
+      "lastAccessed": 1770396791178,
+      "type": "file"
+    },
+    {
+      "path": "packages/shared/src/database.ts",
+      "accessCount": 1,
+      "lastAccessed": 1770396792097,
       "type": "file"
     }
   ],

@@ -21,6 +21,8 @@ const buttonVariants = cva(
           "bg-background text-foreground border-2 border-foreground shadow-[4px_4px_0px_0px] shadow-foreground hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px] active:translate-x-[4px] active:translate-y-[4px] active:shadow-none",
         secondary:
           "bg-secondary text-secondary-foreground border-2 border-foreground shadow-[4px_4px_0px_0px] shadow-primary hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px] active:translate-x-[4px] active:translate-y-[4px] active:shadow-none",
+        noShadow:
+          "bg-background text-foreground border-2 border-foreground hover:bg-accent",
         ghost:
           "bg-transparent hover:bg-accent border-2 border-transparent",
         link:
