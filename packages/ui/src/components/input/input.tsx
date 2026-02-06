@@ -1,8 +1,7 @@
 import * as React from "react";
 import { cn } from "@packages/ui/lib/utils";
 
-export interface InputProps
-  extends React.InputHTMLAttributes<HTMLInputElement> {}
+export type InputProps = React.InputHTMLAttributes<HTMLInputElement>;
 
 /**
  * Input - RetroUI NeoBrutalist 스타일 입력 필드

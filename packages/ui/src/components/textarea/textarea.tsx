@@ -1,8 +1,7 @@
 import * as React from "react";
 import { cn } from "@packages/ui/lib/utils";
 
-export interface TextareaProps
-  extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {}
+export type TextareaProps = React.TextareaHTMLAttributes<HTMLTextAreaElement>;
 
 /**
  * Textarea - RetroUI NeoBrutalist 스타일 텍스트영역

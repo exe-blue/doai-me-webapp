@@ -17,13 +17,11 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
   ]),
-  // Allow require imports in specific CommonJS files
-  {
-    files: ["server.js", "test-supabase.js"],
-    rules: {
-      "@typescript-eslint/no-require-imports": "off",
-    },
-  },
+  // Ignore CommonJS files from linting
+  globalIgnores([
+    "server.js",
+    "test-supabase.js",
+  ]),
 ]);
 
 export default eslintConfig;

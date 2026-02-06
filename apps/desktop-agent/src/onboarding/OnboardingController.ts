@@ -175,7 +175,7 @@ export class OnboardingController extends EventEmitter {
     const results: DeviceOnboardingState[] = [];
     let completed = 0;
     let failed = 0;
-    let skipped = 0;
+    const skipped = 0;
 
     // 병렬 처리
     const chunks = this.chunkArray(deviceSerials, parallel);
