@@ -26,7 +26,6 @@ export async function GET(request: NextRequest) {
     let query = supabase
       .from('devices')
       .select('*')
-      .like('pc_id', 'P__-___') // Strict filter: only P01-001 format devices
       .order('pc_id', { ascending: true })
       .limit(limit);
 
@@ -35,12 +34,13 @@ export async function GET(request: NextRequest) {
       query = query.eq('status', status);
     }
 
-    // PC ID filter (prefix match)
-    if (pcId) {
-      query = query.like('pc_id', `${pcId}-%`);
-    }
+    const { data: allDevices, error } = await query;
 
-    const { data: devices, error } = await query;
+    // PC ID filter (prefix match) - done in JS to avoid UUID type mismatch
+    let devices = allDevices;
+    if (pcId && devices) {
+      devices = devices.filter(d => String(d.pc_id || '').startsWith(pcId));
+    }
 
     if (error) {
       console.error('[API] Devices query error:', error);

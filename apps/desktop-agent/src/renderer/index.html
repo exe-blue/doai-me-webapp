@@ -1401,6 +1401,8 @@
   </div>
 
   <script>
+  (function() {
+    'use strict';
     // ============================================
     // State
     // ============================================
@@ -1665,9 +1667,9 @@
       }).join('');
     }
 
-    window.refreshDevice = function(deviceId) {
+    function refreshDevice(deviceId) {
       addLog({ level: 'INFO', category: 'DEVICE', message: `기기 새로고침: ${deviceId}` });
-    };
+    }
 
     // ============================================
     // Device Detail Panel
@@ -2138,8 +2140,20 @@
       }
     }
 
+    // Expose functions used by inline onclick handlers
+    window.switchTab = switchTab;
+    window.setLogFilter = setLogFilter;
+    window.runInfraCheck = runInfraCheck;
+    window.closeDevicePanel = closeDevicePanel;
+    window.toggleScrcpy = toggleScrcpy;
+    window.panelDeviceAction = panelDeviceAction;
+    window.openDevicePanel = openDevicePanel;
+    window.refreshDevice = refreshDevice;
+    window.installApk = installApk;
+
     // Start
     init();
+  })();
   </script>
 </body>
 </html>
