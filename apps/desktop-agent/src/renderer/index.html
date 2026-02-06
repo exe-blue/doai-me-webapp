@@ -2081,6 +2081,12 @@
           });
         }
 
+        // 초기 서버 상태 조회 (이벤트 놓침 방지)
+        if (api.getServerStatus) {
+          const status = await api.getServerStatus();
+          updateServerStatus(status.connected, status.message);
+        }
+
         if (api.onDeviceUpdate) {
           api.onDeviceUpdate((event, devices) => {
             state.devices = devices;

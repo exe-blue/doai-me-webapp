@@ -32,7 +32,7 @@ interface GlobalSettings {
 }
 
 const DEFAULT_SETTINGS: GlobalSettings = {
-  socketUrl: 'http://localhost:3001',
+  socketUrl: process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001',
   autoReconnect: true,
   heartbeatInterval: 5000,
 

@@ -160,52 +160,108 @@ function getHeatmapData(): HeatmapData {
 // ============================================
 
 function createWindow(): void {
-  const iconPath = getIconPath();
-  logger.info('Creating window', { iconPath, isPackaged: app.isPackaged });
+  try {
+    const iconPath = getIconPath();
+    const preloadPath = path.join(__dirname, 'preload.js');
+    const htmlPath = path.join(__dirname, 'index.html');
 
-  mainWindow = new BrowserWindow({
-    width: 800,
-    height: 600,
-    minWidth: 600,
-    minHeight: 400,
-    show: false,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
-    icon: iconPath,
-  });
+    console.log('[createWindow] Starting', { iconPath, preloadPath, htmlPath });
+    logger.info('Creating window', { iconPath, preloadPath, htmlPath, isPackaged: app.isPackaged });
 
-  if (IS_DEV) {
-    mainWindow.webContents.openDevTools();
+    mainWindow = new BrowserWindow({
+      width: 800,
+      height: 600,
+      minWidth: 600,
+      minHeight: 400,
+      show: false,
+      webPreferences: {
+        preload: preloadPath,
+        contextIsolation: true,
+        nodeIntegration: false,
+      },
+      icon: iconPath,
+    });
+
+    if (IS_DEV) {
+      mainWindow.webContents.openDevTools();
+    }
+
+    // 렌더러 크래시 감지
+    mainWindow.webContents.on('render-process-gone', (_event, details) => {
+      logger.error('Renderer process gone', { reason: details.reason, exitCode: details.exitCode });
+      console.error('[createWindow] Renderer process gone:', details.reason);
+    });
+
+    // 페이지 로드 실패 감지
+    mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
+      logger.error('Page failed to load', { errorCode, errorDescription, validatedURL });
+      console.error('[createWindow] did-fail-load:', errorCode, errorDescription);
+      // 로드 실패 시에도 윈도우 표시 (에러가 보이도록)
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.show();
+      }
+    });
+
+    // 콘솔 메시지 캡처 (렌더러 JS 에러 디버깅용)
+    mainWindow.webContents.on('console-message', (_event, level, message) => {
+      if (level >= 2) { // warning 이상
+        logger.warn('Renderer console', { level, message: message.substring(0, 200) });
+      }
+    });
+
+    // loadFile Promise 에러 핸들링
+    mainWindow.loadFile(htmlPath)
+      .then(() => {
+        logger.info('loadFile succeeded', { htmlPath });
+      })
+      .catch((err) => {
+        logger.error('loadFile failed', { error: (err as Error).message, htmlPath });
+        console.error('[createWindow] loadFile failed:', (err as Error).message);
+        // 로드 실패 시에도 윈도우 표시
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.show();
+        }
+      });
+
+    mainWindow.once('ready-to-show', () => {
+      logger.info('Window ready-to-show');
+      console.log('[createWindow] ready-to-show fired');
+      mainWindow?.show();
+    });
+
+    // 안전장치: 3초 후에도 윈도우가 안 보이면 강제 표시
+    setTimeout(() => {
+      if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+        logger.warn('Window not visible after 3s, forcing show');
+        console.warn('[createWindow] Forcing show after 3s timeout');
+        mainWindow.show();
+      }
+    }, 3000);
+
+    mainWindow.on('close', (event) => {
+      if (!isAppQuitting) {
+        event.preventDefault();
+        mainWindow?.hide();
+      }
+    });
+
+    mainWindow.on('closed', () => {
+      mainWindow = null;
+    });
+
+    logger.info('createWindow completed');
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    logger.error('createWindow CRASHED', { error: msg, stack: (error as Error).stack });
+    console.error('[createWindow] CRASHED:', msg);
+    // 긴급 폴백: 최소한의 윈도우 생성
+    try {
+      mainWindow = new BrowserWindow({ width: 600, height: 400, show: true });
+      mainWindow.loadURL(`data:text/html,<h1>Error: ${encodeURIComponent(msg)}</h1><p>Desktop Agent window failed to initialize.</p>`);
+    } catch (fallbackErr) {
+      console.error('[createWindow] Even fallback failed:', (fallbackErr as Error).message);
+    }
   }
-
-  mainWindow.loadFile(path.join(__dirname, 'index.html'));
-
-  mainWindow.once('ready-to-show', () => {
-    logger.info('Window ready-to-show');
-    mainWindow?.show();
-  });
-
-  // 안전장치: 5초 후에도 윈도우가 안 보이면 강제 표시
-  setTimeout(() => {
-    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
-      logger.warn('Window not visible after 5s, forcing show');
-      mainWindow.show();
-    }
-  }, 5000);
-
-  mainWindow.on('close', (event) => {
-    if (!isAppQuitting) {
-      event.preventDefault();
-      mainWindow?.hide();
-    }
-  });
-
-  mainWindow.on('closed', () => {
-    mainWindow = null;
-  });
 }
 
 // ============================================
@@ -417,7 +473,12 @@ async function startAgent(): Promise<void> {
   // Manager Components 초기화 (Worker 오케스트레이션)
   // ============================================
 
-  await initializeManagerComponents();
+  try {
+    await initializeManagerComponents();
+  } catch (err) {
+    logger.error('Manager components init failed (non-fatal)', { error: (err as Error).message });
+    pushLog({ timestamp: Date.now(), level: 'error', message: `Manager 초기화 실패: ${(err as Error).message}`, source: 'system' });
+  }
 
   // 디바이스 상태 변경 시 renderer에 브로드캐스트
   deviceManager.on('device:connected', (device: { serial: string }) => {
@@ -582,10 +643,10 @@ async function initializeManagerComponents(): Promise<void> {
     });
 
   } catch (error) {
-    logger.error('[Manager] Failed to initialize Manager components', {
-      error: error instanceof Error ? error.message : String(error),
-    });
-    throw error;
+    const msg = error instanceof Error ? error.message : String(error);
+    logger.error('[Manager] Failed to initialize Manager components (non-fatal)', { error: msg });
+    // EADDRINUSE 등 — 다른 인스턴스가 실행 중일 수 있음. throw 하지 않고 계속 진행
+    // Worker 오케스트레이션 없이 기본 기능은 사용 가능
   }
 }
 
@@ -961,7 +1022,14 @@ function sendToRenderer(channel: string, data?: unknown): void {
 // ============================================
 
 app.on('ready', async () => {
-  logger.info('App ready', { isPackaged: app.isPackaged, resourcesPath: process.resourcesPath });
+  console.log('[App] ready event fired', { isPackaged: app.isPackaged, version: app.getVersion() });
+  logger.info('App ready', {
+    isPackaged: app.isPackaged,
+    version: app.getVersion(),
+    resourcesPath: process.resourcesPath,
+    __dirname,
+    userData: app.getPath('userData'),
+  });
 
   try {
     // 설정 로드 (v1.2.0)
@@ -969,14 +1037,19 @@ app.on('ready', async () => {
     // config.json의 backendBaseUrl을 SERVER_URL에 반영
     if (appConfig.backendBaseUrl) {
       SERVER_URL = appConfig.backendBaseUrl;
+      logger.info('SERVER_URL overridden by config', { serverUrl: SERVER_URL });
     }
   } catch (err) {
     logger.error('loadAppConfig failed', { error: (err as Error).message });
   }
 
+  console.log('[App] Creating window...');
   createWindow();
+  console.log('[App] Creating tray...');
   createTray();
+  console.log('[App] Setting up IPC...');
   setupIPC();
+  console.log('[App] Setup complete, scheduling agent start...');
 
   // 약간의 딜레이 후 에이전트 시작
   setTimeout(() => {
