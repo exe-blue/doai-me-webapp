@@ -302,7 +302,7 @@ export class MinicapServer extends EventEmitter {
       });
 
       socket.on('data', (data) => {
-        this.handleData(data);
+        this.handleData(Buffer.isBuffer(data) ? data : Buffer.from(data));
       });
 
       socket.on('error', (err) => {
