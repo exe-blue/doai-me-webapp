@@ -89,11 +89,16 @@ export async function POST(request: NextRequest) {
       }
 
       // 중복 확인 (DB에서 id가 YouTube Video ID임)
-      const { data: existing } = await supabase
+      const { data: existing, error: checkError } = await supabase
         .from("videos")
         .select("id")
         .eq("id", videoId)
-        .single();
+        .maybeSingle();
+
+      // Handle errors except PGRST116 (not found)
+      if (checkError && checkError.code !== "PGRST116") {
+        return errorResponse("DB_ERROR", checkError.message, 500);
+      }
 
       if (existing) {
         return errorResponse("DUPLICATE", "이미 등록된 영상입니다", 409);

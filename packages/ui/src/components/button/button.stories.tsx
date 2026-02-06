@@ -10,7 +10,7 @@ const meta: Meta<typeof Button> = {
     layout: "centered",
     docs: {
       description: {
-        component: "RetroUI/NeoBrutalist 스타일 버튼. 두꺼운 테두리, 그림자, 호버 시 이동 효과.",
+        component: "RetroUI NeoBrutalist 스타일 버튼. 두꺼운 테두리, 그림자, 호버 시 이동 효과.",
       },
     },
   },
@@ -21,7 +21,7 @@ const meta: Meta<typeof Button> = {
     },
     size: {
       control: "select",
-      options: ["sm", "default", "lg", "icon"],
+      options: ["sm", "md", "lg", "icon"],
     },
   },
 };
@@ -52,7 +52,7 @@ export const AllSizes: Story = {
   render: () => (
     <div className="flex items-center gap-4">
       <Button size="sm">Small</Button>
-      <Button size="default">Default</Button>
+      <Button size="md">Medium</Button>
       <Button size="lg">Large</Button>
       <Button size="icon">
         <Mail className="h-4 w-4" />

@@ -54,4 +54,7 @@ async function testConnection() {
   }
 }
 
-testConnection();
+testConnection().catch((err) => {
+  console.error("Test connection failed:", err);
+  process.exit(1);
+});

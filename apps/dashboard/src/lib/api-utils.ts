@@ -30,13 +30,28 @@ export function successResponse<T>(data: T, status = 200) {
 }
 
 // 에러 응답
-export function errorResponse(code: string, message: string, status = 400) {
+// Supports two signatures:
+// - errorResponse(code, message, status) - full error info
+// - errorResponse(message, status) - simplified (code defaults to 'ERROR')
+export function errorResponse(codeOrMessage: string, messageOrStatus: string | number, status?: number) {
+  // Determine which signature is being used
+  if (typeof messageOrStatus === 'number') {
+    // Simplified: errorResponse(message, status)
+    return NextResponse.json(
+      {
+        success: false,
+        error: { code: 'ERROR', message: codeOrMessage },
+      } as ApiResponse,
+      { status: messageOrStatus }
+    );
+  }
+  // Full: errorResponse(code, message, status)
   return NextResponse.json(
     {
       success: false,
-      error: { code, message },
+      error: { code: codeOrMessage, message: messageOrStatus },
     } as ApiResponse,
-    { status }
+    { status: status ?? 400 }
   );
 }
 

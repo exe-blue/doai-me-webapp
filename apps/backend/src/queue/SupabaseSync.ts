@@ -18,6 +18,7 @@ import type { Database } from '../db/types';
 import type { WorkflowWorker, WorkflowJobResult, WorkflowProgressEvent, WorkflowErrorEvent } from './WorkflowWorker';
 import type { QueueManager } from './QueueManager';
 import type { CeleryBridge } from './CeleryBridge';
+import { classifyError } from '@doai/shared';
 
 // ============================================
 // 타입
@@ -215,6 +216,8 @@ export class SupabaseSyncService {
 
   private onWorkflowError(data: WorkflowErrorEvent): void {
     this.safeExec('workflow:error', async () => {
+      const errorCode = data.error_code || classifyError(data.error);
+
       // execution_logs INSERT
       await this.db.from('execution_logs').insert({
         execution_id: data.job_id,
@@ -223,8 +226,21 @@ export class SupabaseSyncService {
         level: 'error',
         status: 'failed',
         message: data.error,
-        data: { retry_count: data.retry_count },
+        data: { retry_count: data.retry_count, error_code: errorCode },
       } as AnyRecord);
+
+      // job_assignments 연결 시 error_code, retry_count 동기화
+      if (data.job_id && data.device_id && data.device_id !== 'server') {
+        await this.db
+          .from('job_assignments')
+          .update({
+            error_code: errorCode,
+            error_log: data.error,
+            retry_count: data.retry_count,
+          } as AnyRecord)
+          .eq('job_id', data.job_id)
+          .eq('device_id', data.device_id);
+      }
 
       // device → ERROR
       if (data.device_id && data.device_id !== 'server') {

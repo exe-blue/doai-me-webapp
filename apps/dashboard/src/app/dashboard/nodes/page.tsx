@@ -537,12 +537,12 @@ export default function NodesPage() {
       {/* Header - Dev Tool Style */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-mono font-bold text-foreground">기기관리</h1>
+          <h1 className="text-xl font-head text-foreground">기기관리</h1>
           <div className="flex items-center gap-3 mt-2">
             {/* Connection Status Indicator */}
             <div className="flex items-center gap-2">
               <div className={`h-2 w-2 rounded-full ${isConnected ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]' : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]'}`} />
-              <span className="font-mono text-xs text-zinc-400">
+              <span className="font-mono text-xs text-muted-foreground">
                 {isConnected ? '연결됨' : '연결 끊김'}
               </span>
             </div>
@@ -563,11 +563,11 @@ export default function NodesPage() {
                 <ChevronDown className="h-3 w-3 ml-1" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="font-mono text-xs bg-zinc-900 border-zinc-700">
-              <div className="px-2 py-1.5 text-[10px] text-zinc-500">
+            <DropdownMenuContent align="end" className="font-mono text-xs bg-card border-border">
+              <div className="px-2 py-1.5 text-[10px] text-muted-foreground">
                 대상: 필터된 {getTargetDevices().length}대 기기
               </div>
-              <DropdownMenuSeparator className="bg-zinc-700" />
+              <DropdownMenuSeparator className="bg-border" />
               <DropdownMenuItem onClick={wakeUpAll} className="cursor-pointer">
                 <Power className="h-3.5 w-3.5 mr-2 text-yellow-400" />
                 Wake Up
@@ -584,7 +584,7 @@ export default function NodesPage() {
                 <AppWindow className="h-3.5 w-3.5 mr-2 text-cyan-400" />
                 Restart App
               </DropdownMenuItem>
-              <DropdownMenuSeparator className="bg-zinc-700" />
+              <DropdownMenuSeparator className="bg-border" />
               <DropdownMenuItem onClick={openYoutubeAll} className="cursor-pointer">
                 <Youtube className="h-3.5 w-3.5 mr-2 text-red-400" />
                 YouTube 실행
@@ -593,7 +593,7 @@ export default function NodesPage() {
                 <Zap className="h-3.5 w-3.5 mr-2 text-purple-400" />
                 전체 초기화
               </DropdownMenuItem>
-              <DropdownMenuSeparator className="bg-zinc-700" />
+              <DropdownMenuSeparator className="bg-border" />
               <DropdownMenuItem 
                 onClick={() => setShowClearOfflineDialog(true)} 
                 className="cursor-pointer text-red-400"
@@ -607,17 +607,17 @@ export default function NodesPage() {
 
           {/* Clear Offline Confirmation Dialog */}
           <AlertDialog open={showClearOfflineDialog} onOpenChange={setShowClearOfflineDialog}>
-            <AlertDialogContent className="bg-zinc-900 border-zinc-700">
+            <AlertDialogContent className="bg-card border-border">
               <AlertDialogHeader>
-                <AlertDialogTitle className="text-white">오프라인 기기 삭제</AlertDialogTitle>
-                <AlertDialogDescription className="text-zinc-400">
+                <AlertDialogTitle className="text-foreground">오프라인 기기 삭제</AlertDialogTitle>
+                <AlertDialogDescription className="text-muted-foreground">
                   정말로 <span className="text-red-400 font-bold">{stats.offline}개</span>의 오프라인 기기를 삭제하시겠습니까?
                   <br /><br />
                   이 작업은 되돌릴 수 없으며, 삭제된 기기는 다시 연결될 때 새로운 슬롯이 할당됩니다.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                <AlertDialogCancel className="bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700">
+                <AlertDialogCancel className="bg-muted border-border text-foreground hover:bg-muted">
                   취소
                 </AlertDialogCancel>
                 <AlertDialogAction 
@@ -635,7 +635,7 @@ export default function NodesPage() {
             size="sm"
             onClick={unifyResolution}
             disabled={!isConnected}
-            className="font-mono text-xs border-zinc-700 hover:border-zinc-600 hover:bg-zinc-900"
+            className="font-mono text-xs border-border hover:border-border hover:bg-card"
           >
             <Monitor className="h-3.5 w-3.5 mr-1.5" />
             UNIFY_RES
@@ -645,7 +645,7 @@ export default function NodesPage() {
             size="sm"
             onClick={setBrightnessAll}
             disabled={!isConnected}
-            className="font-mono text-xs border-zinc-700 hover:border-zinc-600 hover:bg-zinc-900"
+            className="font-mono text-xs border-border hover:border-border hover:bg-card"
           >
             <Sun className="h-3.5 w-3.5 mr-1.5" />
             BRIGHTNESS
@@ -655,7 +655,7 @@ export default function NodesPage() {
             size="sm"
             onClick={setVolumeAll}
             disabled={!isConnected}
-            className="font-mono text-xs border-zinc-700 hover:border-zinc-600 hover:bg-zinc-900"
+            className="font-mono text-xs border-border hover:border-border hover:bg-card"
           >
             <Volume2 className="h-3.5 w-3.5 mr-1.5" />
             MUTE
@@ -665,7 +665,7 @@ export default function NodesPage() {
             size="sm"
             onClick={() => window.location.reload()}
             disabled={isLoading}
-            className="font-mono text-xs border-zinc-700 hover:border-zinc-600 hover:bg-zinc-900"
+            className="font-mono text-xs border-border hover:border-border hover:bg-card"
           >
             <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isLoading ? 'animate-spin' : ''}`} />
             REFRESH
@@ -676,61 +676,61 @@ export default function NodesPage() {
       {/* Stats - Dev Tool Bento Grid */}
       <div className="grid grid-cols-5 gap-2">
         {/* Total */}
-        <div className="rounded-md border border-zinc-800 bg-black dark:bg-zinc-950 p-3">
+        <div className="rounded-md border border-border bg-background p-3">
           <div className="flex items-center justify-between mb-1">
-            <span className="font-mono text-[10px] text-zinc-500 uppercase">총 기기</span>
-            <Monitor className="h-3.5 w-3.5 text-zinc-600" />
+            <span className="font-mono text-[10px] text-muted-foreground uppercase">총 기기</span>
+            <Monitor className="h-3.5 w-3.5 text-muted-foreground" />
           </div>
-          <span className="font-mono text-2xl font-bold text-white">{stats.total}</span>
+          <span className="font-mono text-2xl font-bold text-foreground">{stats.total}</span>
         </div>
 
         {/* Online */}
-        <div className="rounded-md border border-zinc-800 bg-black dark:bg-zinc-950 p-3">
+        <div className="rounded-md border border-border bg-background p-3">
           <div className="flex items-center justify-between mb-1">
-            <span className="font-mono text-[10px] text-zinc-500 uppercase">대기</span>
+            <span className="font-mono text-[10px] text-muted-foreground uppercase">대기</span>
             <div className="h-2 w-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]" />
           </div>
           <span className="font-mono text-2xl font-bold text-green-400">{stats.online}</span>
         </div>
 
         {/* Working */}
-        <div className="rounded-md border border-zinc-800 bg-black dark:bg-zinc-950 p-3">
+        <div className="rounded-md border border-border bg-background p-3">
           <div className="flex items-center justify-between mb-1">
-            <span className="font-mono text-[10px] text-zinc-500 uppercase">작업중</span>
+            <span className="font-mono text-[10px] text-muted-foreground uppercase">작업중</span>
             <div className="h-2 w-2 rounded-full bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.5)]" />
           </div>
           <span className="font-mono text-2xl font-bold text-yellow-400">{stats.working}</span>
         </div>
 
         {/* Error */}
-        <div className="rounded-md border border-zinc-800 bg-black dark:bg-zinc-950 p-3">
+        <div className="rounded-md border border-border bg-background p-3">
           <div className="flex items-center justify-between mb-1">
-            <span className="font-mono text-[10px] text-zinc-500 uppercase">오류</span>
+            <span className="font-mono text-[10px] text-muted-foreground uppercase">오류</span>
             <div className="h-2 w-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]" />
           </div>
           <span className="font-mono text-2xl font-bold text-red-400">{stats.error}</span>
         </div>
 
         {/* Offline Count */}
-        <div className="rounded-md border border-zinc-800 bg-black dark:bg-zinc-950 p-3">
+        <div className="rounded-md border border-border bg-background p-3">
           <div className="flex items-center justify-between mb-1">
-            <span className="font-mono text-[10px] text-zinc-500 uppercase">오프라인</span>
+            <span className="font-mono text-[10px] text-muted-foreground uppercase">오프라인</span>
             <div className="h-2 w-2 rounded-full bg-zinc-500" />
           </div>
-          <span className="font-mono text-2xl font-bold text-zinc-400">{stats.offline}</span>
+          <span className="font-mono text-2xl font-bold text-muted-foreground">{stats.offline}</span>
         </div>
       </div>
 
       {/* Filter Bar */}
-      <div className="flex items-center gap-4 p-3 rounded-md border border-zinc-800 bg-black dark:bg-zinc-950">
-        <Filter className="h-4 w-4 text-zinc-500" />
+      <div className="flex items-center gap-4 p-3 rounded-md border border-border bg-background">
+        <Filter className="h-4 w-4 text-muted-foreground" />
 
         {/* Group Filters */}
         <div className="flex items-center gap-2">
-          <span className="font-mono text-[10px] text-zinc-500 uppercase">Groups:</span>
+          <span className="font-mono text-[10px] text-muted-foreground uppercase">Groups:</span>
           {/* PC Select */}
           <Select value={filterPC} onValueChange={setFilterPC}>
-            <SelectTrigger className="w-[100px] h-7 font-mono text-xs bg-zinc-900 border-zinc-700">
+            <SelectTrigger className="w-[100px] h-7 font-mono text-xs bg-card border-border">
               <SelectValue placeholder="PC" />
             </SelectTrigger>
             <SelectContent>
@@ -743,7 +743,7 @@ export default function NodesPage() {
 
           {/* Board Select */}
           <Select value={filterBoard} onValueChange={setFilterBoard}>
-            <SelectTrigger className="w-[90px] h-7 font-mono text-xs bg-zinc-900 border-zinc-700">
+            <SelectTrigger className="w-[90px] h-7 font-mono text-xs bg-card border-border">
               <SelectValue placeholder="Board" />
             </SelectTrigger>
             <SelectContent>
@@ -756,11 +756,11 @@ export default function NodesPage() {
         </div>
 
         {/* Separator */}
-        <div className="h-6 w-px bg-zinc-800" />
+        <div className="h-6 w-px bg-border" />
 
         {/* Status Checkboxes */}
         <div className="flex items-center gap-4">
-          <span className="font-mono text-[10px] text-zinc-500 uppercase">Status:</span>
+          <span className="font-mono text-[10px] text-muted-foreground uppercase">Status:</span>
 
           {/* Normal (Sleep + Running) */}
           <label className="flex items-center gap-1.5 cursor-pointer group">
@@ -769,7 +769,7 @@ export default function NodesPage() {
               onCheckedChange={(checked) => setShowNormal(checked === true)}
               className="h-4 w-4 border-zinc-600 data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
             />
-            <span className="font-mono text-xs text-zinc-400 group-hover:text-zinc-300">
+            <span className="font-mono text-xs text-muted-foreground group-hover:text-foreground">
               Normal
             </span>
             <div className="h-1.5 w-1.5 rounded-full bg-green-500" />
@@ -782,7 +782,7 @@ export default function NodesPage() {
               onCheckedChange={(checked) => setShowError(checked === true)}
               className="h-4 w-4 border-zinc-600 data-[state=checked]:bg-red-500 data-[state=checked]:border-red-500"
             />
-            <span className="font-mono text-xs text-zinc-400 group-hover:text-zinc-300">
+            <span className="font-mono text-xs text-muted-foreground group-hover:text-foreground">
               Error
             </span>
             <div className="h-1.5 w-1.5 rounded-full bg-red-500" />
@@ -795,7 +795,7 @@ export default function NodesPage() {
               onCheckedChange={(checked) => setShowOffline(checked === true)}
               className="h-4 w-4 border-zinc-600 data-[state=checked]:bg-zinc-500 data-[state=checked]:border-zinc-500"
             />
-            <span className="font-mono text-xs text-zinc-400 group-hover:text-zinc-300">
+            <span className="font-mono text-xs text-muted-foreground group-hover:text-foreground">
               Offline
             </span>
             <div className="h-1.5 w-1.5 rounded-full bg-zinc-500" />
@@ -803,7 +803,7 @@ export default function NodesPage() {
         </div>
 
         {/* Filter count */}
-        <span className="font-mono text-xs text-zinc-600 ml-auto">
+        <span className="font-mono text-xs text-muted-foreground ml-auto">
           {filteredDevices.length} / {validDevices.length}
         </span>
 
@@ -819,7 +819,7 @@ export default function NodesPage() {
               setShowError(true);
               setShowOffline(true);
             }}
-            className="h-7 font-mono text-xs text-zinc-400 hover:text-white"
+            className="h-7 font-mono text-xs text-muted-foreground hover:text-foreground"
           >
             Reset
           </Button>
@@ -840,15 +840,15 @@ export default function NodesPage() {
 
       {/* Device Groups */}
       {isLoading ? (
-        <div className="flex flex-col items-center justify-center py-16 rounded-md border border-zinc-800 bg-black dark:bg-zinc-950">
+        <div className="flex flex-col items-center justify-center py-16 rounded-md border border-border bg-background">
           <Loader2 className="h-6 w-6 animate-spin text-primary mb-3" />
-          <span className="font-mono text-xs text-zinc-500">연결중...</span>
+          <span className="font-mono text-xs text-muted-foreground">연결중...</span>
         </div>
       ) : Object.keys(devicesByPc).length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 rounded-md border border-zinc-800 border-dashed bg-black dark:bg-zinc-950">
-          <WifiOff className="h-8 w-8 text-zinc-600 mb-3" />
-          <span className="font-mono text-sm text-zinc-500">연결된 기기 없음</span>
-          <span className="font-mono text-xs text-zinc-600 mt-1">워커 연결 대기중...</span>
+        <div className="flex flex-col items-center justify-center py-16 rounded-md border border-border border-dashed bg-background">
+          <WifiOff className="h-8 w-8 text-muted-foreground mb-3" />
+          <span className="font-mono text-sm text-muted-foreground">연결된 기기 없음</span>
+          <span className="font-mono text-xs text-muted-foreground mt-1">워커 연결 대기중...</span>
         </div>
       ) : (
         <div className="space-y-4">

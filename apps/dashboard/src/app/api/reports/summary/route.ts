@@ -12,10 +12,24 @@ export async function GET(request: NextRequest) {
       return errorResponse("INVALID_REQUEST", "dateFrom과 dateTo가 필요합니다", 400);
     }
 
-    // Validate date format (YYYY-MM-DD)
+    // Validate date format (YYYY-MM-DD) and actual date validity
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
     if (!dateRegex.test(dateFrom) || !dateRegex.test(dateTo)) {
       return errorResponse("INVALID_REQUEST", "날짜 형식은 YYYY-MM-DD여야 합니다", 400);
+    }
+
+    // Parse and validate actual dates
+    const dateFromDate = new Date(dateFrom + "T00:00:00Z");
+    const dateToDate = new Date(dateTo + "T00:00:00Z");
+    
+    // Check for invalid dates (NaN)
+    if (isNaN(dateFromDate.getTime()) || isNaN(dateToDate.getTime())) {
+      return errorResponse("INVALID_REQUEST", "날짜 형식은 YYYY-MM-DD여야 하고 올바른 날짜여야 합니다", 400);
+    }
+    
+    // Ensure dateFrom <= dateTo
+    if (dateFromDate.getTime() > dateToDate.getTime()) {
+      return errorResponse("INVALID_REQUEST", "시작 날짜가 종료 날짜보다 늦을 수 없습니다", 400);
     }
 
     const startDate = `${dateFrom}T00:00:00.000Z`;

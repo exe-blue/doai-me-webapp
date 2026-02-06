@@ -437,11 +437,11 @@ export default function DeviceIssuesPage() {
         {/* 헤더 */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
               <AlertTriangle className="h-6 w-6 text-yellow-500" />
               디바이스 이슈
             </h1>
-            <p className="text-sm text-zinc-400">
+            <p className="text-sm text-muted-foreground">
               {stats.total}개의 미해결 이슈가 있습니다
             </p>
           </div>
@@ -453,50 +453,50 @@ export default function DeviceIssuesPage() {
 
         {/* 통계 카드 */}
         <div className="grid grid-cols-5 gap-4">
-          <div className="rounded-lg border border-red-500/30 bg-zinc-900/50 p-4">
+          <div className="rounded-lg border border-red-500/30 bg-card/50 p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-zinc-400">심각</p>
+                <p className="text-xs text-muted-foreground">심각</p>
                 <p className="text-2xl font-bold text-red-500">{stats.critical}</p>
               </div>
               <AlertTriangle className="h-8 w-8 text-red-500" />
             </div>
           </div>
 
-          <div className="rounded-lg border border-yellow-500/30 bg-zinc-900/50 p-4">
+          <div className="rounded-lg border border-yellow-500/30 bg-card/50 p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-zinc-400">경고</p>
+                <p className="text-xs text-muted-foreground">경고</p>
                 <p className="text-2xl font-bold text-yellow-500">{stats.warning}</p>
               </div>
               <AlertCircle className="h-8 w-8 text-yellow-500" />
             </div>
           </div>
 
-          <div className="rounded-lg border border-blue-500/30 bg-zinc-900/50 p-4">
+          <div className="rounded-lg border border-blue-500/30 bg-card/50 p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-zinc-400">처리중</p>
+                <p className="text-xs text-muted-foreground">처리중</p>
                 <p className="text-2xl font-bold text-blue-500">{stats.inProgress}</p>
               </div>
               <Loader2 className="h-8 w-8 text-blue-500" />
             </div>
           </div>
 
-          <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
+          <div className="rounded-lg border border-border bg-card/50 p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-zinc-400">전체 미해결</p>
-                <p className="text-2xl font-bold text-white">{stats.total}</p>
+                <p className="text-xs text-muted-foreground">전체 미해결</p>
+                <p className="text-2xl font-bold text-foreground">{stats.total}</p>
               </div>
-              <Clock className="h-8 w-8 text-zinc-500" />
+              <Clock className="h-8 w-8 text-muted-foreground" />
             </div>
           </div>
 
-          <div className="rounded-lg border border-green-500/30 bg-zinc-900/50 p-4">
+          <div className="rounded-lg border border-green-500/30 bg-card/50 p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-zinc-400">오늘 해결</p>
+                <p className="text-xs text-muted-foreground">오늘 해결</p>
                 <p className="text-2xl font-bold text-green-500">{stats.resolvedToday}</p>
               </div>
               <CheckCircle2 className="h-8 w-8 text-green-500" />
@@ -505,8 +505,8 @@ export default function DeviceIssuesPage() {
         </div>
 
         {/* 이슈 유형별 요약 */}
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-          <h2 className="text-lg font-semibold text-white mb-4">유형별 현황</h2>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <h2 className="text-lg font-semibold text-foreground mb-4">유형별 현황</h2>
           <div className="grid grid-cols-8 gap-2">
             {typeStats.map((stat) => {
               const Icon = stat.icon;
@@ -524,7 +524,7 @@ export default function DeviceIssuesPage() {
                       <Icon className={`h-5 w-5 mx-auto ${stat.color}`} />
                       <div className="text-center mt-1">
                         <div className={`text-lg font-bold ${stat.color}`}>{stat.count}</div>
-                        <div className="text-xs text-zinc-500 truncate">
+                        <div className="text-xs text-muted-foreground truncate">
                           {stat.label}
                         </div>
                       </div>
@@ -540,17 +540,17 @@ export default function DeviceIssuesPage() {
         {/* 필터 & 검색 */}
         <div className="flex items-center gap-4">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="디바이스 또는 이슈 검색..."
-              className="pl-10 bg-zinc-900 border-zinc-700"
+              className="pl-10 bg-card border-border"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
 
           <Select value={severityFilter} onValueChange={setSeverityFilter}>
-            <SelectTrigger className="w-28 bg-zinc-900 border-zinc-700">
+            <SelectTrigger className="w-28 bg-card border-border">
               <SelectValue placeholder="심각도" />
             </SelectTrigger>
             <SelectContent>
@@ -562,7 +562,7 @@ export default function DeviceIssuesPage() {
           </Select>
 
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-28 bg-zinc-900 border-zinc-700">
+            <SelectTrigger className="w-28 bg-card border-border">
               <SelectValue placeholder="상태" />
             </SelectTrigger>
             <SelectContent>
@@ -575,7 +575,7 @@ export default function DeviceIssuesPage() {
           </Select>
 
           <Select value={nodeFilter} onValueChange={setNodeFilter}>
-            <SelectTrigger className="w-28 bg-zinc-900 border-zinc-700">
+            <SelectTrigger className="w-28 bg-card border-border">
               <SelectValue placeholder="노드" />
             </SelectTrigger>
             <SelectContent>
@@ -619,11 +619,11 @@ export default function DeviceIssuesPage() {
         </div>
 
         {/* 이슈 테이블 */}
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50">
+        <div className="rounded-lg border border-border bg-card/50">
           <Table>
             <TableHeader>
-              <TableRow className="border-zinc-800 hover:bg-transparent">
-                <TableHead className="text-zinc-400 w-10">
+              <TableRow className="border-border hover:bg-transparent">
+                <TableHead className="text-muted-foreground w-10">
                   <Checkbox
                     checked={isAllSelected}
                     onCheckedChange={(checked) => {
@@ -637,25 +637,25 @@ export default function DeviceIssuesPage() {
                     }}
                   />
                 </TableHead>
-                <TableHead className="text-zinc-400">디바이스</TableHead>
-                <TableHead className="text-zinc-400">이슈</TableHead>
-                <TableHead className="text-zinc-400">심각도</TableHead>
-                <TableHead className="text-zinc-400">상태</TableHead>
-                <TableHead className="text-zinc-400">재시도</TableHead>
-                <TableHead className="text-zinc-400">발생 시간</TableHead>
-                <TableHead className="text-zinc-400 w-10"></TableHead>
+                <TableHead className="text-muted-foreground">디바이스</TableHead>
+                <TableHead className="text-muted-foreground">이슈</TableHead>
+                <TableHead className="text-muted-foreground">심각도</TableHead>
+                <TableHead className="text-muted-foreground">상태</TableHead>
+                <TableHead className="text-muted-foreground">재시도</TableHead>
+                <TableHead className="text-muted-foreground">발생 시간</TableHead>
+                <TableHead className="text-muted-foreground w-10"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin mx-auto text-zinc-500" />
+                    <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
                   </TableCell>
                 </TableRow>
               ) : filteredIssues.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-zinc-500">
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                     이슈가 없습니다
                   </TableCell>
                 </TableRow>
@@ -666,7 +666,7 @@ export default function DeviceIssuesPage() {
                   return (
                     <TableRow
                       key={issue.id}
-                      className={`border-zinc-800 ${issue.status === "resolved" || issue.status === "ignored" ? "opacity-50" : ""}`}
+                      className={`border-border ${issue.status === "resolved" || issue.status === "ignored" ? "opacity-50" : ""}`}
                     >
                       <TableCell>
                         <Checkbox
@@ -684,10 +684,10 @@ export default function DeviceIssuesPage() {
 
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <Smartphone className="h-4 w-4 text-zinc-500" />
+                          <Smartphone className="h-4 w-4 text-muted-foreground" />
                           <div>
-                            <div className="font-medium text-white">{issue.device_id}</div>
-                            <div className="text-xs text-zinc-500">{issue.node_id}</div>
+                            <div className="font-medium text-foreground">{issue.device_id}</div>
+                            <div className="text-xs text-muted-foreground">{issue.node_id}</div>
                           </div>
                         </div>
                       </TableCell>
@@ -695,15 +695,15 @@ export default function DeviceIssuesPage() {
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <div
-                            className={`p-1.5 rounded ${issueTypeConfig[issue.issue_type]?.bgColor || "bg-zinc-800"}`}
+                            className={`p-1.5 rounded ${issueTypeConfig[issue.issue_type]?.bgColor || "bg-muted"}`}
                           >
                             <TypeIcon
-                              className={`h-4 w-4 ${issueTypeConfig[issue.issue_type]?.color || "text-zinc-400"}`}
+                              className={`h-4 w-4 ${issueTypeConfig[issue.issue_type]?.color || "text-muted-foreground"}`}
                             />
                           </div>
                           <div>
-                            <div className="font-medium text-sm text-white">{issue.title}</div>
-                            <div className="text-xs text-zinc-500 truncate max-w-[250px]">
+                            <div className="font-medium text-sm text-foreground">{issue.title}</div>
+                            <div className="text-xs text-muted-foreground truncate max-w-[250px]">
                               {issue.description}
                             </div>
                           </div>
@@ -726,7 +726,7 @@ export default function DeviceIssuesPage() {
                         </Badge>
                       </TableCell>
 
-                      <TableCell className="text-zinc-400">
+                      <TableCell className="text-muted-foreground">
                         {issue.auto_retry_count > 0 && (
                           <span className="text-sm">
                             {issue.auto_retry_count}회
@@ -737,7 +737,7 @@ export default function DeviceIssuesPage() {
                       <TableCell>
                         <Tooltip>
                           <TooltipTrigger>
-                            <span className="text-sm text-zinc-400">
+                            <span className="text-sm text-muted-foreground">
                               {formatTimeAgo(issue.detected_at)}
                             </span>
                           </TooltipTrigger>
@@ -793,7 +793,7 @@ export default function DeviceIssuesPage() {
         </div>
 
         {filteredIssues.length > 50 && (
-          <p className="text-center text-sm text-zinc-500">
+          <p className="text-center text-sm text-muted-foreground">
             {filteredIssues.length}개 중 50개 표시
           </p>
         )}
@@ -810,7 +810,7 @@ export default function DeviceIssuesPage() {
                       return (
                         <Icon
                           className={`h-5 w-5 ${
-                            issueTypeConfig[selectedIssue.issue_type]?.color || "text-zinc-400"
+                            issueTypeConfig[selectedIssue.issue_type]?.color || "text-muted-foreground"
                           }`}
                         />
                       );
@@ -847,43 +847,43 @@ export default function DeviceIssuesPage() {
                   </div>
 
                   {/* 설명 */}
-                  <div className="p-3 bg-zinc-800 rounded-lg">
-                    <p className="text-sm text-white">{selectedIssue.description}</p>
+                  <div className="p-3 bg-muted rounded-lg">
+                    <p className="text-sm text-foreground">{selectedIssue.description}</p>
                   </div>
 
                   {/* 메타데이터 */}
                   {Object.keys(selectedIssue.metadata).length > 0 && (
                     <div className="space-y-2">
-                      <h4 className="text-sm font-medium text-white">추가 정보</h4>
+                      <h4 className="text-sm font-medium text-foreground">추가 정보</h4>
                       <div className="grid grid-cols-2 gap-2 text-sm">
                         {selectedIssue.metadata.battery_level !== undefined && (
-                          <div className="p-2 bg-zinc-800 rounded text-zinc-300">
-                            <span className="text-zinc-500">배터리:</span>{" "}
+                          <div className="p-2 bg-muted rounded text-foreground">
+                            <span className="text-muted-foreground">배터리:</span>{" "}
                             {selectedIssue.metadata.battery_level}%
                           </div>
                         )}
                         {selectedIssue.metadata.temperature !== undefined && (
-                          <div className="p-2 bg-zinc-800 rounded text-zinc-300">
-                            <span className="text-zinc-500">온도:</span>{" "}
+                          <div className="p-2 bg-muted rounded text-foreground">
+                            <span className="text-muted-foreground">온도:</span>{" "}
                             {selectedIssue.metadata.temperature}°C
                           </div>
                         )}
                         {selectedIssue.metadata.memory_usage !== undefined && (
-                          <div className="p-2 bg-zinc-800 rounded text-zinc-300">
-                            <span className="text-zinc-500">메모리:</span>{" "}
+                          <div className="p-2 bg-muted rounded text-foreground">
+                            <span className="text-muted-foreground">메모리:</span>{" "}
                             {selectedIssue.metadata.memory_usage}%
                           </div>
                         )}
                         {selectedIssue.metadata.storage_usage !== undefined && (
-                          <div className="p-2 bg-zinc-800 rounded text-zinc-300">
-                            <span className="text-zinc-500">저장소:</span>{" "}
+                          <div className="p-2 bg-muted rounded text-foreground">
+                            <span className="text-muted-foreground">저장소:</span>{" "}
                             {selectedIssue.metadata.storage_usage}%
                           </div>
                         )}
                         {selectedIssue.metadata.task_id && (
-                          <div className="p-2 bg-zinc-800 rounded col-span-2 text-zinc-300">
-                            <span className="text-zinc-500">작업 ID:</span>{" "}
-                            <code className="text-zinc-400">{selectedIssue.metadata.task_id}</code>
+                          <div className="p-2 bg-muted rounded col-span-2 text-foreground">
+                            <span className="text-muted-foreground">작업 ID:</span>{" "}
+                            <code className="text-muted-foreground">{selectedIssue.metadata.task_id}</code>
                           </div>
                         )}
                       </div>
@@ -893,7 +893,7 @@ export default function DeviceIssuesPage() {
                   {/* 에러 코드 */}
                   {selectedIssue.error_code && (
                     <div className="p-3 bg-red-500/10 rounded-lg">
-                      <div className="text-xs text-zinc-500">에러 코드</div>
+                      <div className="text-xs text-muted-foreground">에러 코드</div>
                       <code className="text-red-500">{selectedIssue.error_code}</code>
                     </div>
                   )}
@@ -901,13 +901,13 @@ export default function DeviceIssuesPage() {
                   {/* 시간 정보 */}
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
-                      <div className="text-zinc-500">발생 시간</div>
-                      <div className="text-white">{formatDateTime(selectedIssue.detected_at)}</div>
+                      <div className="text-muted-foreground">발생 시간</div>
+                      <div className="text-foreground">{formatDateTime(selectedIssue.detected_at)}</div>
                     </div>
                     {selectedIssue.resolved_at && (
                       <div>
-                        <div className="text-zinc-500">해결 시간</div>
-                        <div className="text-white">
+                        <div className="text-muted-foreground">해결 시간</div>
+                        <div className="text-foreground">
                           {formatDateTime(selectedIssue.resolved_at)}
                         </div>
                       </div>
@@ -917,8 +917,8 @@ export default function DeviceIssuesPage() {
                   {/* 해결 노트 */}
                   {selectedIssue.resolution_note && (
                     <div className="p-3 bg-green-500/10 rounded-lg">
-                      <div className="text-xs text-zinc-500 mb-1">해결 노트</div>
-                      <p className="text-sm text-white">{selectedIssue.resolution_note}</p>
+                      <div className="text-xs text-muted-foreground mb-1">해결 노트</div>
+                      <p className="text-sm text-foreground">{selectedIssue.resolution_note}</p>
                     </div>
                   )}
 
@@ -950,26 +950,26 @@ export default function DeviceIssuesPage() {
                 <TabsContent value="history" className="mt-4">
                   <ScrollArea className="h-[300px]">
                     {issueLogs.length === 0 ? (
-                      <p className="text-center py-8 text-zinc-500">이력이 없습니다</p>
+                      <p className="text-center py-8 text-muted-foreground">이력이 없습니다</p>
                     ) : (
                       <div className="space-y-3">
                         {issueLogs.map((log, idx) => (
                           <div key={log.id} className="flex gap-3">
                             <div className="flex flex-col items-center">
-                              <div className="h-8 w-8 rounded-full bg-zinc-800 flex items-center justify-center">
-                                <History className="h-4 w-4 text-zinc-400" />
+                              <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
+                                <History className="h-4 w-4 text-muted-foreground" />
                               </div>
                               {idx < issueLogs.length - 1 && (
-                                <div className="flex-1 w-px bg-zinc-700 my-1" />
+                                <div className="flex-1 w-px bg-border my-1" />
                               )}
                             </div>
                             <div className="flex-1 pb-3">
-                              <div className="font-medium text-sm text-white">{log.action}</div>
-                              <div className="text-xs text-zinc-500">
+                              <div className="font-medium text-sm text-foreground">{log.action}</div>
+                              <div className="text-xs text-muted-foreground">
                                 {formatDateTime(log.performed_at)} • {log.performed_by}
                               </div>
                               {log.details && (
-                                <div className="text-sm mt-1 text-zinc-400">
+                                <div className="text-sm mt-1 text-muted-foreground">
                                   {log.details}
                                 </div>
                               )}
@@ -997,13 +997,13 @@ export default function DeviceIssuesPage() {
 
             <div className="space-y-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium text-white">해결 노트</label>
+                <label className="text-sm font-medium text-foreground">해결 노트</label>
                 <Textarea
                   placeholder="해결 방법이나 메모를 입력하세요..."
                   value={resolutionNote}
                   onChange={(e) => setResolutionNote(e.target.value)}
                   rows={3}
-                  className="bg-zinc-900 border-zinc-700"
+                  className="bg-card border-border"
                 />
               </div>
             </div>

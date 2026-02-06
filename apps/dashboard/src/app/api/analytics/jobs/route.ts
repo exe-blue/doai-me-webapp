@@ -114,11 +114,17 @@ export async function GET(request: NextRequest) {
         ? completed.reduce((sum, a) => sum + (a.final_duration_sec || 0), 0) / completed.length
         : 0;
 
-      const runningDevices = running.map(a => ({
-        device_id: a.device_id,
-        serial_number: (a.devices as Record<string, string> | null)?.serial_number || 'Unknown',
-        progress_pct: a.progress_pct || 0
-      }));
+      const runningDevices = running.map(a => {
+        const deviceData = a.devices as unknown;
+        const serialNumber = Array.isArray(deviceData)
+          ? (deviceData[0] as { serial_number?: string })?.serial_number
+          : (deviceData as { serial_number?: string } | null)?.serial_number;
+        return {
+          device_id: a.device_id,
+          serial_number: serialNumber || 'Unknown',
+          progress_pct: a.progress_pct || 0
+        };
+      });
 
       return {
         id: job.id,

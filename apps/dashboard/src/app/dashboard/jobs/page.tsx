@@ -339,7 +339,7 @@ export default function JobsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-8 w-8 animate-spin text-zinc-500" />
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
@@ -351,7 +351,7 @@ export default function JobsPage() {
       {/* ================================================== */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-mono font-bold text-foreground">작업 타임라인</h1>
+          <h1 className="text-xl font-head text-foreground">작업 타임라인</h1>
           <div className="flex items-center gap-2 mt-2">
             <div
               className={cn(
@@ -361,7 +361,7 @@ export default function JobsPage() {
                   : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]'
               )}
             />
-            <span className="font-mono text-xs text-zinc-400">
+            <span className="font-mono text-xs text-muted-foreground">
               대기: {idleDevices.length}대 | 온라인: {devices.filter(d => d.status !== 'offline').length}대
             </span>
           </div>
@@ -393,16 +393,16 @@ export default function JobsPage() {
       {/* Section: Queue (Vertical Stack Timeline) */}
       {/* Running at bottom, Pending stacked above */}
       {/* ================================================== */}
-      <div className="rounded-lg border border-zinc-800 bg-black/50 overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 bg-zinc-900/50">
+      <div className="rounded-lg border border-border bg-background/50 overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card/50">
           <div className="flex items-center gap-3">
             <Clock className="h-4 w-4 text-blue-500" />
-            <span className="font-mono text-sm font-bold text-white">작업 큐</span>
-            <span className="font-mono text-xs text-zinc-500">
+            <span className="font-mono text-sm font-bold text-foreground">작업 큐</span>
+            <span className="font-mono text-xs text-muted-foreground">
               ({jobs.length}개 {runningJob ? '• 1개 실행중' : ''})
             </span>
           </div>
-          <div className="flex items-center gap-1 text-zinc-500">
+          <div className="flex items-center gap-1 text-muted-foreground">
             <ArrowDown className="h-3 w-3" />
             <span className="font-mono text-[10px]">실행 방향</span>
           </div>
@@ -414,8 +414,8 @@ export default function JobsPage() {
             // Empty State
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <PlayCircle className="h-12 w-12 text-zinc-700 mb-4" />
-              <p className="font-mono text-sm text-zinc-400 mb-1">대기 중인 작업 없음</p>
-              <p className="font-mono text-xs text-zinc-600">새 작업을 등록하세요</p>
+              <p className="font-mono text-sm text-muted-foreground mb-1">대기 중인 작업 없음</p>
+              <p className="font-mono text-xs text-muted-foreground">새 작업을 등록하세요</p>
             </div>
           ) : (
             <div className="flex flex-col-reverse gap-2">
@@ -459,12 +459,12 @@ export default function JobsPage() {
       {/* Section: Execution History (Compact Table) */}
       {/* ================================================== */}
       {completedJobs.length > 0 && (
-        <div className="rounded-lg border border-zinc-800 bg-black/50 overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 bg-zinc-900/50">
+        <div className="rounded-lg border border-border bg-background/50 overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card/50">
             <div className="flex items-center gap-3">
               <History className="h-4 w-4 text-blue-500" />
-              <span className="font-mono text-sm font-bold text-white">실행 기록</span>
-              <span className="font-mono text-xs text-zinc-500">({completedJobs.length}개)</span>
+              <span className="font-mono text-sm font-bold text-foreground">실행 기록</span>
+              <span className="font-mono text-xs text-muted-foreground">({completedJobs.length}개)</span>
             </div>
             
             {/* Pagination Controls */}
@@ -479,7 +479,7 @@ export default function JobsPage() {
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
-                <span className="font-mono text-xs text-zinc-400">
+                <span className="font-mono text-xs text-muted-foreground">
                   {historyPage} / {historyTotalPages}
                 </span>
                 <Button
@@ -496,9 +496,9 @@ export default function JobsPage() {
           </div>
 
           {/* Compact History Table */}
-          <div className="divide-y divide-zinc-800/50">
+          <div className="divide-y divide-border/50">
             {/* Header */}
-            <div className="hidden sm:grid grid-cols-12 gap-2 px-4 py-2 bg-zinc-900/30 text-[10px] font-mono text-zinc-500 uppercase">
+            <div className="hidden sm:grid grid-cols-12 gap-2 px-4 py-2 bg-card/30 text-[10px] font-mono text-muted-foreground uppercase">
               <div className="col-span-1">상태</div>
               <div className="col-span-5">작업</div>
               <div className="col-span-3">시간</div>
@@ -520,7 +520,7 @@ export default function JobsPage() {
               return (
                 <div
                   key={job.id}
-                  className="grid grid-cols-12 gap-2 px-4 py-2.5 items-center hover:bg-zinc-900/30 transition-colors"
+                  className="grid grid-cols-12 gap-2 px-4 py-2.5 items-center hover:bg-card/30 transition-colors"
                 >
                   {/* Status Icon */}
                   <div className="col-span-1">
@@ -534,7 +534,7 @@ export default function JobsPage() {
                   {/* Job Info: Thumbnail + ID + Title */}
                   <div className="col-span-5 flex items-center gap-2 min-w-0">
                     {/* Small Thumbnail */}
-                    <div className="shrink-0 w-10 h-7 rounded overflow-hidden bg-zinc-800">
+                    <div className="shrink-0 w-10 h-7 rounded overflow-hidden bg-muted">
                       {thumbnailUrl ? (
                         /* eslint-disable-next-line @next/next/no-img-element */
                         <img
@@ -545,17 +545,17 @@ export default function JobsPage() {
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
-                          <PlayCircle className="h-3 w-3 text-zinc-600" />
+                          <PlayCircle className="h-3 w-3 text-muted-foreground" />
                         </div>
                       )}
                     </div>
                     
                     <div className="min-w-0">
-                      <p className="font-mono text-xs text-white truncate">
+                      <p className="font-mono text-xs text-foreground truncate">
                         {job.display_name || job.title}
                       </p>
                       {job.title !== job.display_name && (
-                        <p className="font-mono text-[9px] text-zinc-500 truncate">
+                        <p className="font-mono text-[9px] text-muted-foreground truncate">
                           {job.title}
                         </p>
                       )}
@@ -564,7 +564,7 @@ export default function JobsPage() {
 
                   {/* Timing: Started / Duration */}
                   <div className="col-span-3">
-                    <p className="font-mono text-[10px] text-zinc-400">
+                    <p className="font-mono text-[10px] text-muted-foreground">
                       {new Date(job.created_at).toLocaleString('ko-KR', {
                         month: 'short',
                         day: 'numeric',
@@ -572,7 +572,7 @@ export default function JobsPage() {
                         minute: '2-digit',
                       })}
                     </p>
-                    <p className="font-mono text-[10px] text-zinc-500 flex items-center gap-1">
+                    <p className="font-mono text-[10px] text-muted-foreground flex items-center gap-1">
                       <Timer className="h-3 w-3" />
                       {job.duration_sec}초
                     </p>
@@ -582,8 +582,8 @@ export default function JobsPage() {
                   <div className="col-span-2">
                     <p className="font-mono text-[10px]">
                       <span className="text-green-400">{job.stats?.completed || 0}</span>
-                      <span className="text-zinc-600">/</span>
-                      <span className="text-zinc-400">{job.total_assigned || 0}</span>
+                      <span className="text-muted-foreground">/</span>
+                      <span className="text-muted-foreground">{job.total_assigned || 0}</span>
                     </p>
                     {(job.stats?.failed || 0) > 0 && (
                       <p className="font-mono text-[9px] text-red-400">
@@ -597,7 +597,7 @@ export default function JobsPage() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-6 w-6 p-0 hover:bg-zinc-800"
+                      className="h-6 w-6 p-0 hover:bg-muted"
                       onClick={() => handleOpenLogs(job)}
                       title="로그 보기"
                     >

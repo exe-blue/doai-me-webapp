@@ -102,7 +102,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       return errorResponse(error.message, 500);
     }
 
-    return successResponse(data, 'PC 정보가 수정되었습니다');
+    return successResponse(data);
   } catch (error) {
     console.error('[API] PC PATCH error:', error);
     return errorResponse('Internal server error', 500);
@@ -149,7 +149,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       return errorResponse(delError.message, 500);
     }
 
-    return successResponse({ pc_number: pcNumber }, `PC ${pcNumber}가 삭제되었습니다`);
+    return successResponse({ pc_number: pcNumber });
   } catch (error) {
     console.error('[API] PC DELETE error:', error);
     return errorResponse('Internal server error', 500);

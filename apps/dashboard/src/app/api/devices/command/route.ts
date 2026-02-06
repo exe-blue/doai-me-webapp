@@ -6,7 +6,14 @@ import { successResponse, errorResponse } from "@/lib/api-utils";
 export async function POST(request: NextRequest) {
   try {
     const supabase = getServerClient();
-    const body = await request.json();
+    
+    // Parse JSON with explicit error handling
+    let body;
+    try {
+      body = await request.json();
+    } catch (parseError) {
+      return errorResponse("INVALID_JSON", "요청 본문이 유효한 JSON이 아닙니다", 400);
+    }
 
     const { device_ids, command, params } = body;
 
@@ -73,6 +80,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 특수 명령 처리: disable/enable은 디바이스 상태 변경
+    // Move status update BEFORE queuing commands to ensure atomic state change
     if (command === "disable" || command === "enable") {
       const newStatus = command === "disable" ? "maintenance" : "idle";
       const { error: updateError } = await supabase

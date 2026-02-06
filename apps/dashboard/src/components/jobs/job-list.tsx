@@ -294,9 +294,9 @@ export function JobList({ onJobUpdated }: JobListProps) {
       case 'completed':
         return <CheckCircle2 className="h-4 w-4 text-blue-500" />;
       case 'cancelled':
-        return <AlertCircle className="h-4 w-4 text-zinc-500" />;
+        return <AlertCircle className="h-4 w-4 text-muted-foreground" />;
       default:
-        return <Clock className="h-4 w-4 text-zinc-500" />;
+        return <Clock className="h-4 w-4 text-muted-foreground" />;
     }
   };
 
@@ -309,16 +309,16 @@ export function JobList({ onJobUpdated }: JobListProps) {
       case 'completed':
         return 'text-blue-400';
       case 'cancelled':
-        return 'text-zinc-400';
+        return 'text-muted-foreground';
       default:
-        return 'text-zinc-400';
+        return 'text-muted-foreground';
     }
   };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     );
   }
@@ -335,9 +335,9 @@ export function JobList({ onJobUpdated }: JobListProps) {
   if (jobs.length === 0) {
     return (
       <div className="text-center py-12">
-        <PlayCircle className="h-12 w-12 text-zinc-700 mx-auto mb-4" />
-        <p className="font-mono text-sm text-zinc-500">No jobs created yet</p>
-        <p className="font-mono text-xs text-zinc-600 mt-1">Create a new job to get started</p>
+        <PlayCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+        <p className="font-mono text-sm text-muted-foreground">No jobs created yet</p>
+        <p className="font-mono text-xs text-muted-foreground mt-1">Create a new job to get started</p>
       </div>
     );
   }
@@ -352,18 +352,18 @@ export function JobList({ onJobUpdated }: JobListProps) {
         return (
           <div
             key={job.id}
-            className="rounded-md border border-zinc-800 bg-zinc-900/50 overflow-hidden"
+            className="rounded-md border border-border bg-card/50 overflow-hidden"
           >
             {/* Job Header */}
             <div
-              className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-zinc-800/50 transition-colors"
+              className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-muted/50 transition-colors"
               onClick={() => toggleExpand(job.id)}
             >
               <button className="p-0.5">
                 {isExpanded ? (
-                  <ChevronDown className="h-4 w-4 text-zinc-500" />
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
                 ) : (
-                  <ChevronRight className="h-4 w-4 text-zinc-500" />
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
                 )}
               </button>
 
@@ -371,7 +371,7 @@ export function JobList({ onJobUpdated }: JobListProps) {
 
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="font-mono text-sm font-medium text-white truncate">
+                  <span className="font-mono text-sm font-medium text-foreground truncate">
                     {job.title}
                   </span>
                   <span className={cn('font-mono text-xs uppercase', getStatusColor(job.status))}>
@@ -379,10 +379,10 @@ export function JobList({ onJobUpdated }: JobListProps) {
                   </span>
                 </div>
                 <div className="flex items-center gap-4 mt-1">
-                  <span className="font-mono text-[10px] text-zinc-500">
+                  <span className="font-mono text-[10px] text-muted-foreground">
                     {job.total_assigned || 0} devices
                   </span>
-                  <span className="font-mono text-[10px] text-zinc-500">
+                  <span className="font-mono text-[10px] text-muted-foreground">
                     {progress}% complete
                   </span>
                 </div>
@@ -426,63 +426,63 @@ export function JobList({ onJobUpdated }: JobListProps) {
 
             {/* Expanded Details */}
             {isExpanded && (
-              <div className="px-4 pb-4 pt-2 border-t border-zinc-800 space-y-3">
+              <div className="px-4 pb-4 pt-2 border-t border-border space-y-3">
                 {/* URL */}
                 <div>
-                  <span className="font-mono text-[10px] text-zinc-500 uppercase">URL</span>
-                  <p className="font-mono text-xs text-zinc-300 truncate mt-0.5">
+                  <span className="font-mono text-[10px] text-muted-foreground uppercase">URL</span>
+                  <p className="font-mono text-xs text-foreground truncate mt-0.5">
                     {job.target_url}
                   </p>
                 </div>
 
                 {/* Stats Grid */}
                 <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-                  <div className="p-2 rounded bg-zinc-800/50">
-                    <span className="font-mono text-[10px] text-zinc-500 block">Pending</span>
-                    <span className="font-mono text-sm text-white">{job.stats?.pending || 0}</span>
+                  <div className="p-2 rounded bg-muted/50">
+                    <span className="font-mono text-[10px] text-muted-foreground block">Pending</span>
+                    <span className="font-mono text-sm text-foreground">{job.stats?.pending || 0}</span>
                   </div>
-                  <div className="p-2 rounded bg-zinc-800/50">
-                    <span className="font-mono text-[10px] text-zinc-500 block">Running</span>
+                  <div className="p-2 rounded bg-muted/50">
+                    <span className="font-mono text-[10px] text-muted-foreground block">Running</span>
                     <span className="font-mono text-sm text-green-400">{job.stats?.running || 0}</span>
                   </div>
-                  <div className="p-2 rounded bg-zinc-800/50">
-                    <span className="font-mono text-[10px] text-zinc-500 block">Completed</span>
+                  <div className="p-2 rounded bg-muted/50">
+                    <span className="font-mono text-[10px] text-muted-foreground block">Completed</span>
                     <span className="font-mono text-sm text-blue-400">{job.stats?.completed || 0}</span>
                   </div>
-                  <div className="p-2 rounded bg-zinc-800/50">
-                    <span className="font-mono text-[10px] text-zinc-500 block">Failed</span>
+                  <div className="p-2 rounded bg-muted/50">
+                    <span className="font-mono text-[10px] text-muted-foreground block">Failed</span>
                     <span className="font-mono text-sm text-red-400">{job.stats?.failed || 0}</span>
                   </div>
-                  <div className="p-2 rounded bg-zinc-800/50">
-                    <span className="font-mono text-[10px] text-zinc-500 block">Paused</span>
+                  <div className="p-2 rounded bg-muted/50">
+                    <span className="font-mono text-[10px] text-muted-foreground block">Paused</span>
                     <span className="font-mono text-sm text-yellow-400">{job.stats?.paused || 0}</span>
                   </div>
-                  <div className="p-2 rounded bg-zinc-800/50">
-                    <span className="font-mono text-[10px] text-zinc-500 block">Cancelled</span>
-                    <span className="font-mono text-sm text-zinc-400">{job.stats?.cancelled || 0}</span>
+                  <div className="p-2 rounded bg-muted/50">
+                    <span className="font-mono text-[10px] text-muted-foreground block">Cancelled</span>
+                    <span className="font-mono text-sm text-muted-foreground">{job.stats?.cancelled || 0}</span>
                   </div>
                 </div>
 
                 {/* Settings */}
                 <div className="flex flex-wrap gap-4 text-xs">
                   <div>
-                    <span className="font-mono text-zinc-500">Duration:</span>
-                    <span className="font-mono text-zinc-300 ml-1">{job.duration_sec}s</span>
+                    <span className="font-mono text-muted-foreground">Duration:</span>
+                    <span className="font-mono text-foreground ml-1">{job.duration_sec}s</span>
                   </div>
                   <div>
-                    <span className="font-mono text-zinc-500">Like:</span>
-                    <span className="font-mono text-zinc-300 ml-1">{job.prob_like}%</span>
+                    <span className="font-mono text-muted-foreground">Like:</span>
+                    <span className="font-mono text-foreground ml-1">{job.prob_like}%</span>
                   </div>
                   <div>
-                    <span className="font-mono text-zinc-500">Comment:</span>
-                    <span className="font-mono text-zinc-300 ml-1">{job.prob_comment}%</span>
+                    <span className="font-mono text-muted-foreground">Comment:</span>
+                    <span className="font-mono text-foreground ml-1">{job.prob_comment}%</span>
                   </div>
                 </div>
 
                 {/* Created At */}
                 <div className="text-xs">
-                  <span className="font-mono text-zinc-500">Created:</span>
-                  <span className="font-mono text-zinc-400 ml-1">
+                  <span className="font-mono text-muted-foreground">Created:</span>
+                  <span className="font-mono text-muted-foreground ml-1">
                     {new Date(job.created_at).toLocaleString('ko-KR')}
                   </span>
                 </div>

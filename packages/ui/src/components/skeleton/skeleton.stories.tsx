@@ -9,7 +9,7 @@ const meta: Meta<typeof Skeleton> = {
     layout: "centered",
     docs: {
       description: {
-        component: "RetroUI/NeoBrutalist 스타일 스켈레톤 로더.",
+        component: "RetroUI NeoBrutalist 스타일 스켈레톤 로더.",
       },
     },
   },

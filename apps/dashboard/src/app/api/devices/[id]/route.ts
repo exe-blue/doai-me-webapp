@@ -33,10 +33,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     if (error) {
       if (error.code === 'PGRST116') {
-        return errorResponse('Device not found', 404);
+        return errorResponse('NOT_FOUND', 'Device not found', 404);
       }
       console.error('[API] Device query error:', error);
-      return errorResponse(error.message, 500);
+      return errorResponse('DB_ERROR', error.message, 500);
     }
 
     // 관리번호 생성
@@ -52,7 +52,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     });
   } catch (error) {
     console.error('[API] Device GET error:', error);
-    return errorResponse('Internal server error', 500);
+    return errorResponse('INTERNAL_ERROR', 'Internal server error', 500);
   }
 }
 
@@ -103,7 +103,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       return errorResponse(error.message, 500);
     }
 
-    return successResponse(data, '디바이스 정보가 수정되었습니다');
+    return successResponse(data);
   } catch (error) {
     console.error('[API] Device PATCH error:', error);
     return errorResponse('Internal server error', 500);
@@ -128,7 +128,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       return errorResponse(error.message, 500);
     }
 
-    return successResponse({ id }, '디바이스가 삭제되었습니다');
+    return successResponse({ id });
   } catch (error) {
     console.error('[API] Device DELETE error:', error);
     return errorResponse('Internal server error', 500);

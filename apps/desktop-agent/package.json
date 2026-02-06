@@ -47,5 +47,9 @@
     "url": "https://github.com/doai-me/doai-agent-releases.git"
   },
   "author": "DOAI Inc. <support@doai.me>",
-  "license": "MIT"
+  "license": "MIT",
+  "build": {
+    "appId": "com.doai.agent",
+    "productName": "DoAi.Me Agent"
+  }
 }

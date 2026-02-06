@@ -55,10 +55,15 @@ export async function GET(request: NextRequest) {
     const errorRate = totalTasks > 0 ? (failedTasks / totalTasks) * 100 : 0;
 
     // 활성 디바이스 수 조회
-    const { count: activeDevices } = await supabase
+    const { count, error: deviceCountError } = await supabase
       .from("devices")
       .select("*", { count: "exact", head: true })
       .in("status", ["IDLE", "RUNNING", "BUSY"]);
+
+    if (deviceCountError) {
+      return errorResponse("DB_ERROR", deviceCountError.message, 500);
+    }
+    const activeDevices = count ?? 0;
 
     const report = {
       date: targetDate,
@@ -69,7 +74,7 @@ export async function GET(request: NextRequest) {
       total_watch_time: totalWatchTime,
       avg_watch_time: Math.round(avgWatchTime),
       unique_videos: uniqueVideos,
-      active_devices: activeDevices || 0,
+      active_devices: activeDevices,
       error_rate: Math.round(errorRate * 100) / 100,
       tasks_per_hour: tasksPerHour,
     };

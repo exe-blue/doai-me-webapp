@@ -21,24 +21,29 @@
     "prepare": "husky || true",
     "clean": "npx rimraf node_modules apps/*/node_modules packages/*/node_modules infra/*/node_modules",
     "sb": "npm run storybook --workspace=@packages/ui",
-    
     "build:types": "npm run build --workspace=packages/worker-types",
     "build:core": "npm run build --workspace=packages/worker-core",
+    "build:ui-automator": "npm run build --workspace=packages/ui-automator",
     "build:youtube-bot": "npm run build --workspace=apps/youtube-bot",
+    "build:install-bot": "npm run build --workspace=apps/install-bot",
+    "build:health-bot": "npm run build --workspace=apps/health-bot",
     "build:agent": "npm run build --workspace=apps/desktop-agent",
-    "build:workers": "npm run build:types && npm run build:core && npm run build:youtube-bot",
-    
+    "build:workers": "npm run build:types && npm run build:core && npm run build:ui-automator && npm run build:youtube-bot && npm run build:install-bot && npm run build:health-bot",
     "dev:youtube-bot": "npm run dev --workspace=apps/youtube-bot",
+    "dev:install-bot": "npm run dev --workspace=apps/install-bot",
+    "dev:health-bot": "npm run dev --workspace=apps/health-bot",
     "start:youtube-bot": "npm run start --workspace=apps/youtube-bot",
-    
     "typecheck:types": "npm run typecheck --workspace=packages/worker-types",
     "typecheck:core": "npm run typecheck --workspace=packages/worker-core",
+    "typecheck:ui-automator": "npm run typecheck --workspace=packages/ui-automator",
     "typecheck:youtube-bot": "npm run typecheck --workspace=apps/youtube-bot",
-    "typecheck:workers": "npm run typecheck:types && npm run typecheck:core && npm run typecheck:youtube-bot",
-    
+    "typecheck:install-bot": "npm run typecheck --workspace=apps/install-bot",
+    "typecheck:health-bot": "npm run typecheck --workspace=apps/health-bot",
+    "typecheck:workers": "npm run typecheck:types && npm run typecheck:core && npm run typecheck:ui-automator && npm run typecheck:youtube-bot && npm run typecheck:install-bot && npm run typecheck:health-bot",
     "download:minicap": "node scripts/download-minicap.js"
   },
   "devDependencies": {
+    "@esbuild/linux-x64": "^0.27.2",
     "@eslint/js": "^9.0.0",
     "eslint": "^9.0.0",
     "husky": "^9.0.0",

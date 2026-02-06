@@ -2,21 +2,24 @@
 
 import * as React from "react";
 import * as LabelPrimitive from "@radix-ui/react-label";
+import { cva } from "class-variance-authority";
 import { cn } from "@packages/ui/lib/utils";
 
 /**
- * Label - RetroUI/NeoBrutalist 스타일 라벨
+ * RetroUI Label
+ * @see https://www.retroui.dev/docs/components/label
  */
+const labelVariants = cva(
+  "leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+);
+
 const Label = React.forwardRef<
   React.ElementRef<typeof LabelPrimitive.Root>,
   React.ComponentPropsWithoutRef<typeof LabelPrimitive.Root>
 >(({ className, ...props }, ref) => (
   <LabelPrimitive.Root
     ref={ref}
-    className={cn(
-      "text-sm font-bold leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70",
-      className
-    )}
+    className={cn(labelVariants(), className)}
     {...props}
   />
 ));

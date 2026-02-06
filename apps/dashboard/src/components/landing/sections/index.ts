@@ -4,5 +4,6 @@ export { Features } from "./features";
 export { Statistics } from "./statistics";
 export { Testimonials } from "./testimonials";
 export { Pricing } from "./pricing";
+export { Philosophy } from "./philosophy";
 export { CTA } from "./cta";
 export { Footer } from "./footer";

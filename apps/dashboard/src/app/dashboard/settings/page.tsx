@@ -118,7 +118,7 @@ export default function SettingsPage() {
                 ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]'
                 : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]'
             )} />
-            <span className="font-mono text-xs text-zinc-400">
+            <span className="font-mono text-xs text-muted-foreground">
               {pcCount} PCs / {devices.length} devices
             </span>
           </div>
@@ -128,7 +128,7 @@ export default function SettingsPage() {
             variant="outline"
             size="sm"
             onClick={resetToDefaults}
-            className="font-mono text-xs border-zinc-700 hover:border-zinc-600 hover:bg-zinc-900"
+            className="font-mono text-xs border-border hover:border-border hover:bg-card"
           >
             <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
             RESET
@@ -159,27 +159,27 @@ export default function SettingsPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Connection Settings */}
-        <div className="rounded-md border border-zinc-800 bg-black dark:bg-zinc-950 overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 bg-zinc-900/50">
+        <div className="rounded-md border border-border bg-background overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card/50">
             <div className="flex items-center gap-3">
               <Wifi className="h-4 w-4 text-blue-500" />
-              <span className="font-mono text-sm font-bold text-white">CONNECTION</span>
+              <span className="font-mono text-sm font-bold text-foreground">CONNECTION</span>
             </div>
           </div>
 
           <div className="p-4 space-y-4">
             {/* Socket URL */}
             <div>
-              <label className="font-mono text-[10px] text-zinc-500 uppercase block mb-2">
+              <label className="font-mono text-[10px] text-muted-foreground uppercase block mb-2">
                 Socket.io URL
               </label>
               <div className="relative">
-                <Server className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
+                <Server className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   type="url"
                   value={settings.socketUrl}
                   onChange={(e) => updateSetting('socketUrl', e.target.value)}
-                  className="pl-10 font-mono text-sm bg-zinc-900 border-zinc-700 focus:border-zinc-600"
+                  className="pl-10 font-mono text-sm bg-card border-border focus:border-border"
                 />
               </div>
             </div>
@@ -187,8 +187,8 @@ export default function SettingsPage() {
             {/* Auto Reconnect */}
             <div className="flex items-center justify-between">
               <div>
-                <span className="font-mono text-sm text-white">Auto Reconnect</span>
-                <p className="font-mono text-[10px] text-zinc-500 mt-0.5">
+                <span className="font-mono text-sm text-foreground">Auto Reconnect</span>
+                <p className="font-mono text-[10px] text-muted-foreground mt-0.5">
                   Automatically reconnect on disconnect
                 </p>
               </div>
@@ -200,7 +200,7 @@ export default function SettingsPage() {
 
             {/* Heartbeat Interval */}
             <div>
-              <label className="font-mono text-[10px] text-zinc-500 uppercase block mb-2">
+              <label className="font-mono text-[10px] text-muted-foreground uppercase block mb-2">
                 Heartbeat Interval (ms)
               </label>
               <Input
@@ -210,18 +210,18 @@ export default function SettingsPage() {
                 step={1000}
                 value={settings.heartbeatInterval}
                 onChange={(e) => updateSetting('heartbeatInterval', parseInt(e.target.value) || 5000)}
-                className="font-mono text-sm bg-zinc-900 border-zinc-700 focus:border-zinc-600"
+                className="font-mono text-sm bg-card border-border focus:border-border"
               />
             </div>
           </div>
         </div>
 
         {/* Default Probabilities */}
-        <div className="rounded-md border border-zinc-800 bg-black dark:bg-zinc-950 overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 bg-zinc-900/50">
+        <div className="rounded-md border border-border bg-background overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card/50">
             <div className="flex items-center gap-3">
               <Settings className="h-4 w-4 text-green-500" />
-              <span className="font-mono text-sm font-bold text-white">DEFAULT_PROBABILITIES</span>
+              <span className="font-mono text-sm font-bold text-foreground">DEFAULT_PROBABILITIES</span>
             </div>
           </div>
 
@@ -231,9 +231,9 @@ export default function SettingsPage() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <ThumbsUp className="h-4 w-4 text-blue-500" />
-                  <span className="font-mono text-xs text-zinc-400">Default Like Rate</span>
+                  <span className="font-mono text-xs text-muted-foreground">Default Like Rate</span>
                 </div>
-                <span className="font-mono text-sm text-white">{settings.defaultLikeRate}%</span>
+                <span className="font-mono text-sm text-foreground">{settings.defaultLikeRate}%</span>
               </div>
               <Slider
                 value={[settings.defaultLikeRate]}
@@ -249,9 +249,9 @@ export default function SettingsPage() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <MessageSquare className="h-4 w-4 text-green-500" />
-                  <span className="font-mono text-xs text-zinc-400">Default Comment Rate</span>
+                  <span className="font-mono text-xs text-muted-foreground">Default Comment Rate</span>
                 </div>
-                <span className="font-mono text-sm text-white">{settings.defaultCommentRate}%</span>
+                <span className="font-mono text-sm text-foreground">{settings.defaultCommentRate}%</span>
               </div>
               <Slider
                 value={[settings.defaultCommentRate]}
@@ -267,9 +267,9 @@ export default function SettingsPage() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <UserPlus className="h-4 w-4 text-red-500" />
-                  <span className="font-mono text-xs text-zinc-400">Default Subscribe Rate</span>
+                  <span className="font-mono text-xs text-muted-foreground">Default Subscribe Rate</span>
                 </div>
-                <span className="font-mono text-sm text-white">{settings.defaultSubscribeRate}%</span>
+                <span className="font-mono text-sm text-foreground">{settings.defaultSubscribeRate}%</span>
               </div>
               <Slider
                 value={[settings.defaultSubscribeRate]}
@@ -283,18 +283,18 @@ export default function SettingsPage() {
         </div>
 
         {/* Default Duration Settings */}
-        <div className="rounded-md border border-zinc-800 bg-black dark:bg-zinc-950 overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 bg-zinc-900/50">
+        <div className="rounded-md border border-border bg-background overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card/50">
             <div className="flex items-center gap-3">
               <Clock className="h-4 w-4 text-yellow-500" />
-              <span className="font-mono text-sm font-bold text-white">DEFAULT_DURATION</span>
+              <span className="font-mono text-sm font-bold text-foreground">DEFAULT_DURATION</span>
             </div>
           </div>
 
           <div className="p-4 space-y-4">
             <div className="flex items-center gap-3">
               <div className="flex-1">
-                <label className="font-mono text-[10px] text-zinc-500 uppercase block mb-2">
+                <label className="font-mono text-[10px] text-muted-foreground uppercase block mb-2">
                   Min Duration (seconds)
                 </label>
                 <Input
@@ -303,12 +303,12 @@ export default function SettingsPage() {
                   max={settings.defaultMaxDuration}
                   value={settings.defaultMinDuration}
                   onChange={(e) => updateSetting('defaultMinDuration', parseInt(e.target.value) || 60)}
-                  className="font-mono text-sm bg-zinc-900 border-zinc-700 focus:border-zinc-600"
+                  className="font-mono text-sm bg-card border-border focus:border-border"
                 />
               </div>
-              <span className="font-mono text-zinc-500 mt-6">~</span>
+              <span className="font-mono text-muted-foreground mt-6">~</span>
               <div className="flex-1">
-                <label className="font-mono text-[10px] text-zinc-500 uppercase block mb-2">
+                <label className="font-mono text-[10px] text-muted-foreground uppercase block mb-2">
                   Max Duration (seconds)
                 </label>
                 <Input
@@ -317,29 +317,29 @@ export default function SettingsPage() {
                   max={600}
                   value={settings.defaultMaxDuration}
                   onChange={(e) => updateSetting('defaultMaxDuration', parseInt(e.target.value) || 180)}
-                  className="font-mono text-sm bg-zinc-900 border-zinc-700 focus:border-zinc-600"
+                  className="font-mono text-sm bg-card border-border focus:border-border"
                 />
               </div>
             </div>
-            <p className="font-mono text-[10px] text-zinc-600">
+            <p className="font-mono text-[10px] text-muted-foreground">
               Default watch duration range for new jobs
             </p>
           </div>
         </div>
 
         {/* Device Defaults */}
-        <div className="rounded-md border border-zinc-800 bg-black dark:bg-zinc-950 overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 bg-zinc-900/50">
+        <div className="rounded-md border border-border bg-background overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card/50">
             <div className="flex items-center gap-3">
               <Server className="h-4 w-4 text-purple-500" />
-              <span className="font-mono text-sm font-bold text-white">DEVICE_DEFAULTS</span>
+              <span className="font-mono text-sm font-bold text-foreground">DEVICE_DEFAULTS</span>
             </div>
           </div>
 
           <div className="p-4 space-y-4">
             {/* Resolution */}
             <div>
-              <label className="font-mono text-[10px] text-zinc-500 uppercase block mb-2">
+              <label className="font-mono text-[10px] text-muted-foreground uppercase block mb-2">
                 Default Resolution
               </label>
               <div className="flex items-center gap-2">
@@ -347,14 +347,14 @@ export default function SettingsPage() {
                   type="number"
                   value={settings.defaultResolutionWidth}
                   onChange={(e) => updateSetting('defaultResolutionWidth', parseInt(e.target.value) || 1080)}
-                  className="font-mono text-sm bg-zinc-900 border-zinc-700 focus:border-zinc-600"
+                  className="font-mono text-sm bg-card border-border focus:border-border"
                 />
-                <span className="font-mono text-zinc-500">x</span>
+                <span className="font-mono text-muted-foreground">x</span>
                 <Input
                   type="number"
                   value={settings.defaultResolutionHeight}
                   onChange={(e) => updateSetting('defaultResolutionHeight', parseInt(e.target.value) || 2340)}
-                  className="font-mono text-sm bg-zinc-900 border-zinc-700 focus:border-zinc-600"
+                  className="font-mono text-sm bg-card border-border focus:border-border"
                 />
               </div>
             </div>
@@ -362,8 +362,8 @@ export default function SettingsPage() {
             {/* Brightness */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="font-mono text-xs text-zinc-400">Default Brightness</span>
-                <span className="font-mono text-sm text-white">{settings.defaultBrightness}</span>
+                <span className="font-mono text-xs text-muted-foreground">Default Brightness</span>
+                <span className="font-mono text-sm text-foreground">{settings.defaultBrightness}</span>
               </div>
               <Slider
                 value={[settings.defaultBrightness]}
@@ -377,8 +377,8 @@ export default function SettingsPage() {
             {/* Volume */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="font-mono text-xs text-zinc-400">Default Volume</span>
-                <span className="font-mono text-sm text-white">{settings.defaultVolume}</span>
+                <span className="font-mono text-xs text-muted-foreground">Default Volume</span>
+                <span className="font-mono text-sm text-foreground">{settings.defaultVolume}</span>
               </div>
               <Slider
                 value={[settings.defaultVolume]}

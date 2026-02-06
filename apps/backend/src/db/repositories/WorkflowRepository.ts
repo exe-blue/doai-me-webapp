@@ -201,44 +201,54 @@ export class WorkflowRepository {
   /**
    * Fallback atomic increment using Supabase update with select
    * Note: This has a small race window but is acceptable for version increments
+   * Uses bounded retries to prevent infinite recursion
    */
-  private async incrementVersionFallback(id: string): Promise<number> {
-    // First, get current version
-    const { data: current, error: selectError } = await this.db
-      .from('workflows')
-      .select('version')
-      .eq('id', id)
-      .single();
+  private async incrementVersionFallback(id: string, maxRetries: number = 3): Promise<number> {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      // First, get current version
+      const { data: current, error: selectError } = await this.db
+        .from('workflows')
+        .select('version')
+        .eq('id', id)
+        .single();
 
-    if (selectError) {
-      if (selectError.code === 'PGRST116') {
-        throw new Error(`Workflow not found: ${id}`);
+      if (selectError) {
+        if (selectError.code === 'PGRST116') {
+          throw new Error(`Workflow not found: ${id}`);
+        }
+        throw selectError;
       }
-      throw selectError;
+
+      const currentVersion = current?.version ?? 0;
+      const newVersion = currentVersion + 1;
+
+      // Update with optimistic locking to detect race conditions
+      const { data, error: updateError } = await this.db
+        .from('workflows')
+        .update({ version: newVersion })
+        .eq('id', id)
+        .eq('version', currentVersion) // Optimistic lock
+        .select('version')
+        .single();
+
+      if (updateError) {
+        // If PGRST116 (no rows), it means race condition occurred
+        if (updateError.code === 'PGRST116') {
+          if (attempt < maxRetries) {
+            // Small delay before retry
+            await new Promise(resolve => setTimeout(resolve, 10 * attempt));
+            continue; // Retry
+          }
+          throw new Error(`Concurrency error: failed to increment version after ${maxRetries} attempts`);
+        }
+        throw updateError;
+      }
+
+      return data?.version ?? newVersion;
     }
 
-    const currentVersion = current?.version ?? 0;
-    const newVersion = currentVersion + 1;
-
-    // Update with optimistic locking to detect race conditions
-    const { data, error: updateError } = await this.db
-      .from('workflows')
-      .update({ version: newVersion })
-      .eq('id', id)
-      .eq('version', currentVersion) // Optimistic lock
-      .select('version')
-      .single();
-
-    if (updateError) {
-      // If PGRST116 (no rows), it means race condition occurred
-      if (updateError.code === 'PGRST116') {
-        // Retry once on race condition
-        return await this.incrementVersionFallback(id);
-      }
-      throw updateError;
-    }
-
-    return data?.version ?? newVersion;
+    // Should not reach here, but satisfy TypeScript
+    throw new Error(`Failed to increment version after ${maxRetries} attempts`);
   }
 
   // ============================================

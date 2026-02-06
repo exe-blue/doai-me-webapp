@@ -223,6 +223,7 @@ export default function VideosPage() {
 
     if (error) {
       console.error("상태 변경 실패:", error);
+      alert(`영상 상태 변경에 실패했습니다: ${error.message}`);
     } else {
       fetchVideos();
     }
@@ -235,6 +236,7 @@ export default function VideosPage() {
 
     if (error) {
       console.error("삭제 실패:", error);
+      alert(`영상 삭제에 실패했습니다: ${error.message}`);
     } else {
       fetchVideos();
     }
@@ -304,7 +306,7 @@ export default function VideosPage() {
                     setNewVideo({ ...newVideo, search_keyword: e.target.value })
                   }
                 />
-                <p className="text-xs text-zinc-500">
+                <p className="text-xs text-muted-foreground">
                   디바이스가 YouTube에서 검색할 키워드입니다. 비워두면 제목에서 #해시태그를 제외하고 자동 추출됩니다.
                 </p>
               </div>
@@ -359,11 +361,11 @@ export default function VideosPage() {
               </div>
 
               {/* 행동 확률 */}
-              <div className="space-y-4 rounded-lg border border-zinc-700 p-4">
-                <h4 className="font-medium text-white">행동 확률 (%)</h4>
+              <div className="space-y-4 rounded-lg border border-border p-4">
+                <h4 className="font-medium text-foreground">행동 확률 (%)</h4>
                 <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <Label className="flex items-center gap-1 text-zinc-400">
+                    <Label className="flex items-center gap-1 text-muted-foreground">
                       <ThumbsUp className="h-3 w-3" /> 좋아요
                     </Label>
                     <Input
@@ -380,7 +382,7 @@ export default function VideosPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className="flex items-center gap-1 text-zinc-400">
+                    <Label className="flex items-center gap-1 text-muted-foreground">
                       <MessageSquare className="h-3 w-3" /> 댓글
                     </Label>
                     <Input
@@ -397,7 +399,7 @@ export default function VideosPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className="flex items-center gap-1 text-zinc-400">
+                    <Label className="flex items-center gap-1 text-muted-foreground">
                       <UserPlus className="h-3 w-3" /> 구독
                     </Label>
                     <Input
@@ -430,21 +432,21 @@ export default function VideosPage() {
 
       {/* 통계 카드 */}
       <div className="grid grid-cols-4 gap-4">
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-          <div className="text-sm text-zinc-400">전체 영상</div>
-          <div className="text-2xl font-bold text-white">{stats.total}</div>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <div className="text-sm text-muted-foreground">전체 영상</div>
+          <div className="text-2xl font-bold text-foreground">{stats.total}</div>
         </div>
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-          <div className="text-sm text-zinc-400">진행중</div>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <div className="text-sm text-muted-foreground">진행중</div>
           <div className="text-2xl font-bold text-green-500">{stats.active}</div>
         </div>
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-          <div className="text-sm text-zinc-400">완료</div>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <div className="text-sm text-muted-foreground">완료</div>
           <div className="text-2xl font-bold text-blue-500">{stats.completed}</div>
         </div>
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-          <div className="text-sm text-zinc-400">전체 진행률</div>
-          <div className="text-2xl font-bold text-white">
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <div className="text-sm text-muted-foreground">전체 진행률</div>
+          <div className="text-2xl font-bold text-foreground">
             {stats.totalTarget > 0
               ? Math.round((stats.totalCompleted / stats.totalTarget) * 100)
               : 0}

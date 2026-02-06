@@ -69,11 +69,11 @@ const statusConfig: Record<DeviceHealthStatus, {
   },
   offline: {
     bgGradient: 'from-zinc-500/5 to-transparent',
-    borderColor: 'border-zinc-700 hover:border-zinc-600',
+    borderColor: 'border-border hover:border-border',
     glowColor: '',
     label: '오프라인',
-    labelColor: 'text-zinc-500',
-    neonBar: 'bg-zinc-700',
+    labelColor: 'text-muted-foreground',
+    neonBar: 'bg-border',
   },
 };
 
@@ -110,7 +110,7 @@ export function DeviceCard({ device, onClick, isSelected, isMaster }: DeviceCard
         className={cn(
           // Base styles - MagicUI aesthetic
           'relative cursor-pointer rounded-md border overflow-hidden transition-all duration-200',
-          'bg-gradient-to-b bg-black dark:bg-zinc-950',
+          'bg-gradient-to-b bg-background',
           config.bgGradient,
           config.borderColor,
           config.glowColor,
@@ -129,7 +129,7 @@ export function DeviceCard({ device, onClick, isSelected, isMaster }: DeviceCard
         <div className="p-2.5">
           {/* Header: Device Name (P01-001) - Large, Bold */}
           <div className="flex items-center justify-between mb-2">
-            <span className="font-mono text-sm font-bold text-white">
+            <span className="font-mono text-sm font-bold text-foreground">
               {deviceName}
             </span>
             {isMaster && (
@@ -141,15 +141,15 @@ export function DeviceCard({ device, onClick, isSelected, isMaster }: DeviceCard
 
           {/* Row 1: Serial */}
           <div className="flex items-center justify-between text-[10px] mb-1">
-            <span className="font-mono text-zinc-500">Serial:</span>
-            <span className="font-mono text-zinc-400">
+            <span className="font-mono text-muted-foreground">Serial:</span>
+            <span className="font-mono text-muted-foreground">
               {serialShort}...
             </span>
           </div>
 
           {/* Row 2: IP - Full display */}
           <div className="flex items-center justify-between text-[10px] mb-2">
-            <span className="font-mono text-zinc-500">IP:</span>
+            <span className="font-mono text-muted-foreground">IP:</span>
             <span className={cn(
               'font-mono',
               hasValidIp ? 'text-green-400' : 'text-red-400'
@@ -161,7 +161,7 @@ export function DeviceCard({ device, onClick, isSelected, isMaster }: DeviceCard
           {/* Status Badge */}
           <div className={cn(
             'font-mono text-[10px] font-medium text-center py-0.5 rounded',
-            health === 'offline' ? 'bg-zinc-800/50 text-zinc-500' : `${config.labelColor}`
+            health === 'offline' ? 'bg-muted/50 text-muted-foreground' : `${config.labelColor}`
           )}>
             {config.label}
           </div>

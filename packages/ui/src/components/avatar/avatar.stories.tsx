@@ -9,7 +9,7 @@ const meta: Meta<typeof Avatar> = {
     layout: "centered",
     docs: {
       description: {
-        component: "RetroUI/NeoBrutalist 스타일 아바타. 두꺼운 테두리.",
+        component: "RetroUI NeoBrutalist 스타일 아바타. 두꺼운 테두리.",
       },
     },
   },

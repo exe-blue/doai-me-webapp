@@ -47,6 +47,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { StatsCard } from "@/components/ui/stats-card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
@@ -360,16 +361,16 @@ export default function ChannelsPage() {
                     setNewChannel({ ...newChannel, url: e.target.value })
                   }
                 />
-                <p className="text-xs text-zinc-500">
+                <p className="text-xs text-muted-foreground">
                   @핸들, /channel/UC..., /c/이름 형식 모두 지원
                 </p>
               </div>
 
               {/* 자동 수집 */}
-              <div className="flex items-center justify-between rounded-lg border border-zinc-700 p-4">
+              <div className="flex items-center justify-between rounded-lg border border-border p-4">
                 <div className="space-y-0.5">
                   <Label>자동 영상 수집</Label>
-                  <p className="text-xs text-zinc-500">
+                  <p className="text-xs text-muted-foreground">
                     새 영상이 업로드되면 자동으로 등록합니다
                   </p>
                 </div>
@@ -398,9 +399,9 @@ export default function ChannelsPage() {
               )}
 
               {/* 기본 시청 설정 */}
-              <div className="space-y-4 rounded-lg border border-zinc-700 p-4">
-                <h4 className="font-medium text-white">기본 시청 설정</h4>
-                <p className="text-xs text-zinc-500">
+              <div className="space-y-4 rounded-lg border border-border p-4">
+                <h4 className="font-medium text-foreground">기본 시청 설정</h4>
+                <p className="text-xs text-muted-foreground">
                   이 채널에서 수집된 영상에 적용될 기본값
                 </p>
 
@@ -419,7 +420,7 @@ export default function ChannelsPage() {
 
                 <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <Label className="text-zinc-400">좋아요 %</Label>
+                    <Label className="text-muted-foreground">좋아요 %</Label>
                     <Input
                       type="number"
                       min={0}
@@ -434,7 +435,7 @@ export default function ChannelsPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-zinc-400">댓글 %</Label>
+                    <Label className="text-muted-foreground">댓글 %</Label>
                     <Input
                       type="number"
                       min={0}
@@ -449,7 +450,7 @@ export default function ChannelsPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-zinc-400">구독 %</Label>
+                    <Label className="text-muted-foreground">구독 %</Label>
                     <Input
                       type="number"
                       min={0}
@@ -480,18 +481,9 @@ export default function ChannelsPage() {
 
       {/* 통계 카드 */}
       <div className="grid grid-cols-3 gap-4">
-        <div className="border-2 border-foreground bg-card shadow-[4px_4px_0px_0px] shadow-foreground p-4">
-          <div className="text-sm text-muted-foreground font-medium">전체 채널</div>
-          <div className="text-2xl font-bold text-foreground">{stats.total}</div>
-        </div>
-        <div className="border-2 border-foreground bg-card shadow-[4px_4px_0px_0px] shadow-foreground p-4">
-          <div className="text-sm text-muted-foreground font-medium">활성 채널</div>
-          <div className="text-2xl font-bold text-green-600">{stats.active}</div>
-        </div>
-        <div className="border-2 border-foreground bg-card shadow-[4px_4px_0px_0px] shadow-foreground p-4">
-          <div className="text-sm text-muted-foreground font-medium">자동 수집</div>
-          <div className="text-2xl font-bold text-blue-600">{stats.autoCollect}</div>
-        </div>
+        <StatsCard label="전체 채널" value={stats.total} />
+        <StatsCard variant="success" label="활성 채널" value={stats.active} />
+        <StatsCard variant="info" label="자동 수집" value={stats.autoCollect} />
       </div>
 
       {/* 필터 & 검색 */}
@@ -678,11 +670,11 @@ export default function ChannelsPage() {
                     <img
                       src={selectedChannel.profile_url}
                       alt={selectedChannel.name}
-                      className="h-16 w-16 rounded-full object-cover bg-zinc-800"
+                      className="h-16 w-16 rounded-full object-cover bg-muted"
                     />
                   ) : (
-                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-zinc-800">
-                      <Users className="h-8 w-8 text-zinc-500" />
+                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted">
+                      <Users className="h-8 w-8 text-muted-foreground" />
                     </div>
                   )}
                   <div>
@@ -700,26 +692,26 @@ export default function ChannelsPage() {
 
                 <TabsContent value="videos" className="mt-4 space-y-4">
                   {channelVideos.length === 0 ? (
-                    <div className="py-8 text-center text-zinc-500">
+                    <div className="py-8 text-center text-muted-foreground">
                       등록된 영상이 없습니다
                     </div>
                   ) : (
                     channelVideos.map((video) => (
                       <div
                         key={video.id}
-                        className="flex items-center gap-3 rounded-lg border border-zinc-700 p-3"
+                        className="flex items-center gap-3 rounded-lg border border-border p-3"
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={video.thumbnail_url || `https://img.youtube.com/vi/${video.id}/mqdefault.jpg`}
                           alt={video.title}
-                          className="h-12 w-20 rounded object-cover bg-zinc-800"
+                          className="h-12 w-20 rounded object-cover bg-muted"
                         />
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium text-white truncate">
+                          <div className="text-sm font-medium text-foreground truncate">
                             {video.title}
                           </div>
-                          <div className="text-xs text-zinc-500">
+                          <div className="text-xs text-muted-foreground">
                             {video.completed_views}/{video.target_views} 완료
                           </div>
                         </div>
@@ -735,8 +727,8 @@ export default function ChannelsPage() {
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <div>
-                        <div className="font-medium text-white">자동 수집</div>
-                        <div className="text-xs text-zinc-500">
+                        <div className="font-medium text-foreground">자동 수집</div>
+                        <div className="text-xs text-muted-foreground">
                           {selectedChannel.collect_interval_hours}시간마다 수집
                         </div>
                       </div>
@@ -748,29 +740,29 @@ export default function ChannelsPage() {
                       />
                     </div>
 
-                    <div className="rounded-lg border border-zinc-700 p-4 space-y-2">
-                      <div className="text-sm font-medium text-white">기본 시청 설정</div>
+                    <div className="rounded-lg border border-border p-4 space-y-2">
+                      <div className="text-sm font-medium text-foreground">기본 시청 설정</div>
                       <div className="grid grid-cols-2 gap-2 text-sm">
-                        <div className="text-zinc-500">시청 시간</div>
-                        <div className="text-zinc-300">{selectedChannel.default_watch_duration_sec}초</div>
-                        <div className="text-zinc-500">좋아요 확률</div>
-                        <div className="text-zinc-300">{selectedChannel.default_prob_like}%</div>
-                        <div className="text-zinc-500">댓글 확률</div>
-                        <div className="text-zinc-300">{selectedChannel.default_prob_comment}%</div>
-                        <div className="text-zinc-500">구독 확률</div>
-                        <div className="text-zinc-300">{selectedChannel.default_prob_subscribe}%</div>
+                        <div className="text-muted-foreground">시청 시간</div>
+                        <div className="text-foreground">{selectedChannel.default_watch_duration_sec}초</div>
+                        <div className="text-muted-foreground">좋아요 확률</div>
+                        <div className="text-foreground">{selectedChannel.default_prob_like}%</div>
+                        <div className="text-muted-foreground">댓글 확률</div>
+                        <div className="text-foreground">{selectedChannel.default_prob_comment}%</div>
+                        <div className="text-muted-foreground">구독 확률</div>
+                        <div className="text-foreground">{selectedChannel.default_prob_subscribe}%</div>
                       </div>
                     </div>
 
-                    <div className="rounded-lg border border-zinc-700 p-4 space-y-2">
-                      <div className="text-sm font-medium text-white">채널 정보</div>
+                    <div className="rounded-lg border border-border p-4 space-y-2">
+                      <div className="text-sm font-medium text-foreground">채널 정보</div>
                       <div className="grid grid-cols-2 gap-2 text-sm">
-                        <div className="text-zinc-500">구독자</div>
-                        <div className="text-zinc-300">{selectedChannel.subscriber_count || "-"}</div>
-                        <div className="text-zinc-500">영상 수</div>
-                        <div className="text-zinc-300">{selectedChannel.video_count || 0}개</div>
-                        <div className="text-zinc-500">마지막 수집</div>
-                        <div className="text-zinc-300">
+                        <div className="text-muted-foreground">구독자</div>
+                        <div className="text-foreground">{selectedChannel.subscriber_count || "-"}</div>
+                        <div className="text-muted-foreground">영상 수</div>
+                        <div className="text-foreground">{selectedChannel.video_count || 0}개</div>
+                        <div className="text-muted-foreground">마지막 수집</div>
+                        <div className="text-foreground">
                           {selectedChannel.last_collected_at
                             ? formatTimeAgo(selectedChannel.last_collected_at)
                             : "수집 전"}

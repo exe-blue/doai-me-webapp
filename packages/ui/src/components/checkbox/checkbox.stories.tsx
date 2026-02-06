@@ -10,7 +10,7 @@ const meta: Meta<typeof Checkbox> = {
     layout: "centered",
     docs: {
       description: {
-        component: "RetroUI/NeoBrutalist 스타일 체크박스.",
+        component: "RetroUI NeoBrutalist 스타일 체크박스.",
       },
     },
   },
@@ -68,7 +68,7 @@ export const AllSizes: Story = {
   render: () => (
     <div className="flex items-center gap-4">
       <Checkbox size="sm" defaultChecked />
-      <Checkbox size="default" defaultChecked />
+      <Checkbox size="md" defaultChecked />
       <Checkbox size="lg" defaultChecked />
     </div>
   ),

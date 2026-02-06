@@ -321,7 +321,9 @@ export class AlertManager extends EventEmitter {
       });
     } catch (error) {
       if ((error as Error).name === 'AbortError') {
-        logger.warn('[AlertManager] Discord webhook timed out');
+        // Treat timeout as best-effort - log but don't rethrow
+        logger.warn('[AlertManager] Discord webhook timed out (treated as best-effort)');
+        return; // Swallow AbortError
       }
       throw error;
     } finally {

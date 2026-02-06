@@ -78,7 +78,7 @@ interface OnboardingDevice {
 // 상태 배지 컴포넌트
 function StatusBadge({ status }: { status: OnboardingStatus }) {
   const config: Record<OnboardingStatus, { color: string; icon: React.ReactNode; label: string }> = {
-    not_started: { color: 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30', icon: <Clock className="h-3 w-3" />, label: '대기' },
+    not_started: { color: 'bg-zinc-500/20 text-muted-foreground border-zinc-500/30', icon: <Clock className="h-3 w-3" />, label: '대기' },
     in_progress: { color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30', icon: <Activity className="h-3 w-3" />, label: '진행중' },
     completed: { color: 'bg-green-500/20 text-green-400 border-green-500/30', icon: <CheckCircle className="h-3 w-3" />, label: '완료' },
     failed: { color: 'bg-red-500/20 text-red-400 border-red-500/30', icon: <XCircle className="h-3 w-3" />, label: '실패' },
@@ -111,7 +111,7 @@ function StepProgress({ completedSteps, currentStep }: { completedSteps: string[
                 ? 'bg-green-500/20 text-green-400'
                 : isCurrent
                 ? 'bg-yellow-500/20 text-yellow-400 animate-pulse'
-                : 'bg-zinc-800 text-zinc-600'
+                : 'bg-muted text-muted-foreground'
             }`}
             title={step.name}
           >
@@ -280,7 +280,7 @@ export default function OnboardingPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-mono font-bold text-foreground">디바이스 온보딩</h1>
-          <p className="text-zinc-500 font-mono text-xs mt-1">
+          <p className="text-muted-foreground font-mono text-xs mt-1">
             새 디바이스 초기화 및 설정 자동화
           </p>
         </div>
@@ -290,7 +290,7 @@ export default function OnboardingPage() {
             size="sm"
             onClick={handleRefresh}
             disabled={refreshing}
-            className="font-mono text-xs border-zinc-700 hover:border-zinc-600"
+            className="font-mono text-xs border-border hover:border-border"
           >
             <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${refreshing ? 'animate-spin' : ''}`} />
             REFRESH
@@ -308,30 +308,30 @@ export default function OnboardingPage() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-5 gap-4">
-        <Card className="bg-black border-zinc-800">
+        <Card className="bg-background border-border">
           <CardHeader className="pb-2">
-            <CardTitle className="font-mono text-xs text-zinc-500">전체</CardTitle>
+            <CardTitle className="font-mono text-xs text-muted-foreground">전체</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-mono font-bold text-white">{stats.total}</div>
+            <div className="text-3xl font-mono font-bold text-foreground">{stats.total}</div>
           </CardContent>
         </Card>
         
-        <Card className="bg-black border-zinc-800">
+        <Card className="bg-background border-border">
           <CardHeader className="pb-2">
-            <CardTitle className="font-mono text-xs text-zinc-500 flex items-center gap-1">
+            <CardTitle className="font-mono text-xs text-muted-foreground flex items-center gap-1">
               <Clock className="h-3 w-3" />
               대기
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-mono font-bold text-zinc-400">{stats.notStarted}</div>
+            <div className="text-3xl font-mono font-bold text-muted-foreground">{stats.notStarted}</div>
           </CardContent>
         </Card>
 
-        <Card className="bg-black border-zinc-800">
+        <Card className="bg-background border-border">
           <CardHeader className="pb-2">
-            <CardTitle className="font-mono text-xs text-zinc-500 flex items-center gap-1">
+            <CardTitle className="font-mono text-xs text-muted-foreground flex items-center gap-1">
               <Activity className="h-3 w-3" />
               진행중
             </CardTitle>
@@ -341,9 +341,9 @@ export default function OnboardingPage() {
           </CardContent>
         </Card>
 
-        <Card className="bg-black border-zinc-800">
+        <Card className="bg-background border-border">
           <CardHeader className="pb-2">
-            <CardTitle className="font-mono text-xs text-zinc-500 flex items-center gap-1">
+            <CardTitle className="font-mono text-xs text-muted-foreground flex items-center gap-1">
               <CheckCircle className="h-3 w-3" />
               완료
             </CardTitle>
@@ -353,9 +353,9 @@ export default function OnboardingPage() {
           </CardContent>
         </Card>
 
-        <Card className="bg-black border-zinc-800">
+        <Card className="bg-background border-border">
           <CardHeader className="pb-2">
-            <CardTitle className="font-mono text-xs text-zinc-500 flex items-center gap-1">
+            <CardTitle className="font-mono text-xs text-muted-foreground flex items-center gap-1">
               <XCircle className="h-3 w-3" />
               실패
             </CardTitle>
@@ -367,9 +367,9 @@ export default function OnboardingPage() {
       </div>
 
       {/* Onboarding Steps Overview */}
-      <Card className="bg-black border-zinc-800">
+      <Card className="bg-background border-border">
         <CardHeader>
-          <CardTitle className="font-mono text-sm text-zinc-300">온보딩 단계</CardTitle>
+          <CardTitle className="font-mono text-sm text-foreground">온보딩 단계</CardTitle>
           <CardDescription className="font-mono text-xs">
             각 디바이스는 9단계를 순차적으로 진행합니다
           </CardDescription>
@@ -381,16 +381,16 @@ export default function OnboardingPage() {
               return (
                 <div key={step.id} className="flex-1">
                   <div className="flex items-center gap-2">
-                    <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center">
+                    <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-muted flex items-center justify-center">
                       <StepIcon className="h-4 w-4 text-cyan-400" />
                     </div>
                     {idx < ONBOARDING_STEPS.length - 1 && (
-                      <ChevronRight className="h-4 w-4 text-zinc-600 flex-shrink-0" />
+                      <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                     )}
                   </div>
                   <div className="mt-2">
-                    <div className="font-mono text-xs text-white">{step.name}</div>
-                    <div className="font-mono text-[10px] text-zinc-500">{step.description}</div>
+                    <div className="font-mono text-xs text-foreground">{step.name}</div>
+                    <div className="font-mono text-[10px] text-muted-foreground">{step.description}</div>
                   </div>
                 </div>
               );
@@ -400,10 +400,10 @@ export default function OnboardingPage() {
       </Card>
 
       {/* Devices Table */}
-      <Card className="bg-black border-zinc-800">
+      <Card className="bg-background border-border">
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="font-mono text-sm text-zinc-300">
+            <CardTitle className="font-mono text-sm text-foreground">
               디바이스 목록 ({devices.length})
             </CardTitle>
             {selectedDevices.size > 0 && (
@@ -416,28 +416,28 @@ export default function OnboardingPage() {
         <CardContent>
           {devices.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
-              <Smartphone className="h-12 w-12 text-zinc-600 mb-4" />
-              <p className="text-zinc-500 font-mono text-sm">온보딩 기록이 없습니다</p>
-              <p className="text-zinc-600 font-mono text-xs mt-2">
+              <Smartphone className="h-12 w-12 text-muted-foreground mb-4" />
+              <p className="text-muted-foreground font-mono text-sm">온보딩 기록이 없습니다</p>
+              <p className="text-muted-foreground font-mono text-xs mt-2">
                 새 디바이스를 연결하고 온보딩을 시작하세요
               </p>
             </div>
           ) : (
             <Table>
               <TableHeader>
-                <TableRow className="border-zinc-800 hover:bg-transparent">
+                <TableRow className="border-border hover:bg-transparent">
                   <TableHead className="w-10">
                     <Checkbox
                       checked={selectedDevices.size === devices.length && devices.length > 0}
                       onCheckedChange={toggleAll}
                     />
                   </TableHead>
-                  <TableHead className="font-mono text-xs text-zinc-500">Device ID</TableHead>
-                  <TableHead className="font-mono text-xs text-zinc-500">Node</TableHead>
-                  <TableHead className="font-mono text-xs text-zinc-500">Status</TableHead>
-                  <TableHead className="font-mono text-xs text-zinc-500">Progress</TableHead>
-                  <TableHead className="font-mono text-xs text-zinc-500">Current Step</TableHead>
-                  <TableHead className="font-mono text-xs text-zinc-500">Actions</TableHead>
+                  <TableHead className="font-mono text-xs text-muted-foreground">Device ID</TableHead>
+                  <TableHead className="font-mono text-xs text-muted-foreground">Node</TableHead>
+                  <TableHead className="font-mono text-xs text-muted-foreground">Status</TableHead>
+                  <TableHead className="font-mono text-xs text-muted-foreground">Progress</TableHead>
+                  <TableHead className="font-mono text-xs text-muted-foreground">Current Step</TableHead>
+                  <TableHead className="font-mono text-xs text-muted-foreground">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -447,18 +447,18 @@ export default function OnboardingPage() {
                   );
                   
                   return (
-                    <TableRow key={device.device_id} className="border-zinc-800">
+                    <TableRow key={device.device_id} className="border-border">
                       <TableCell>
                         <Checkbox
                           checked={selectedDevices.has(device.device_id)}
                           onCheckedChange={() => toggleDevice(device.device_id)}
                         />
                       </TableCell>
-                      <TableCell className="font-mono text-xs text-white">
+                      <TableCell className="font-mono text-xs text-foreground">
                         {device.device_id}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="font-mono text-xs border-zinc-700">
+                        <Badge variant="outline" className="font-mono text-xs border-border">
                           {device.node_id}
                         </Badge>
                       </TableCell>
@@ -467,8 +467,8 @@ export default function OnboardingPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <Progress value={progress} className="h-1.5 w-20 bg-zinc-800" />
-                          <span className="font-mono text-xs text-zinc-400">{progress}%</span>
+                          <Progress value={progress} className="h-1.5 w-20 bg-muted" />
+                          <span className="font-mono text-xs text-muted-foreground">{progress}%</span>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -512,10 +512,10 @@ export default function OnboardingPage() {
 
       {/* Start Onboarding Dialog */}
       <Dialog open={showStartDialog} onOpenChange={setShowStartDialog}>
-        <DialogContent className="bg-zinc-900 border-zinc-800">
+        <DialogContent className="bg-card border-border">
           <DialogHeader>
-            <DialogTitle className="font-mono text-white">온보딩 시작</DialogTitle>
-            <DialogDescription className="font-mono text-xs text-zinc-400">
+            <DialogTitle className="font-mono text-foreground">온보딩 시작</DialogTitle>
+            <DialogDescription className="font-mono text-xs text-muted-foreground">
               선택한 디바이스들의 온보딩을 시작합니다.
               연결된 디바이스가 자동으로 감지됩니다.
             </DialogDescription>
@@ -523,24 +523,24 @@ export default function OnboardingPage() {
           
           <div className="space-y-4 py-4">
             <div>
-              <label className="font-mono text-xs text-zinc-500 block mb-2">Node ID</label>
+              <label className="font-mono text-xs text-muted-foreground block mb-2">Node ID</label>
               <input
                 type="text"
                 value={nodeId}
                 onChange={(e) => setNodeId(e.target.value)}
-                className="w-full bg-zinc-800 border border-zinc-700 rounded px-3 py-2 font-mono text-sm text-white"
+                className="w-full bg-muted border border-border rounded px-3 py-2 font-mono text-sm text-foreground"
                 placeholder="PC00"
               />
-              <p className="font-mono text-[10px] text-zinc-500 mt-1">
+              <p className="font-mono text-[10px] text-muted-foreground mt-1">
                 디바이스 명명에 사용됩니다 (예: {nodeId}-00, {nodeId}-01)
               </p>
             </div>
 
-            <div className="bg-zinc-800/50 rounded-lg p-4">
-              <h4 className="font-mono text-xs text-zinc-400 mb-2">온보딩 단계:</h4>
+            <div className="bg-muted/50 rounded-lg p-4">
+              <h4 className="font-mono text-xs text-muted-foreground mb-2">온보딩 단계:</h4>
               <ol className="space-y-1">
                 {ONBOARDING_STEPS.map((step, idx) => (
-                  <li key={step.id} className="font-mono text-xs text-zinc-500 flex items-center gap-2">
+                  <li key={step.id} className="font-mono text-xs text-muted-foreground flex items-center gap-2">
                     <span className="text-cyan-400">{idx + 1}.</span>
                     {step.name}
                   </li>
@@ -553,7 +553,7 @@ export default function OnboardingPage() {
             <Button
               variant="outline"
               onClick={() => setShowStartDialog(false)}
-              className="font-mono text-xs border-zinc-700"
+              className="font-mono text-xs border-border"
             >
               취소
             </Button>

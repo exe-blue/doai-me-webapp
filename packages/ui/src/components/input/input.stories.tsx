@@ -11,7 +11,7 @@ const meta: Meta<typeof Input> = {
     layout: "centered",
     docs: {
       description: {
-        component: "RetroUI/NeoBrutalist 스타일 입력 필드. 두꺼운 테두리와 그림자.",
+        component: "RetroUI NeoBrutalist 스타일 입력 필드. 두꺼운 테두리와 그림자.",
       },
     },
   },

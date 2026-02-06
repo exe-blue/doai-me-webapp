@@ -18,7 +18,7 @@ const meta: Meta<typeof Select> = {
     layout: "centered",
     docs: {
       description: {
-        component: "RetroUI/NeoBrutalist 스타일 드롭다운 선택.",
+        component: "RetroUI NeoBrutalist 스타일 드롭다운 선택.",
       },
     },
   },

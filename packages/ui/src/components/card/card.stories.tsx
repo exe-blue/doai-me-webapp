@@ -11,7 +11,7 @@ const meta: Meta<typeof Card> = {
     layout: "centered",
     docs: {
       description: {
-        component: "RetroUI/NeoBrutalist 스타일 카드. 두꺼운 테두리와 그림자.",
+        component: "RetroUI NeoBrutalist 스타일 카드. 두꺼운 테두리와 그림자.",
       },
     },
   },
@@ -93,6 +93,54 @@ export const MultipleCards: Story = {
       <Card className="p-4">
         <CardTitle className="mb-2">Errors</CardTitle>
         <p className="text-3xl font-bold text-red-600">1</p>
+      </Card>
+    </div>
+  ),
+};
+
+export const CardVariants: Story = {
+  render: () => (
+    <div className="flex flex-col gap-4">
+      <Card variant="default" className="p-4 w-[300px]">
+        <CardTitle className="mb-2">Default</CardTitle>
+        <p>기본 스타일 카드</p>
+      </Card>
+      <Card variant="elevated" className="p-4 w-[300px]">
+        <CardTitle className="mb-2">Elevated</CardTitle>
+        <p>더 큰 그림자 카드</p>
+      </Card>
+      <Card variant="outline" className="p-4 w-[300px]">
+        <CardTitle className="mb-2">Outline</CardTitle>
+        <p>테두리만 있는 카드</p>
+      </Card>
+      <Card variant="ghost" className="p-4 w-[300px]">
+        <CardTitle className="mb-2">Ghost</CardTitle>
+        <p>테두리와 그림자 없는 카드</p>
+      </Card>
+    </div>
+  ),
+};
+
+export const InteractiveCard: Story = {
+  render: () => (
+    <div className="flex gap-4">
+      <Card 
+        variant="default" 
+        interactive 
+        className="p-4 w-[200px]"
+        onClick={() => alert('Card clicked!')}
+      >
+        <CardTitle className="mb-2">Clickable</CardTitle>
+        <p>클릭해보세요</p>
+      </Card>
+      <Card 
+        variant="elevated" 
+        interactive 
+        className="p-4 w-[200px]"
+        onClick={() => alert('Card clicked!')}
+      >
+        <CardTitle className="mb-2">Elevated</CardTitle>
+        <p>클릭 가능</p>
       </Card>
     </div>
   ),

@@ -4,7 +4,11 @@ import nextTs from "eslint-config-next/typescript";
 
 const eslintConfig = defineConfig([
   ...nextVitals,
-  ...nextTs,
+  // Apply TypeScript rules only to TypeScript files
+  {
+    files: ["**/*.ts", "**/*.tsx"],
+    ...nextTs[0],
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:
@@ -13,6 +17,13 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
   ]),
+  // Allow require imports in specific CommonJS files
+  {
+    files: ["server.js", "test-supabase.js"],
+    rules: {
+      "@typescript-eslint/no-require-imports": "off",
+    },
+  },
 ]);
 
 export default eslintConfig;

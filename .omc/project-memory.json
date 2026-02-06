@@ -1,0 +1,218 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1770381364504,
+  "projectRoot": "/mnt/c/Users/ChoiJoonho/doai-me-webapp",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": ">=18.0.0",
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      },
+      {
+        "name": "TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "tsconfig.json"
+        ]
+      }
+    ],
+    "frameworks": [],
+    "packageManager": "npm",
+    "runtime": "Node.js 18.0.0"
+  },
+  "build": {
+    "buildCommand": "npm run build",
+    "testCommand": null,
+    "lintCommand": "npm run lint",
+    "devCommand": null,
+    "scripts": {
+      "dev:dashboard": "npm run dev --workspace=apps/dashboard",
+      "dev:backend": "npm run dev --workspace=apps/backend",
+      "dev:agent": "npm run start --workspace=apps/desktop-agent",
+      "storybook": "npm run storybook --workspace=packages/ui",
+      "build:storybook": "npm run build-storybook --workspace=packages/ui",
+      "build": "npm run build --workspaces",
+      "lint": "eslint .",
+      "lint:imports": "node scripts/lint-imports.js",
+      "lint:all": "npm run lint && npm run lint:imports",
+      "typecheck": "tsc --noEmit",
+      "precommit": "npm run lint:imports",
+      "prepare": "husky || true",
+      "clean": "npx rimraf node_modules apps/*/node_modules packages/*/node_modules infra/*/node_modules",
+      "sb": "npm run storybook --workspace=@packages/ui",
+      "build:types": "npm run build --workspace=packages/worker-types",
+      "build:core": "npm run build --workspace=packages/worker-core",
+      "build:youtube-bot": "npm run build --workspace=apps/youtube-bot",
+      "build:agent": "npm run build --workspace=apps/desktop-agent",
+      "build:workers": "npm run build:types && npm run build:core && npm run build:youtube-bot",
+      "dev:youtube-bot": "npm run dev --workspace=apps/youtube-bot",
+      "start:youtube-bot": "npm run start --workspace=apps/youtube-bot",
+      "typecheck:types": "npm run typecheck --workspace=packages/worker-types",
+      "typecheck:core": "npm run typecheck --workspace=packages/worker-core",
+      "typecheck:youtube-bot": "npm run typecheck --workspace=apps/youtube-bot",
+      "typecheck:workers": "npm run typecheck:types && npm run typecheck:core && npm run typecheck:youtube-bot",
+      "download:minicap": "node scripts/download-minicap.js"
+    }
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": true,
+    "workspaces": [
+      "apps/*",
+      "packages/*",
+      "infra/*"
+    ],
+    "mainDirectories": [
+      "docs",
+      "scripts"
+    ],
+    "gitBranches": {
+      "defaultBranch": "main",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "Output": {
+      "path": "Output",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1770381364443,
+      "keyFiles": []
+    },
+    "_archive": {
+      "path": "_archive",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1770381364446,
+      "keyFiles": []
+    },
+    "_legacy": {
+      "path": "_legacy",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1770381364450,
+      "keyFiles": []
+    },
+    "_reference": {
+      "path": "_reference",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1770381364454,
+      "keyFiles": []
+    },
+    "apks": {
+      "path": "apks",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1770381364457,
+      "keyFiles": []
+    },
+    "apps": {
+      "path": "apps",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1770381364461,
+      "keyFiles": []
+    },
+    "client.Tests": {
+      "path": "client.Tests",
+      "purpose": null,
+      "fileCount": 2,
+      "lastAccessed": 1770381364464,
+      "keyFiles": [
+        "CoordinateMapperTests.cs",
+        "DoaiDeviceFarm.Client.Tests.csproj"
+      ]
+    },
+    "config": {
+      "path": "config",
+      "purpose": "Configuration files",
+      "fileCount": 0,
+      "lastAccessed": 1770381364468,
+      "keyFiles": []
+    },
+    "docs": {
+      "path": "docs",
+      "purpose": "Documentation",
+      "fileCount": 11,
+      "lastAccessed": 1770381364471,
+      "keyFiles": [
+        "DESKTOP-AGENT-DEPLOYMENT-PLAN.md",
+        "FE-MIGRATION-SPEC.md",
+        "HANDOFF.md",
+        "INVESTOR-DECK.md",
+        "ONE-PAGER.md"
+      ]
+    },
+    "infra": {
+      "path": "infra",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1770381364475,
+      "keyFiles": []
+    },
+    "packages": {
+      "path": "packages",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1770381364478,
+      "keyFiles": []
+    },
+    "scripts": {
+      "path": "scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 11,
+      "lastAccessed": 1770381364481,
+      "keyFiles": [
+        "DOWNLOAD-AUTOJS-APK.md",
+        "adb_server.py",
+        "device_onboarding.js",
+        "direct_migration.js",
+        "download-minicap.js"
+      ]
+    },
+    "workflows": {
+      "path": "workflows",
+      "purpose": null,
+      "fileCount": 3,
+      "lastAccessed": 1770381364484,
+      "keyFiles": [
+        "daily_reset.yml",
+        "health_check.yml",
+        "youtube_watch.yml"
+      ]
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "apps/dashboard/vercel.json",
+      "accessCount": 1,
+      "lastAccessed": 1770381920681,
+      "type": "file"
+    },
+    {
+      "path": "package.json",
+      "accessCount": 1,
+      "lastAccessed": 1770381921174,
+      "type": "file"
+    },
+    {
+      "path": "apps/dashboard/package.json",
+      "accessCount": 1,
+      "lastAccessed": 1770381921563,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}

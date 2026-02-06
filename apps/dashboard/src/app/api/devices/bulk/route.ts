@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
         if (device.serial_number) {
           const { data } = await supabase
             .from('devices')
-            .select('id')
+            .select('id, pc_id')
             .eq('serial_number', device.serial_number)
             .single();
           existingDevice = data;
@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
         if (!existingDevice && device.ip_address) {
           const { data } = await supabase
             .from('devices')
-            .select('id')
+            .select('id, pc_id')
             .eq('ip_address', device.ip_address)
             .single();
           existingDevice = data;
@@ -141,7 +141,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return successResponse(results, `등록 완료: ${results.created.length}개 생성, ${results.updated.length}개 갱신`);
+    return successResponse({
+      ...results,
+      message: `등록 완료: ${results.created.length}개 생성, ${results.updated.length}개 갱신`
+    });
   } catch (error) {
     console.error('[API] Bulk register error:', error);
     return errorResponse('Internal server error', 500);

@@ -23,7 +23,9 @@
       "@doai/shared": ["../../packages/shared/src/index.ts"],
       "@doai/shared/*": ["../../packages/shared/src/*"],
       "@doai/ui": ["../../packages/ui/src/index.ts"],
-      "@doai/ui/*": ["../../packages/ui/src/*"]
+      "@doai/ui/*": ["../../packages/ui/src/*"],
+      "@packages/ui": ["../../packages/ui"],
+      "@packages/ui/*": ["../../packages/ui/*"]
     }
   },
   "include": [

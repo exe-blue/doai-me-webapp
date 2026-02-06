@@ -15,6 +15,10 @@ export interface WatchJobParams {
   videoUrl: string;
   /** Watch duration in seconds (default: full video or 60s) */
   watchDurationSeconds?: number;
+  /** Minimum watch duration in seconds (for random duration) */
+  watchDurationMinSeconds?: number;
+  /** Maximum watch duration in seconds (for random duration) */
+  watchDurationMaxSeconds?: number;
   /** Whether to like the video (default: probabilistic) */
   like?: boolean;
   /** Whether to comment on the video (default: probabilistic) */
@@ -79,6 +83,21 @@ export class WatchHandler implements JobHandler {
   constructor(adbController: AdbController, logger?: Logger) {
     this.adbController = adbController;
     this.logger = logger ?? defaultLogger.child('WatchHandler');
+  }
+
+  /**
+   * Calculate random watch duration within min/max range
+   */
+  private calculateRandomDuration(params: WatchJobParams): number {
+    // If explicit duration is set, use it
+    if (params.watchDurationSeconds !== undefined) {
+      return params.watchDurationSeconds;
+    }
+
+    // If min/max range is set, randomize
+    const minSec = params.watchDurationMinSeconds ?? 30;
+    const maxSec = params.watchDurationMaxSeconds ?? 180;
+    return Math.floor(Math.random() * (maxSec - minSec + 1)) + minSec;
   }
 
   /**
@@ -163,7 +182,7 @@ export class WatchHandler implements JobHandler {
       }
 
       // Step 3: Watch video
-      const watchDuration = watchParams.watchDurationSeconds ?? 60;
+      const watchDuration = this.calculateRandomDuration(watchParams);
       reportProgress(30, `Watching video for ${watchDuration} seconds`);
 
       await simulator.simulateWatching(

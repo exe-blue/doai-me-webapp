@@ -148,7 +148,7 @@ export function LogDrawer({
       case 'success':
         return 'text-green-400';
       case 'debug':
-        return 'text-zinc-500';
+        return 'text-muted-foreground';
       default:
         return 'text-green-400';
     }
@@ -174,7 +174,7 @@ export function LogDrawer({
       <button
         type="button"
         aria-label="Close drawer"
-        className="fixed inset-0 bg-black/50 z-40 transition-opacity border-0 cursor-default"
+        className="fixed inset-0 bg-background/50 z-40 transition-opacity border-0 cursor-default"
         onClick={onClose}
       />
 
@@ -182,20 +182,20 @@ export function LogDrawer({
       <div
         className={cn(
           'fixed right-0 top-0 h-full w-full max-w-lg z-50',
-          'bg-black border-l border-zinc-800',
+          'bg-background border-l border-border',
           'transform transition-transform duration-300 ease-out',
           open ? 'translate-x-0' : 'translate-x-full'
         )}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 bg-zinc-900/50">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card/50">
           <div className="flex items-center gap-3">
             <Terminal className="h-5 w-5 text-green-500" />
             <div>
-              <h2 className="font-mono text-sm font-bold text-white">
+              <h2 className="font-mono text-sm font-bold text-foreground">
                 Console Logs
               </h2>
-              <p className="font-mono text-[10px] text-zinc-500">
+              <p className="font-mono text-[10px] text-muted-foreground">
                 {jobTitle || deviceId || 'Real-time Logs'}
               </p>
             </div>
@@ -206,7 +206,7 @@ export function LogDrawer({
             <Button
               size="sm"
               variant="ghost"
-              className="h-8 w-8 p-0 hover:bg-zinc-800"
+              className="h-8 w-8 p-0 hover:bg-muted"
               onClick={() => isPaused ? handleResume() : setIsPaused(true)}
               title={isPaused ? '재개' : '일시정지'}
             >
@@ -221,14 +221,14 @@ export function LogDrawer({
             <Button
               size="sm"
               variant="ghost"
-              className="h-8 w-8 p-0 hover:bg-zinc-800"
+              className="h-8 w-8 p-0 hover:bg-muted"
               onClick={handleCopy}
               title="복사"
             >
               {copied ? (
                 <Check className="h-4 w-4 text-green-500" />
               ) : (
-                <Copy className="h-4 w-4 text-zinc-400" />
+                <Copy className="h-4 w-4 text-muted-foreground" />
               )}
             </Button>
 
@@ -236,33 +236,33 @@ export function LogDrawer({
             <Button
               size="sm"
               variant="ghost"
-              className="h-8 w-8 p-0 hover:bg-zinc-800"
+              className="h-8 w-8 p-0 hover:bg-muted"
               onClick={handleClear}
               title="지우기"
             >
-              <Trash2 className="h-4 w-4 text-zinc-400" />
+              <Trash2 className="h-4 w-4 text-muted-foreground" />
             </Button>
 
             {/* Close */}
             <Button
               size="sm"
               variant="ghost"
-              className="h-8 w-8 p-0 hover:bg-zinc-800"
+              className="h-8 w-8 p-0 hover:bg-muted"
               onClick={onClose}
             >
-              <X className="h-4 w-4 text-zinc-400" />
+              <X className="h-4 w-4 text-muted-foreground" />
             </Button>
           </div>
         </div>
 
         {/* Status Bar */}
-        <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-800 bg-zinc-900/30">
+        <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-card/30">
           <div className="flex items-center gap-2">
             <div className={cn(
               'h-2 w-2 rounded-full',
               isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'
             )} />
-            <span className="font-mono text-[10px] text-zinc-500">
+            <span className="font-mono text-[10px] text-muted-foreground">
               {isConnected ? 'Connected' : 'Disconnected'}
             </span>
           </div>
@@ -273,7 +273,7 @@ export function LogDrawer({
                 ⏸ PAUSED ({bufferedCount} buffered)
               </span>
             )}
-            <span className="font-mono text-[10px] text-zinc-500">
+            <span className="font-mono text-[10px] text-muted-foreground">
               {logs.length} lines
             </span>
             <label className="flex items-center gap-1.5 cursor-pointer">
@@ -285,7 +285,7 @@ export function LogDrawer({
               />
               <span className={cn(
                 'font-mono text-[10px] transition-colors',
-                autoScroll ? 'text-green-400' : 'text-zinc-500'
+                autoScroll ? 'text-green-400' : 'text-muted-foreground'
               )}>
                 Auto-scroll {autoScroll ? 'ON' : 'OFF'}
               </span>
@@ -303,7 +303,7 @@ export function LogDrawer({
           }}
         >
           {logs.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-zinc-600">
+            <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
               <Terminal className="h-12 w-12 mb-4 opacity-50" />
               <p className="font-mono text-sm">Waiting for logs...</p>
               <p className="font-mono text-[10px] mt-1">
@@ -313,9 +313,9 @@ export function LogDrawer({
           ) : (
             <div className="space-y-0.5">
               {logs.map((log) => (
-                <div key={log.id} className="flex items-start gap-2 hover:bg-zinc-900/50 px-1 -mx-1 rounded">
+                <div key={log.id} className="flex items-start gap-2 hover:bg-card/50 px-1 -mx-1 rounded">
                   {/* Timestamp */}
-                  <span className="text-zinc-600 shrink-0">
+                  <span className="text-muted-foreground shrink-0">
                     [{new Date(log.timestamp).toLocaleTimeString('ko-KR', {
                       hour: '2-digit',
                       minute: '2-digit',

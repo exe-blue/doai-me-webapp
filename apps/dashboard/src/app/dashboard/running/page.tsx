@@ -323,7 +323,7 @@ export default function RunningPage() {
     return "completing";
   }
 
-  async function fetchNodes() {
+  async function fetchNodes(): Promise<typeof nodes> {
     // 실제로는 별도 테이블이나 API에서 가져옴
     const { data } = await supabase
       .from("nodes")
@@ -331,10 +331,10 @@ export default function RunningPage() {
       .order("name");
 
     if (data && data.length > 0) {
-      setNodes(data.map(n => ({
+      const mappedNodes = data.map(n => ({
         id: n.id,
         name: n.name || n.id,
-        status: n.status === "online" ? "online" : n.status === "busy" ? "busy" : "offline",
+        status: (n.status === "online" ? "online" : n.status === "busy" ? "busy" : "offline") as "online" | "busy" | "offline",
         connected_at: n.connected_at,
         total_devices: n.total_devices || 100,
         active_devices: n.active_devices || 0,
@@ -343,10 +343,12 @@ export default function RunningPage() {
         tasks_per_minute: n.tasks_per_minute || 0,
         cpu_usage: n.cpu_usage || 0,
         memory_usage: n.memory_usage || 0,
-      })));
+      }));
+      setNodes(mappedNodes);
+      return mappedNodes;
     } else {
       // 더미 데이터
-      setNodes([
+      const dummyNodes: typeof nodes = [
         {
           id: "node-1",
           name: "Node 1 (Mini PC)",
@@ -412,11 +414,13 @@ export default function RunningPage() {
           cpu_usage: 52,
           memory_usage: 68,
         },
-      ]);
+      ];
+      setNodes(dummyNodes);
+      return dummyNodes;
     }
   }
 
-  async function fetchStats(currentRunningCount?: number) {
+  async function fetchStats(currentRunningCount?: number, currentNodes?: typeof nodes) {
     try {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -438,6 +442,8 @@ export default function RunningPage() {
 
       // Use provided count if available (fresh data), otherwise fall back to state
       const runningCount = currentRunningCount ?? runningTasks.length;
+      // Use provided nodes if available (fresh data), otherwise fall back to state
+      const nodesData = currentNodes ?? nodes;
 
       setStats({
         total_running: runningCount,
@@ -450,7 +456,8 @@ export default function RunningPage() {
                   completed.length
               )
             : 0,
-        tasks_per_minute: nodes.reduce((sum, n) => sum + n.tasks_per_minute, 0),
+        // Use the freshly fetched or state nodes data
+        tasks_per_minute: nodesData.reduce((sum, n) => sum + n.tasks_per_minute, 0),
         likes_today: completed.filter((c) => c.liked).length,
         comments_today: completed.filter((c) => c.commented).length,
         subscribes_today: completed.filter((c) => c.subscribed).length,
@@ -510,11 +517,11 @@ export default function RunningPage() {
         {/* 헤더 */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
               <Activity className="h-6 w-6 text-green-500" />
               실시간 모니터링
             </h1>
-            <p className="text-sm text-zinc-400">
+            <p className="text-sm text-muted-foreground">
               현재 실행 중인 작업을 실시간으로 확인합니다
             </p>
           </div>
@@ -549,10 +556,10 @@ export default function RunningPage() {
 
         {/* 실시간 통계 */}
         <div className="grid grid-cols-4 gap-4">
-          <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
+          <div className="rounded-lg border border-border bg-card/50 p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-zinc-400">실행 중</p>
+                <p className="text-sm text-muted-foreground">실행 중</p>
                 <p className="text-3xl font-bold text-green-500">
                   {stats.total_running}
                 </p>
@@ -563,39 +570,39 @@ export default function RunningPage() {
             </div>
           </div>
 
-          <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
+          <div className="rounded-lg border border-border bg-card/50 p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-zinc-400">오늘 완료</p>
-                <p className="text-3xl font-bold text-white">{stats.completed_today}</p>
+                <p className="text-sm text-muted-foreground">오늘 완료</p>
+                <p className="text-3xl font-bold text-foreground">{stats.completed_today}</p>
               </div>
               <div className="h-12 w-12 rounded-full bg-blue-500/10 flex items-center justify-center">
                 <CheckCircle2 className="h-6 w-6 text-blue-500" />
               </div>
             </div>
             <div className="mt-2 flex gap-4 text-xs">
-              <span className="flex items-center gap-1 text-zinc-400">
+              <span className="flex items-center gap-1 text-muted-foreground">
                 <ThumbsUp className="h-3 w-3 text-pink-500" />
                 {stats.likes_today}
               </span>
-              <span className="flex items-center gap-1 text-zinc-400">
+              <span className="flex items-center gap-1 text-muted-foreground">
                 <MessageSquare className="h-3 w-3 text-purple-500" />
                 {stats.comments_today}
               </span>
-              <span className="flex items-center gap-1 text-zinc-400">
+              <span className="flex items-center gap-1 text-muted-foreground">
                 <UserPlus className="h-3 w-3 text-orange-500" />
                 {stats.subscribes_today}
               </span>
             </div>
           </div>
 
-          <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
+          <div className="rounded-lg border border-border bg-card/50 p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-zinc-400">처리 속도</p>
-                <p className="text-3xl font-bold text-white">
+                <p className="text-sm text-muted-foreground">처리 속도</p>
+                <p className="text-3xl font-bold text-foreground">
                   {stats.tasks_per_minute.toFixed(1)}
-                  <span className="text-sm text-zinc-500">/분</span>
+                  <span className="text-sm text-muted-foreground">/분</span>
                 </p>
               </div>
               <div className="h-12 w-12 rounded-full bg-yellow-500/10 flex items-center justify-center">
@@ -604,10 +611,10 @@ export default function RunningPage() {
             </div>
           </div>
 
-          <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
+          <div className="rounded-lg border border-border bg-card/50 p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-zinc-400">오늘 실패</p>
+                <p className="text-sm text-muted-foreground">오늘 실패</p>
                 <p className="text-3xl font-bold text-red-500">
                   {stats.failed_today}
                 </p>
@@ -616,7 +623,7 @@ export default function RunningPage() {
                 <AlertCircle className="h-6 w-6 text-red-500" />
               </div>
             </div>
-            <div className="mt-2 text-xs text-zinc-500">
+            <div className="mt-2 text-xs text-muted-foreground">
               성공률:{" "}
               {stats.completed_today + stats.failed_today > 0
                 ? (
@@ -631,8 +638,8 @@ export default function RunningPage() {
         </div>
 
         {/* 노드 상태 */}
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-          <h2 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-4">
             <Server className="h-5 w-5" />
             노드 상태
           </h2>
@@ -640,12 +647,12 @@ export default function RunningPage() {
             {nodes.map((node) => (
               <div
                 key={node.id}
-                className={`p-3 rounded-lg border border-zinc-700 ${
+                className={`p-3 rounded-lg border border-border ${
                   node.status === "offline" ? "opacity-60" : ""
                 }`}
               >
                 <div className="flex items-center justify-between mb-2">
-                  <span className="font-medium text-sm text-white">{node.name}</span>
+                  <span className="font-medium text-sm text-foreground">{node.name}</span>
                   <Badge
                     className={`${nodeStatusColor[node.status]} text-white text-xs border-0`}
                   >
@@ -664,26 +671,26 @@ export default function RunningPage() {
                         <div className="font-medium text-green-500">
                           {node.active_devices}
                         </div>
-                        <div className="text-zinc-500">활성</div>
+                        <div className="text-muted-foreground">활성</div>
                       </div>
                       <div className="text-center">
                         <div className="font-medium text-gray-400">
                           {node.idle_devices}
                         </div>
-                        <div className="text-zinc-500">대기</div>
+                        <div className="text-muted-foreground">대기</div>
                       </div>
                       <div className="text-center">
                         <div className="font-medium text-red-500">
                           {node.error_devices}
                         </div>
-                        <div className="text-zinc-500">오류</div>
+                        <div className="text-muted-foreground">오류</div>
                       </div>
                     </div>
 
                     <div className="space-y-1">
                       <div className="flex justify-between text-xs">
-                        <span className="text-zinc-500">CPU</span>
-                        <span className="text-zinc-400">{node.cpu_usage}%</span>
+                        <span className="text-muted-foreground">CPU</span>
+                        <span className="text-muted-foreground">{node.cpu_usage}%</span>
                       </div>
                       <Progress value={node.cpu_usage} className="h-1" />
                     </div>
@@ -698,15 +705,15 @@ export default function RunningPage() {
         <div className="grid grid-cols-3 gap-6">
           {/* 실행 중 작업 목록 */}
           <div className="col-span-2">
-            <div className="h-[600px] flex flex-col rounded-lg border border-zinc-800 bg-zinc-900/50">
-              <div className="p-4 border-b border-zinc-800 flex-none">
+            <div className="h-[600px] flex flex-col rounded-lg border border-border bg-card/50">
+              <div className="p-4 border-b border-border flex-none">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-semibold text-white">
+                  <h2 className="text-lg font-semibold text-foreground">
                     실행 중인 작업 ({runningTasks.length})
                   </h2>
                   <div className="flex items-center gap-2">
                     <Select value={nodeFilter} onValueChange={setNodeFilter}>
-                      <SelectTrigger className="w-32 h-8 bg-zinc-800 border-zinc-700">
+                      <SelectTrigger className="w-32 h-8 bg-muted border-border">
                         <SelectValue placeholder="노드 필터" />
                       </SelectTrigger>
                       <SelectContent>
@@ -718,7 +725,7 @@ export default function RunningPage() {
                         ))}
                       </SelectContent>
                     </Select>
-                    <div className="flex border border-zinc-700 rounded-md">
+                    <div className="flex border border-border rounded-md">
                       <Button
                         variant={viewMode === "grid" ? "secondary" : "ghost"}
                         size="icon"
@@ -743,10 +750,10 @@ export default function RunningPage() {
                 <ScrollArea className="h-full">
                   {loading ? (
                     <div className="flex items-center justify-center h-full">
-                      <Loader2 className="h-8 w-8 animate-spin text-zinc-500" />
+                      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                     </div>
                   ) : runningTasks.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-full text-zinc-500">
+                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
                       <Play className="h-12 w-12 mb-2 opacity-20" />
                       <p>실행 중인 작업이 없습니다</p>
                     </div>
@@ -755,7 +762,7 @@ export default function RunningPage() {
                       {runningTasks.map((task) => (
                         <div
                           key={task.id}
-                          className="p-3 border border-zinc-700 rounded-lg hover:bg-zinc-800/50 cursor-pointer transition-colors"
+                          className="p-3 border border-border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
                           onClick={() => setSelectedTask(task)}
                         >
                           <div className="flex gap-3">
@@ -766,13 +773,13 @@ export default function RunningPage() {
                                 `https://img.youtube.com/vi/${task.video_id}/default.jpg`
                               }
                               alt=""
-                              className="h-12 w-20 rounded object-cover flex-none bg-zinc-800"
+                              className="h-12 w-20 rounded object-cover flex-none bg-muted"
                             />
                             <div className="flex-1 min-w-0">
-                              <div className="text-sm font-medium text-white truncate">
+                              <div className="text-sm font-medium text-foreground truncate">
                                 {task.video?.title || task.video_id}
                               </div>
-                              <div className="text-xs text-zinc-500 flex items-center gap-2">
+                              <div className="text-xs text-muted-foreground flex items-center gap-2">
                                 <Smartphone className="h-3 w-3" />
                                 {task.device_id?.slice(0, 12)}...
                               </div>
@@ -784,7 +791,7 @@ export default function RunningPage() {
                               <span className="text-blue-400">
                                 {stepLabels[task.current_step] || task.current_step}
                               </span>
-                              <span className="text-zinc-500">
+                              <span className="text-muted-foreground">
                                 {formatDuration(task.elapsed_sec)} /{" "}
                                 {formatDuration(task.watch_duration_sec || 60)}
                               </span>
@@ -826,7 +833,7 @@ export default function RunningPage() {
                       {runningTasks.map((task) => (
                         <div
                           key={task.id}
-                          className="flex items-center gap-3 p-2 border border-zinc-700 rounded-lg hover:bg-zinc-800/50 cursor-pointer"
+                          className="flex items-center gap-3 p-2 border border-border rounded-lg hover:bg-muted/50 cursor-pointer"
                           onClick={() => setSelectedTask(task)}
                         >
                           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -836,13 +843,13 @@ export default function RunningPage() {
                               `https://img.youtube.com/vi/${task.video_id}/default.jpg`
                             }
                             alt=""
-                            className="h-10 w-16 rounded object-cover bg-zinc-800"
+                            className="h-10 w-16 rounded object-cover bg-muted"
                           />
                           <div className="flex-1 min-w-0">
-                            <div className="text-sm font-medium text-white truncate">
+                            <div className="text-sm font-medium text-foreground truncate">
                               {task.video?.title || task.video_id}
                             </div>
-                            <div className="text-xs text-zinc-500">
+                            <div className="text-xs text-muted-foreground">
                               {task.device_id?.slice(0, 8)}... • {task.node_id}
                             </div>
                           </div>
@@ -852,7 +859,7 @@ export default function RunningPage() {
                           <div className="text-xs text-blue-400 w-20">
                             {stepLabels[task.current_step] || task.current_step}
                           </div>
-                          <div className="text-xs text-zinc-500 w-16">
+                          <div className="text-xs text-muted-foreground w-16">
                             {formatDuration(task.elapsed_sec)}
                           </div>
                         </div>
@@ -866,9 +873,9 @@ export default function RunningPage() {
 
           {/* 활동 로그 */}
           <div className="col-span-1">
-            <div className="h-[600px] flex flex-col rounded-lg border border-zinc-800 bg-zinc-900/50">
-              <div className="p-4 border-b border-zinc-800 flex-none">
-                <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+            <div className="h-[600px] flex flex-col rounded-lg border border-border bg-card/50">
+              <div className="p-4 border-b border-border flex-none">
+                <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
                   <TrendingUp className="h-5 w-5" />
                   실시간 활동
                 </h2>
@@ -877,7 +884,7 @@ export default function RunningPage() {
                 <ScrollArea className="h-full">
                   <div className="space-y-2">
                     {activityLogs.length === 0 ? (
-                      <div className="text-center text-zinc-500 py-8">
+                      <div className="text-center text-muted-foreground py-8">
                         활동 로그가 없습니다
                       </div>
                     ) : (
@@ -887,12 +894,12 @@ export default function RunningPage() {
                         return (
                           <div
                             key={log.id}
-                            className="flex items-start gap-2 p-2 rounded-lg hover:bg-zinc-800/50"
+                            className="flex items-start gap-2 p-2 rounded-lg hover:bg-muted/50"
                           >
-                            <Icon className={`h-4 w-4 mt-0.5 ${config?.color || "text-zinc-400"}`} />
+                            <Icon className={`h-4 w-4 mt-0.5 ${config?.color || "text-muted-foreground"}`} />
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm text-white">{log.message}</p>
-                              <p className="text-xs text-zinc-500">
+                              <p className="text-sm text-foreground">{log.message}</p>
+                              <p className="text-xs text-muted-foreground">
                                 {formatTimeAgo(log.timestamp)}
                               </p>
                             </div>
@@ -925,13 +932,13 @@ export default function RunningPage() {
                       `https://img.youtube.com/vi/${selectedTask.video_id}/mqdefault.jpg`
                     }
                     alt=""
-                    className="h-20 w-32 rounded object-cover bg-zinc-800"
+                    className="h-20 w-32 rounded object-cover bg-muted"
                   />
                   <div>
-                    <h4 className="font-medium text-white">
+                    <h4 className="font-medium text-foreground">
                       {selectedTask.video?.title || selectedTask.video_id}
                     </h4>
-                    <p className="text-sm text-zinc-400">
+                    <p className="text-sm text-muted-foreground">
                       {selectedTask.video?.channel_name}
                     </p>
                   </div>
@@ -944,10 +951,10 @@ export default function RunningPage() {
                       {stepLabels[selectedTask.current_step] ||
                         selectedTask.current_step}
                     </span>
-                    <span className="text-white">{selectedTask.progress}%</span>
+                    <span className="text-foreground">{selectedTask.progress}%</span>
                   </div>
                   <Progress value={selectedTask.progress} className="h-3" />
-                  <div className="flex justify-between text-xs text-zinc-500">
+                  <div className="flex justify-between text-xs text-muted-foreground">
                     <span>경과: {formatDuration(selectedTask.elapsed_sec)}</span>
                     <span>
                       목표: {formatDuration(selectedTask.watch_duration_sec || 60)}
@@ -956,14 +963,14 @@ export default function RunningPage() {
                 </div>
 
                 {/* 디바이스 정보 */}
-                <div className="grid grid-cols-2 gap-4 p-3 bg-zinc-800 rounded-lg">
+                <div className="grid grid-cols-2 gap-4 p-3 bg-muted rounded-lg">
                   <div>
-                    <p className="text-xs text-zinc-500">노드</p>
-                    <p className="font-medium text-white">{selectedTask.node_id}</p>
+                    <p className="text-xs text-muted-foreground">노드</p>
+                    <p className="font-medium text-foreground">{selectedTask.node_id}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-zinc-500">디바이스</p>
-                    <p className="font-medium text-white">{selectedTask.device_id?.slice(0, 16)}...</p>
+                    <p className="text-xs text-muted-foreground">디바이스</p>
+                    <p className="font-medium text-foreground">{selectedTask.device_id?.slice(0, 16)}...</p>
                   </div>
                 </div>
 
@@ -973,7 +980,7 @@ export default function RunningPage() {
                     className={`flex items-center gap-2 px-3 py-2 rounded-lg ${
                       selectedTask.will_like
                         ? "bg-pink-500/10 text-pink-500"
-                        : "bg-zinc-800 text-zinc-500"
+                        : "bg-muted text-muted-foreground"
                     }`}
                   >
                     <ThumbsUp className="h-4 w-4" />
@@ -983,7 +990,7 @@ export default function RunningPage() {
                     className={`flex items-center gap-2 px-3 py-2 rounded-lg ${
                       selectedTask.will_comment
                         ? "bg-purple-500/10 text-purple-500"
-                        : "bg-zinc-800 text-zinc-500"
+                        : "bg-muted text-muted-foreground"
                     }`}
                   >
                     <MessageSquare className="h-4 w-4" />
@@ -993,7 +1000,7 @@ export default function RunningPage() {
                     className={`flex items-center gap-2 px-3 py-2 rounded-lg ${
                       selectedTask.will_subscribe
                         ? "bg-orange-500/10 text-orange-500"
-                        : "bg-zinc-800 text-zinc-500"
+                        : "bg-muted text-muted-foreground"
                     }`}
                   >
                     <UserPlus className="h-4 w-4" />

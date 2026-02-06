@@ -157,6 +157,7 @@ export default function ExecutionHistoryPage() {
   const [executions, setExecutions] = useState<ExecutionHistory[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [filters, setFilters] = useState<FilterState>({
     status: "all",
     node: "all",
@@ -174,10 +175,18 @@ export default function ExecutionHistoryPage() {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const pageSize = 50;
 
+  // Debounce search query to avoid excessive API calls
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   useEffect(() => {
     fetchExecutions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters, sortField, sortOrder, currentPage, searchQuery]);
+  }, [filters, sortField, sortOrder, currentPage, debouncedSearch]);
 
   async function fetchExecutions() {
     setLoading(true);
@@ -195,7 +204,7 @@ export default function ExecutionHistoryPage() {
       if (filters.node !== "all") params.append("nodeId", filters.node);
       if (filters.dateRange?.from) params.append("dateFrom", filters.dateRange.from.toISOString());
       if (filters.dateRange?.to) params.append("dateTo", filters.dateRange.to.toISOString());
-      if (searchQuery.trim()) params.append("search", searchQuery.trim());
+      if (debouncedSearch.trim()) params.append("search", debouncedSearch.trim());
 
       const response = await fetch(`/api/executions?${params.toString()}`);
       const result = await response.json();
@@ -321,11 +330,11 @@ export default function ExecutionHistoryPage() {
         {/* 헤더 */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
               <History className="h-6 w-6" />
               실행 이력
             </h1>
-            <p className="text-sm text-zinc-400">
+            <p className="text-sm text-muted-foreground">
               전체 작업 실행 기록을 조회합니다
             </p>
           </div>
@@ -344,20 +353,20 @@ export default function ExecutionHistoryPage() {
 
         {/* 통계 카드 */}
         <div className="grid grid-cols-4 gap-4">
-          <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
+          <div className="rounded-lg border border-border bg-card/50 p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-zinc-400">전체</p>
-                <p className="text-2xl font-bold text-white">{stats.total.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">전체</p>
+                <p className="text-2xl font-bold text-foreground">{stats.total.toLocaleString()}</p>
               </div>
-              <Play className="h-8 w-8 text-zinc-600" />
+              <Play className="h-8 w-8 text-muted-foreground" />
             </div>
           </div>
 
-          <div className="rounded-lg border border-green-500/30 bg-zinc-900/50 p-4">
+          <div className="rounded-lg border border-green-500/30 bg-card/50 p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-zinc-400">완료</p>
+                <p className="text-xs text-muted-foreground">완료</p>
                 <p className="text-2xl font-bold text-green-500">
                   {stats.completed.toLocaleString()}
                 </p>
@@ -366,10 +375,10 @@ export default function ExecutionHistoryPage() {
             </div>
           </div>
 
-          <div className="rounded-lg border border-red-500/30 bg-zinc-900/50 p-4">
+          <div className="rounded-lg border border-red-500/30 bg-card/50 p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-zinc-400">실패</p>
+                <p className="text-xs text-muted-foreground">실패</p>
                 <p className="text-2xl font-bold text-red-500">
                   {stats.failed.toLocaleString()}
                 </p>
@@ -378,10 +387,10 @@ export default function ExecutionHistoryPage() {
             </div>
           </div>
 
-          <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
+          <div className="rounded-lg border border-border bg-card/50 p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-zinc-400">취소</p>
+                <p className="text-xs text-muted-foreground">취소</p>
                 <p className="text-2xl font-bold text-gray-500">
                   {stats.cancelled.toLocaleString()}
                 </p>
@@ -394,10 +403,10 @@ export default function ExecutionHistoryPage() {
         {/* 필터 & 검색 */}
         <div className="flex items-center gap-4">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="영상 제목, 디바이스 ID 검색..."
-              className="pl-10 bg-zinc-900 border-zinc-700"
+              className="pl-10 bg-card border-border"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -426,7 +435,7 @@ export default function ExecutionHistoryPage() {
                 />
               </PopoverContent>
             </Popover>
-            <span className="text-zinc-500">~</span>
+            <span className="text-muted-foreground">~</span>
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant="outline" className="min-w-[120px] justify-start">
@@ -454,7 +463,7 @@ export default function ExecutionHistoryPage() {
             value={filters.status}
             onValueChange={(v) => setFilters({ ...filters, status: v })}
           >
-            <SelectTrigger className="w-28 bg-zinc-900 border-zinc-700">
+            <SelectTrigger className="w-28 bg-card border-border">
               <SelectValue placeholder="상태" />
             </SelectTrigger>
             <SelectContent>
@@ -469,7 +478,7 @@ export default function ExecutionHistoryPage() {
             value={filters.node}
             onValueChange={(v) => setFilters({ ...filters, node: v })}
           >
-            <SelectTrigger className="w-28 bg-zinc-900 border-zinc-700">
+            <SelectTrigger className="w-28 bg-card border-border">
               <SelectValue placeholder="노드" />
             </SelectTrigger>
             <SelectContent>
@@ -491,16 +500,16 @@ export default function ExecutionHistoryPage() {
         </div>
 
         {/* 테이블 */}
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50">
+        <div className="rounded-lg border border-border bg-card/50">
           <Table>
             <TableHeader>
-              <TableRow className="border-zinc-800 hover:bg-transparent">
-                <TableHead className="text-zinc-400">영상</TableHead>
-                <TableHead className="text-zinc-400">디바이스</TableHead>
-                <TableHead className="text-zinc-400">노드</TableHead>
-                <TableHead className="text-zinc-400">상태</TableHead>
+              <TableRow className="border-border hover:bg-transparent">
+                <TableHead className="text-muted-foreground">영상</TableHead>
+                <TableHead className="text-muted-foreground">디바이스</TableHead>
+                <TableHead className="text-muted-foreground">노드</TableHead>
+                <TableHead className="text-muted-foreground">상태</TableHead>
                 <TableHead
-                  className="text-zinc-400 cursor-pointer hover:bg-zinc-800/50"
+                  className="text-muted-foreground cursor-pointer hover:bg-muted/50"
                   onClick={() => toggleSort("started_at")}
                 >
                   <div className="flex items-center gap-1">
@@ -509,7 +518,7 @@ export default function ExecutionHistoryPage() {
                   </div>
                 </TableHead>
                 <TableHead
-                  className="text-zinc-400 cursor-pointer hover:bg-zinc-800/50"
+                  className="text-muted-foreground cursor-pointer hover:bg-muted/50"
                   onClick={() => toggleSort("duration")}
                 >
                   <div className="flex items-center gap-1">
@@ -517,20 +526,20 @@ export default function ExecutionHistoryPage() {
                     <ArrowUpDown className="h-3 w-3" />
                   </div>
                 </TableHead>
-                <TableHead className="text-zinc-400">시청 시간</TableHead>
-                <TableHead className="text-zinc-400 w-10"></TableHead>
+                <TableHead className="text-muted-foreground">시청 시간</TableHead>
+                <TableHead className="text-muted-foreground w-10"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin mx-auto text-zinc-500" />
+                    <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
                   </TableCell>
                 </TableRow>
               ) : executions.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-zinc-500">
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                     실행 이력이 없습니다
                   </TableCell>
                 </TableRow>
@@ -539,10 +548,10 @@ export default function ExecutionHistoryPage() {
                   const StatusIcon = statusConfig[exec.status]?.icon || CheckCircle2;
 
                   return (
-                    <TableRow key={exec.id} className="border-zinc-800">
+                    <TableRow key={exec.id} className="border-border">
                       <TableCell>
                         <div className="flex items-center gap-3">
-                          <div className="w-16 h-9 bg-zinc-800 rounded overflow-hidden flex-shrink-0">
+                          <div className="w-16 h-9 bg-muted rounded overflow-hidden flex-shrink-0">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                               src={exec.video_thumbnail}
@@ -551,10 +560,10 @@ export default function ExecutionHistoryPage() {
                             />
                           </div>
                           <div className="min-w-0">
-                            <div className="font-medium text-sm text-white truncate max-w-[200px]">
+                            <div className="font-medium text-sm text-foreground truncate max-w-[200px]">
                               {exec.video_title}
                             </div>
-                            <div className="text-xs text-zinc-500">
+                            <div className="text-xs text-muted-foreground">
                               {exec.channel_name}
                             </div>
                           </div>
@@ -563,13 +572,13 @@ export default function ExecutionHistoryPage() {
 
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <Smartphone className="h-4 w-4 text-zinc-500" />
-                          <span className="text-sm text-zinc-300">{exec.device_id}</span>
+                          <Smartphone className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm text-foreground">{exec.device_id}</span>
                         </div>
                       </TableCell>
 
                       <TableCell>
-                        <Badge variant="outline" className="border-zinc-700 text-zinc-400">{exec.node_id}</Badge>
+                        <Badge variant="outline" className="border-border text-muted-foreground">{exec.node_id}</Badge>
                       </TableCell>
 
                       <TableCell>
@@ -607,7 +616,7 @@ export default function ExecutionHistoryPage() {
                       <TableCell>
                         <Tooltip>
                           <TooltipTrigger>
-                            <span className="text-sm text-zinc-400">
+                            <span className="text-sm text-muted-foreground">
                               {formatDate(new Date(exec.started_at), "MM/dd HH:mm")}
                             </span>
                           </TooltipTrigger>
@@ -618,17 +627,17 @@ export default function ExecutionHistoryPage() {
                       </TableCell>
 
                       <TableCell>
-                        <span className="text-sm font-mono text-zinc-300">
+                        <span className="text-sm font-mono text-foreground">
                           {formatDuration(exec.duration_seconds)}
                         </span>
                       </TableCell>
 
                       <TableCell>
                         <div className="text-sm">
-                          <span className="font-mono text-zinc-300">
+                          <span className="font-mono text-foreground">
                             {formatDuration(exec.watch_duration_seconds)}
                           </span>
-                          <span className="text-zinc-500 text-xs ml-1">
+                          <span className="text-muted-foreground text-xs ml-1">
                             / {formatDuration(exec.target_watch_seconds)}
                           </span>
                         </div>
@@ -672,7 +681,7 @@ export default function ExecutionHistoryPage() {
 
         {/* 페이지네이션 */}
         <div className="flex items-center justify-between">
-          <div className="text-sm text-zinc-500">
+          <div className="text-sm text-muted-foreground">
             총 {totalCount.toLocaleString()}건 중 {(currentPage - 1) * pageSize + 1}-
             {Math.min(currentPage * pageSize, totalCount)}건
           </div>
@@ -755,7 +764,7 @@ export default function ExecutionHistoryPage() {
                     );
                   })()}
                   {selectedExecution.retry_count > 0 && (
-                    <span className="text-xs text-zinc-500">
+                    <span className="text-xs text-muted-foreground">
                       (재시도 {selectedExecution.retry_count}회)
                     </span>
                   )}
@@ -776,9 +785,9 @@ export default function ExecutionHistoryPage() {
                 )}
 
                 {/* 영상 정보 */}
-                <div className="p-3 bg-zinc-800 rounded-lg">
+                <div className="p-3 bg-muted rounded-lg">
                   <div className="flex items-start gap-3">
-                    <div className="w-20 h-12 bg-zinc-700 rounded overflow-hidden">
+                    <div className="w-20 h-12 bg-muted rounded overflow-hidden">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={selectedExecution.video_thumbnail}
@@ -787,10 +796,10 @@ export default function ExecutionHistoryPage() {
                       />
                     </div>
                     <div>
-                      <div className="font-medium text-sm text-white">
+                      <div className="font-medium text-sm text-foreground">
                         {selectedExecution.video_title}
                       </div>
-                      <div className="text-xs text-zinc-500">
+                      <div className="text-xs text-muted-foreground">
                         {selectedExecution.channel_name}
                       </div>
                     </div>
@@ -799,17 +808,17 @@ export default function ExecutionHistoryPage() {
 
                 {/* 디바이스 정보 */}
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="p-3 bg-zinc-800 rounded-lg">
-                    <div className="text-xs text-zinc-500">디바이스</div>
-                    <div className="font-medium text-white">{selectedExecution.device_id}</div>
-                    <div className="text-xs text-zinc-500">
+                  <div className="p-3 bg-muted rounded-lg">
+                    <div className="text-xs text-muted-foreground">디바이스</div>
+                    <div className="font-medium text-foreground">{selectedExecution.device_id}</div>
+                    <div className="text-xs text-muted-foreground">
                       {selectedExecution.device_name}
                     </div>
                   </div>
-                  <div className="p-3 bg-zinc-800 rounded-lg">
-                    <div className="text-xs text-zinc-500">노드</div>
-                    <div className="font-medium text-white">{selectedExecution.node_id}</div>
-                    <div className="text-xs text-zinc-500">
+                  <div className="p-3 bg-muted rounded-lg">
+                    <div className="text-xs text-muted-foreground">노드</div>
+                    <div className="font-medium text-foreground">{selectedExecution.node_id}</div>
+                    <div className="text-xs text-muted-foreground">
                       IP: {selectedExecution.metadata?.ip_address ?? '—'}
                     </div>
                   </div>
@@ -817,49 +826,49 @@ export default function ExecutionHistoryPage() {
 
                 {/* 시간 정보 */}
                 <div className="grid grid-cols-3 gap-3">
-                  <div className="text-center p-3 bg-zinc-800 rounded-lg">
-                    <div className="text-lg font-bold text-white">
+                  <div className="text-center p-3 bg-muted rounded-lg">
+                    <div className="text-lg font-bold text-foreground">
                       {formatDuration(selectedExecution.duration_seconds)}
                     </div>
-                    <div className="text-xs text-zinc-500">소요 시간</div>
+                    <div className="text-xs text-muted-foreground">소요 시간</div>
                   </div>
-                  <div className="text-center p-3 bg-zinc-800 rounded-lg">
-                    <div className="text-lg font-bold text-white">
+                  <div className="text-center p-3 bg-muted rounded-lg">
+                    <div className="text-lg font-bold text-foreground">
                       {formatDuration(selectedExecution.watch_duration_seconds)}
                     </div>
-                    <div className="text-xs text-zinc-500">시청 시간</div>
+                    <div className="text-xs text-muted-foreground">시청 시간</div>
                   </div>
-                  <div className="text-center p-3 bg-zinc-800 rounded-lg">
-                    <div className="text-lg font-bold text-white">
+                  <div className="text-center p-3 bg-muted rounded-lg">
+                    <div className="text-lg font-bold text-foreground">
                       {formatDuration(selectedExecution.target_watch_seconds)}
                     </div>
-                    <div className="text-xs text-zinc-500">목표 시간</div>
+                    <div className="text-xs text-muted-foreground">목표 시간</div>
                   </div>
                 </div>
 
                 {/* 메타데이터 */}
                 <div className="space-y-2">
-                  <h4 className="text-sm font-medium text-white">실행 정보</h4>
+                  <h4 className="text-sm font-medium text-foreground">실행 정보</h4>
                   <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div className="flex justify-between p-2 bg-zinc-800 rounded">
-                      <span className="text-zinc-500">해상도</span>
-                      <span className="text-zinc-300">{selectedExecution.metadata?.resolution ?? '—'}</span>
+                    <div className="flex justify-between p-2 bg-muted rounded">
+                      <span className="text-muted-foreground">해상도</span>
+                      <span className="text-foreground">{selectedExecution.metadata?.resolution ?? '—'}</span>
                     </div>
-                    <div className="flex justify-between p-2 bg-zinc-800 rounded">
-                      <span className="text-zinc-500">화질</span>
-                      <span className="text-zinc-300">{selectedExecution.metadata?.playback_quality ?? '—'}</span>
+                    <div className="flex justify-between p-2 bg-muted rounded">
+                      <span className="text-muted-foreground">화질</span>
+                      <span className="text-foreground">{selectedExecution.metadata?.playback_quality ?? '—'}</span>
                     </div>
-                    <div className="flex justify-between p-2 bg-zinc-800 rounded">
-                      <span className="text-zinc-500">버퍼링</span>
-                      <span className="text-zinc-300">
+                    <div className="flex justify-between p-2 bg-muted rounded">
+                      <span className="text-muted-foreground">버퍼링</span>
+                      <span className="text-foreground">
                         {selectedExecution.metadata?.buffering_count != null
                           ? `${selectedExecution.metadata.buffering_count}회`
                           : '—'}
                       </span>
                     </div>
-                    <div className="flex justify-between p-2 bg-zinc-800 rounded">
-                      <span className="text-zinc-500">광고 스킵</span>
-                      <span className="text-zinc-300">
+                    <div className="flex justify-between p-2 bg-muted rounded">
+                      <span className="text-muted-foreground">광고 스킵</span>
+                      <span className="text-foreground">
                         {selectedExecution.metadata?.ads_skipped != null
                           ? `${selectedExecution.metadata.ads_skipped}회`
                           : '—'}
@@ -869,18 +878,18 @@ export default function ExecutionHistoryPage() {
                 </div>
 
                 {/* 타임스탬프 */}
-                <Separator className="bg-zinc-700" />
+                <Separator className="bg-border" />
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <div className="text-zinc-500">시작</div>
-                    <div className="text-white">
+                    <div className="text-muted-foreground">시작</div>
+                    <div className="text-foreground">
                       {formatDate(new Date(selectedExecution.started_at), "yyyy-MM-dd HH:mm:ss")}
                     </div>
                   </div>
                   {selectedExecution.completed_at && (
                     <div>
-                      <div className="text-zinc-500">종료</div>
-                      <div className="text-white">
+                      <div className="text-muted-foreground">종료</div>
+                      <div className="text-foreground">
                         {formatDate(
                           new Date(selectedExecution.completed_at),
                           "yyyy-MM-dd HH:mm:ss"

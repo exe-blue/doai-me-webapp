@@ -2,12 +2,51 @@
 
 import * as React from "react";
 import * as RadioGroupPrimitive from "@radix-ui/react-radio-group";
-import { Circle } from "lucide-react";
+import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@packages/ui/lib/utils";
 
 /**
- * RadioGroup - NeoBrutalist 스타일 라디오 그룹
+ * RetroUI RadioGroup variants
+ * @see https://www.retroui.dev/docs/components/radio
  */
+const radioVariants = cva("border-border border-2", {
+  variants: {
+    variant: {
+      default: "",
+      outline: "",
+      solid: "",
+    },
+    size: {
+      sm: "h-4 w-4",
+      md: "h-5 w-5",
+      lg: "h-6 w-6",
+    },
+  },
+  defaultVariants: {
+    variant: "default",
+    size: "md",
+  },
+});
+
+const radioIndicatorVariants = cva("flex", {
+  variants: {
+    variant: {
+      default: "bg-primary border-2 border-border",
+      outline: "border-2 border-border",
+      solid: "bg-border",
+    },
+    size: {
+      sm: "h-2 w-2",
+      md: "h-2.5 w-2.5",
+      lg: "h-3.5 w-3.5",
+    },
+  },
+  defaultVariants: {
+    variant: "default",
+    size: "md",
+  },
+});
+
 const RadioGroup = React.forwardRef<
   React.ElementRef<typeof RadioGroupPrimitive.Root>,
   React.ComponentPropsWithoutRef<typeof RadioGroupPrimitive.Root>
@@ -22,24 +61,22 @@ const RadioGroup = React.forwardRef<
 });
 RadioGroup.displayName = RadioGroupPrimitive.Root.displayName;
 
+export interface RadioGroupItemProps
+  extends React.ComponentPropsWithoutRef<typeof RadioGroupPrimitive.Item>,
+    VariantProps<typeof radioVariants> {}
+
 const RadioGroupItem = React.forwardRef<
   React.ElementRef<typeof RadioGroupPrimitive.Item>,
-  React.ComponentPropsWithoutRef<typeof RadioGroupPrimitive.Item>
->(({ className, ...props }, ref) => {
+  RadioGroupItemProps
+>(({ className, variant, size, ...props }, ref) => {
   return (
     <RadioGroupPrimitive.Item
       ref={ref}
-      className={cn(
-        "aspect-square h-5 w-5 border-2 border-foreground bg-background",
-        "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
-        "disabled:cursor-not-allowed disabled:opacity-50",
-        "data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground",
-        className
-      )}
+      className={cn(radioVariants({ variant, size }), className)}
       {...props}
     >
-      <RadioGroupPrimitive.Indicator className="flex items-center justify-center">
-        <Circle className="h-2.5 w-2.5 fill-current text-current" />
+      <RadioGroupPrimitive.Indicator className="flex justify-center items-center">
+        <span className={radioIndicatorVariants({ variant, size })} />
       </RadioGroupPrimitive.Indicator>
     </RadioGroupPrimitive.Item>
   );

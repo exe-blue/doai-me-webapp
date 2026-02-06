@@ -7,3 +7,6 @@ export type { HumanSimulatorConfig, ScrollDirection } from './HumanSimulator';
 
 export { WatchHandler } from './WatchHandler';
 export type { WatchJobParams, WatchJobResultData } from './WatchHandler';
+
+export { SurfHandler } from './SurfHandler';
+export type { SurfJobParams, SurfJobResultData } from './SurfHandler';

@@ -3,21 +3,22 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@packages/ui/lib/utils";
 
 /**
- * RetroUI 스타일 Alert variants
+ * RetroUI Alert variants
+ * @see https://www.retroui.dev/docs/components/alert
  */
 const alertVariants = cva(
-  "relative w-full p-4 border-2 shadow-[4px_4px_0px_0px]",
+  "relative w-full p-4 border-2 border-border shadow-md rounded",
   {
     variants: {
       variant: {
-        default: "bg-background text-foreground border-foreground shadow-foreground",
-        solid: "bg-foreground text-background border-foreground shadow-foreground",
+        default: "bg-background text-foreground",
+        solid: "bg-foreground text-background",
       },
       status: {
-        info: "bg-blue-100 text-blue-800 border-blue-800 shadow-blue-800",
-        success: "bg-green-100 text-green-800 border-green-800 shadow-green-800",
-        warning: "bg-yellow-100 text-yellow-800 border-yellow-800 shadow-yellow-800",
-        error: "bg-red-100 text-red-800 border-red-800 shadow-red-800",
+        info: "bg-blue-100 text-blue-800 border-blue-800",
+        success: "bg-green-100 text-green-800 border-green-800",
+        warning: "bg-yellow-100 text-yellow-800 border-yellow-800",
+        error: "bg-red-100 text-red-800 border-red-800",
       },
     },
     defaultVariants: {
@@ -31,7 +32,7 @@ export interface AlertProps
     VariantProps<typeof alertVariants> {}
 
 /**
- * Alert - RetroUI/NeoBrutalist 스타일 알림
+ * Alert - RetroUI NeoBrutalist 스타일 알림
  */
 const Alert = React.forwardRef<HTMLDivElement, AlertProps>(
   ({ className, variant, status, ...props }, ref) => (
@@ -51,7 +52,7 @@ const AlertTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <h5
     ref={ref}
-    className={cn("mb-1 font-bold leading-none tracking-tight", className)}
+    className={cn("mb-1 font-head font-bold leading-none tracking-tight", className)}
     {...props}
   />
 ));

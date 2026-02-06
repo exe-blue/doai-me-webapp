@@ -10,7 +10,7 @@ const meta: Meta<typeof Alert> = {
     layout: "centered",
     docs: {
       description: {
-        component: "RetroUI/NeoBrutalist 스타일 알림. 두꺼운 테두리와 상태별 색상.",
+        component: "RetroUI NeoBrutalist 스타일 알림. 두꺼운 테두리와 상태별 색상.",
       },
     },
   },

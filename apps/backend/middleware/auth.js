@@ -41,10 +41,27 @@ if (!WORKER_SECRET_TOKEN) {
   // Generate a secure random token for development instead of using a predictable default
   generatedDevToken = crypto.randomBytes(32).toString('hex');
   WORKER_SECRET_TOKEN = generatedDevToken;
-  console.warn('[Auth] WARNING: WORKER_SECRET_TOKEN not set.');
-  console.warn('[Auth] Generated secure random token for this session (development only).');
-  console.warn(`[Auth] Use this token to connect workers: ${generatedDevToken}`);
-  console.warn('[Auth] NOTE: This token will change on every server restart!');
+  
+  // Write token to a local file with restrictive permissions instead of logging
+  const fs = require('node:fs');
+  const tokenFilePath = path.join(__dirname, '../../.dev-worker-token');
+  try {
+    fs.writeFileSync(tokenFilePath, generatedDevToken, { mode: 0o600 });
+    console.warn('[Auth] WARNING: WORKER_SECRET_TOKEN not set.');
+    console.warn('[Auth] Generated secure random token for this session (development only).');
+    console.warn(`[Auth] Token saved to: ${tokenFilePath}`);
+    // Only show full token if explicitly enabled via environment flag
+    if (process.env.SHOW_DEV_TOKEN === 'true') {
+      console.warn(`[Auth] Token: ${generatedDevToken}`);
+    } else {
+      console.warn(`[Auth] Token preview: ${generatedDevToken.substring(0, 8)}...`);
+    }
+    console.warn('[Auth] NOTE: This token will change on every server restart!');
+  } catch (writeError) {
+    console.error('[Auth] Failed to write token file:', writeError.message);
+    // Fallback: only show truncated token
+    console.warn('[Auth] Token preview: ' + generatedDevToken.substring(0, 8) + '...');
+  }
 }
 
 /**
@@ -141,7 +158,12 @@ async function dashboardAuthMiddleware(socket, next) {
     // 토큰 만료 시간 저장 (재연결 시 검증용)
     socket.tokenExp = decoded.exp;
 
-    console.log(`[Auth] Dashboard authenticated: ${socket.user.email || socket.user.id} (${socket.id})`);
+    // Log only non-PII identifier (user.id) and a hashed version of email if needed for debugging
+    const userIdentifier = socket.user.id;
+    const emailHash = socket.user.email 
+      ? crypto.createHash('sha256').update(socket.user.email).digest('hex').substring(0, 8)
+      : null;
+    console.log(`[Auth] Dashboard authenticated: user=${userIdentifier}${emailHash ? ` (email_hash=${emailHash})` : ''} (${socket.id})`);
     next();
   } catch (err) {
     console.log(`[Auth] Dashboard auth failed: ${err.message} (${socket.id})`);

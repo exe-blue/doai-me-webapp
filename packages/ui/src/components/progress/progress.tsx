@@ -5,8 +5,8 @@ import * as ProgressPrimitive from "@radix-ui/react-progress";
 import { cn } from "@packages/ui/lib/utils";
 
 /**
- * Progress - RetroUI/NeoBrutalist 스타일 진행률 표시
- * 두꺼운 테두리와 명확한 진행 표시
+ * Progress - RetroUI NeoBrutalist 스타일 진행률 표시
+ * @see https://www.retroui.dev/docs/components/progress
  */
 const Progress = React.forwardRef<
   React.ElementRef<typeof ProgressPrimitive.Root>,
@@ -15,13 +15,13 @@ const Progress = React.forwardRef<
   <ProgressPrimitive.Root
     ref={ref}
     className={cn(
-      "relative h-4 w-full overflow-hidden bg-muted border-2 border-foreground",
+      "relative h-4 w-full overflow-hidden bg-background border-2 border-border",
       className
     )}
     {...props}
   >
     <ProgressPrimitive.Indicator
-      className="h-full bg-primary transition-all duration-300 ease-in-out"
+      className="h-full w-full flex-1 bg-primary transition-all"
       style={{ transform: `translateX(-${100 - (value || 0)}%)` }}
     />
   </ProgressPrimitive.Root>

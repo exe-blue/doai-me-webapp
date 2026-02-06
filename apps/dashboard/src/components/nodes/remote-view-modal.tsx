@@ -253,17 +253,17 @@ export function RemoteViewModal({
           <div className="flex-1">
             {/* Broadcast Control Toggle */}
             {onBroadcastToggle && (
-              <div className="flex items-center justify-between p-3 mb-3 bg-zinc-900 rounded-lg border border-zinc-800">
+              <div className="flex items-center justify-between p-3 mb-3 bg-card rounded-lg border border-border">
                 <div className="flex items-center gap-2">
                   <Radio className={cn(
                     "h-4 w-4",
-                    broadcastEnabled ? "text-red-500" : "text-zinc-500"
+                    broadcastEnabled ? "text-red-500" : "text-muted-foreground"
                   )} />
                   <div>
-                    <Label htmlFor="broadcast-toggle" className="font-mono text-sm font-medium text-white">
+                    <Label htmlFor="broadcast-toggle" className="font-mono text-sm font-medium text-foreground">
                       BROADCAST MODE
                     </Label>
-                    <p className="font-mono text-[10px] text-zinc-500">
+                    <p className="font-mono text-[10px] text-muted-foreground">
                       {broadcastEnabled
                         ? `Syncing to ${broadcastDeviceIds.length} devices`
                         : 'Click to sync with group'}
@@ -283,8 +283,8 @@ export function RemoteViewModal({
               ref={imageRef}
               onClick={handleImageClick}
               className={cn(
-                'relative bg-zinc-900 rounded-lg overflow-hidden cursor-crosshair mx-auto',
-                'border border-zinc-800',
+                'relative bg-card rounded-lg overflow-hidden cursor-crosshair mx-auto',
+                'border border-border',
                 broadcastEnabled && 'ring-2 ring-red-500/50'
               )}
               style={{
@@ -302,25 +302,25 @@ export function RemoteViewModal({
                   draggable={false}
                 />
               ) : isStreaming ? (
-                <div className="absolute inset-0 flex items-center justify-center bg-zinc-900">
+                <div className="absolute inset-0 flex items-center justify-center bg-card">
                   <div className="text-center">
                     <Loader2 className="h-8 w-8 mx-auto mb-2 text-red-500 animate-spin" />
-                    <p className="font-mono text-xs text-zinc-400">Waiting for stream...</p>
-                    <p className="font-mono text-[10px] text-zinc-600 mt-1">Connecting to device</p>
+                    <p className="font-mono text-xs text-muted-foreground">Waiting for stream...</p>
+                    <p className="font-mono text-[10px] text-muted-foreground mt-1">Connecting to device</p>
                   </div>
                 </div>
               ) : (
-                <div className="absolute inset-0 flex items-center justify-center bg-zinc-900">
+                <div className="absolute inset-0 flex items-center justify-center bg-card">
                   <div className="text-center">
-                    <MousePointer className="h-8 w-8 mx-auto mb-2 text-zinc-600" />
-                    <p className="font-mono text-xs text-zinc-500">Click START STREAM</p>
+                    <MousePointer className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                    <p className="font-mono text-xs text-muted-foreground">Click START STREAM</p>
                   </div>
                 </div>
               )}
 
               {isLoading && (
-                <div className="absolute inset-0 flex items-center justify-center bg-zinc-900/80">
-                  <Loader2 className="h-8 w-8 animate-spin text-zinc-500" />
+                <div className="absolute inset-0 flex items-center justify-center bg-card/80">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
               )}
 
@@ -348,7 +348,7 @@ export function RemoteViewModal({
 
             {/* Click coordinates display */}
             {clickPos && (
-              <p className="font-mono text-[10px] text-zinc-500 text-center">
+              <p className="font-mono text-[10px] text-muted-foreground text-center">
                 Last tap: ({clickPos.x}, {clickPos.y})
               </p>
             )}
@@ -440,9 +440,9 @@ export function RemoteViewModal({
           {/* Right: Broadcast Targets Panel */}
           {broadcastDevices.length > 0 && (
             <div className="w-48 shrink-0">
-              <div className="rounded-md border border-zinc-800 bg-zinc-900 overflow-hidden">
-                <div className="px-3 py-2 border-b border-zinc-800 bg-zinc-800/50">
-                  <span className="font-mono text-[10px] text-zinc-500 uppercase">
+              <div className="rounded-md border border-border bg-card overflow-hidden">
+                <div className="px-3 py-2 border-b border-border bg-muted/50">
+                  <span className="font-mono text-[10px] text-muted-foreground uppercase">
                     BROADCAST TARGETS
                   </span>
                 </div>
@@ -452,25 +452,25 @@ export function RemoteViewModal({
                       key={bd.id}
                       className={cn(
                         "flex items-center gap-2 px-2 py-1.5 rounded text-xs font-mono",
-                        broadcastEnabled ? "bg-red-500/10 border border-red-500/30" : "bg-zinc-800/50"
+                        broadcastEnabled ? "bg-red-500/10 border border-red-500/30" : "bg-muted/50"
                       )}
                     >
                       <div className={cn(
                         "h-1.5 w-1.5 rounded-full",
                         bd.status === 'busy' ? "bg-yellow-500" :
-                        bd.status === 'offline' ? "bg-zinc-600" : "bg-green-500"
+                        bd.status === 'offline' ? "bg-muted-foreground" : "bg-green-500"
                       )} />
                       <span className={cn(
                         "truncate",
-                        broadcastEnabled ? "text-red-400" : "text-zinc-400"
+                        broadcastEnabled ? "text-red-400" : "text-muted-foreground"
                       )}>
                         {bd.name}
                       </span>
                     </div>
                   ))}
                 </div>
-                <div className="px-3 py-2 border-t border-zinc-800 bg-zinc-800/30">
-                  <span className="font-mono text-[10px] text-zinc-600">
+                <div className="px-3 py-2 border-t border-border bg-muted/30">
+                  <span className="font-mono text-[10px] text-muted-foreground">
                     {broadcastEnabled ? `${broadcastDevices.length} synced` : `${broadcastDevices.length} available`}
                   </span>
                 </div>

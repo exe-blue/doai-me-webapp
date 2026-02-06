@@ -6,7 +6,8 @@ import { ChevronDown } from "lucide-react";
 import { cn } from "@packages/ui/lib/utils";
 
 /**
- * Accordion - NeoBrutalist 스타일 아코디언
+ * Accordion - RetroUI NeoBrutalist 스타일 아코디언
+ * @see https://www.retroui.dev/docs/components/accordion
  */
 const Accordion = AccordionPrimitive.Root;
 
@@ -17,8 +18,7 @@ const AccordionItem = React.forwardRef<
   <AccordionPrimitive.Item
     ref={ref}
     className={cn(
-      "border-2 border-foreground bg-background",
-      "[&:not(:first-child)]:-mt-[2px]",
+      "border-2 border-border bg-background rounded text-foreground shadow-md hover:shadow-sm data-[state=open]:shadow-sm transition-all overflow-hidden",
       className
     )}
     {...props}
@@ -34,9 +34,7 @@ const AccordionTrigger = React.forwardRef<
     <AccordionPrimitive.Trigger
       ref={ref}
       className={cn(
-        "flex flex-1 items-center justify-between p-4 font-bold text-left transition-all",
-        "hover:bg-primary hover:text-primary-foreground",
-        "[&[data-state=open]]:bg-primary [&[data-state=open]]:text-primary-foreground",
+        "flex flex-1 items-start justify-between px-4 py-2 font-head cursor-pointer focus:outline-hidden",
         "[&[data-state=open]>svg]:rotate-180",
         className
       )}
@@ -55,10 +53,10 @@ const AccordionContent = React.forwardRef<
 >(({ className, children, ...props }, ref) => (
   <AccordionPrimitive.Content
     ref={ref}
-    className="overflow-hidden text-sm transition-all data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down"
+    className="overflow-hidden text-sm data-[state=open]:animate-accordion-down data-[state=closed]:animate-accordion-up"
     {...props}
   >
-    <div className={cn("p-4 border-t-2 border-foreground", className)}>{children}</div>
+    <div className={cn("px-4 pt-2 pb-4", className)}>{children}</div>
   </AccordionPrimitive.Content>
 ));
 AccordionContent.displayName = AccordionPrimitive.Content.displayName;

@@ -166,6 +166,7 @@ export class WorkflowExecutionRepository {
       error_message?: string;
       completed_devices?: number;
       failed_devices?: number;
+      started_at?: string;
     }
   ): Promise<void> {
     const update: WorkflowExecutionUpdate = { status, ...extra };
@@ -265,60 +266,79 @@ export class WorkflowExecutionRepository {
 
   /**
    * Fallback atomic increment using raw SQL via Supabase
-   * Single atomic UPDATE with conditional status change
+   * Single atomic UPDATE with conditional status change and retry on race condition
    */
   private async incrementDeviceCountFallback(
     id: string,
-    type: 'completed' | 'failed'
+    type: 'completed' | 'failed',
+    maxRetries: number = 3
   ): Promise<void> {
     const columnToIncrement = type === 'completed' ? 'completed_devices' : 'failed_devices';
     
-    // Atomic UPDATE with CASE expression for status calculation
-    // This uses a single query to increment count and conditionally update status
-    const { data, error } = await this.db
-      .from('workflow_executions')
-      .select('total_devices, completed_devices, failed_devices')
-      .eq('id', id)
-      .single();
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      // Read current state
+      const { data, error } = await this.db
+        .from('workflow_executions')
+        .select('total_devices, completed_devices, failed_devices')
+        .eq('id', id)
+        .single();
 
-    if (error || !data) return;
-
-    const newCompleted = type === 'completed' 
-      ? (data.completed_devices ?? 0) + 1 
-      : (data.completed_devices ?? 0);
-    const newFailed = type === 'failed' 
-      ? (data.failed_devices ?? 0) + 1 
-      : (data.failed_devices ?? 0);
-    const total = data.total_devices ?? 0;
-
-    // Build atomic update
-    const update: WorkflowExecutionUpdate = {
-      [columnToIncrement]: type === 'completed' ? newCompleted : newFailed,
-    };
-
-    // Check if all devices are processed
-    if (newCompleted + newFailed >= total && total > 0) {
-      if (newFailed === 0) {
-        update.status = 'completed';
-      } else if (newCompleted === 0) {
-        update.status = 'failed';
-      } else {
-        update.status = 'partial';
+      if (error || !data) {
+        if (error) throw error;
+        return; // Record not found
       }
-      update.completed_at = new Date().toISOString();
+
+      // Recompute new values on each attempt
+      const currentCompleted = data.completed_devices ?? 0;
+      const currentFailed = data.failed_devices ?? 0;
+      const newCompleted = type === 'completed' ? currentCompleted + 1 : currentCompleted;
+      const newFailed = type === 'failed' ? currentFailed + 1 : currentFailed;
+      const total = data.total_devices ?? 0;
+      const currentValue = type === 'completed' ? currentCompleted : currentFailed;
+
+      // Build atomic update
+      const update: WorkflowExecutionUpdate = {
+        [columnToIncrement]: type === 'completed' ? newCompleted : newFailed,
+      };
+
+      // Check if all devices are processed
+      if (newCompleted + newFailed >= total && total > 0) {
+        if (newFailed === 0) {
+          update.status = 'completed';
+        } else if (newCompleted === 0) {
+          update.status = 'failed';
+        } else {
+          update.status = 'partial';
+        }
+        update.completed_at = new Date().toISOString();
+      }
+
+      // Attempt update with optimistic locking
+      const { data: updateResult, error: updateError } = await this.db
+        .from('workflow_executions')
+        .update(update)
+        .eq('id', id)
+        .eq(columnToIncrement, currentValue)
+        .select('id');
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      // Check if update affected any rows (optimistic lock success)
+      if (updateResult && updateResult.length > 0) {
+        return; // Success
+      }
+
+      // No rows affected - race condition detected, retry
+      if (attempt < maxRetries) {
+        // Small delay before retry to reduce contention
+        await new Promise(resolve => setTimeout(resolve, 10 * attempt));
+      }
     }
 
-    const { error: updateError } = await this.db
-      .from('workflow_executions')
-      .update(update)
-      .eq('id', id)
-      // Use optimistic locking to detect race conditions
-      .eq(columnToIncrement, type === 'completed' ? data.completed_devices ?? 0 : data.failed_devices ?? 0);
-
-    // If update affected 0 rows due to race condition, retry once
-    if (updateError) {
-      throw updateError;
-    }
+    // Exhausted retries
+    throw new Error(`Concurrency error: failed to increment ${columnToIncrement} after ${maxRetries} attempts`);
   }
 
   // ============================================

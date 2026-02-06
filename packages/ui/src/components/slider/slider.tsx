@@ -5,7 +5,8 @@ import * as SliderPrimitive from "@radix-ui/react-slider";
 import { cn } from "@packages/ui/lib/utils";
 
 /**
- * Slider - NeoBrutalist 스타일 슬라이더
+ * Slider - RetroUI NeoBrutalist 스타일 슬라이더
+ * @see https://www.retroui.dev/docs/components/slider
  */
 const Slider = React.forwardRef<
   React.ElementRef<typeof SliderPrimitive.Root>,
@@ -19,10 +20,10 @@ const Slider = React.forwardRef<
     )}
     {...props}
   >
-    <SliderPrimitive.Track className="relative h-3 w-full grow overflow-hidden bg-muted border-2 border-foreground">
+    <SliderPrimitive.Track className="relative h-3 w-full grow overflow-hidden bg-background border-2 border-border">
       <SliderPrimitive.Range className="absolute h-full bg-primary" />
     </SliderPrimitive.Track>
-    <SliderPrimitive.Thumb className="block h-5 w-5 border-2 border-foreground bg-background shadow-[2px_2px_0px_0px] shadow-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-primary cursor-grab active:cursor-grabbing" />
+    <SliderPrimitive.Thumb className="block h-4.5 w-4.5 border-2 border-border bg-background shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50" />
   </SliderPrimitive.Root>
 ));
 Slider.displayName = SliderPrimitive.Root.displayName;

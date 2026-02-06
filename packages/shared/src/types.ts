@@ -372,6 +372,8 @@ export interface JobAssignment {
   did_comment?: boolean;
   did_playlist?: boolean;
   error_log?: string;
+  error_code?: string | null;
+  retry_count?: number;
   assigned_at: string;
   created_at: string;
   started_at?: string;

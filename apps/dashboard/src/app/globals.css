@@ -5,6 +5,7 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  /* Radius */
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -12,6 +13,8 @@
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 12px);
   --radius-4xl: calc(var(--radius) + 16px);
+
+  /* Colors */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -19,6 +22,7 @@
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
@@ -27,6 +31,7 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -43,12 +48,15 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Container */
   --container-max-width: 1200px;
   --container-padding: 1rem;
   --container-center: true;
 
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* Fonts — RetroUI NeoBrutalist */
+  --font-head: var(--font-archivo-black);
+  --font-sans: var(--font-space-grotesk);
 
   /* Grid background sizes */
   --bg-size-grid-1: 100% 100%;
@@ -58,36 +66,12 @@
   --bg-size-grid-5: 20% 100%;
   --bg-size-grid-6: calc(100% / 6) 100%;
 
-  --bg-image-grid-1: linear-gradient(
-    to right,
-    hsl(var(--border)) 1px,
-    transparent 1px
-  );
-  --bg-image-grid-2: linear-gradient(
-    to right,
-    hsl(var(--border)) 1px,
-    transparent 1px
-  );
-  --bg-image-grid-3: linear-gradient(
-    to right,
-    hsl(var(--border)) 1px,
-    transparent 1px
-  );
-  --bg-image-grid-4: linear-gradient(
-    to right,
-    hsl(var(--border)) 1px,
-    transparent 1px
-  );
-  --bg-image-grid-5: linear-gradient(
-    to right,
-    hsl(var(--border)) 1px,
-    transparent 1px
-  );
-  --bg-image-grid-6: linear-gradient(
-    to right,
-    hsl(var(--border)) 1px,
-    transparent 1px
-  );
+  --bg-image-grid-1: linear-gradient(to right, var(--border) 1px, transparent 1px);
+  --bg-image-grid-2: linear-gradient(to right, var(--border) 1px, transparent 1px);
+  --bg-image-grid-3: linear-gradient(to right, var(--border) 1px, transparent 1px);
+  --bg-image-grid-4: linear-gradient(to right, var(--border) 1px, transparent 1px);
+  --bg-image-grid-5: linear-gradient(to right, var(--border) 1px, transparent 1px);
+  --bg-image-grid-6: linear-gradient(to right, var(--border) 1px, transparent 1px);
 
   /* Animation definitions */
   --animate-marquee: marquee var(--duration) linear infinite;
@@ -104,7 +88,6 @@
     from {
       transform: translateX(0);
     }
-
     to {
       transform: translateX(calc(-100% - var(--gap)));
     }
@@ -114,7 +97,6 @@
     from {
       transform: translateY(0);
     }
-
     to {
       transform: translateY(calc(-100% - var(--gap)));
     }
@@ -130,7 +112,6 @@
     from {
       height: 0;
     }
-
     to {
       height: var(--radix-accordion-content-height);
     }
@@ -140,7 +121,6 @@
     from {
       height: var(--radix-accordion-content-height);
     }
-
     to {
       height: 0;
     }
@@ -151,7 +131,6 @@
     100% {
       transform: translate(-50%, -50%) scale(1);
     }
-
     50% {
       transform: translate(-50%, -50%) scale(0.9);
     }
@@ -161,7 +140,6 @@
     0% {
       transform: rotate(0deg) translateY(calc(var(--radius) * 1px)) rotate(0deg);
     }
-
     100% {
       transform: rotate(360deg) translateY(calc(var(--radius) * 1px))
         rotate(-360deg);
@@ -193,116 +171,106 @@
 }
 
 /* =============================================
-   DoAi.Me Yellow Theme - Based on logo #f2cb05
-   OKLCH Color System
+   DoAi.Me RetroUI Theme
+   NeoBrutalist Design System — HEX Colors
    ============================================= */
 
 :root {
   --header-height: 3.5rem;
-  --radius: 0.625rem;
+  --radius: 0.5rem;
 
-  /* Yellow Theme - Light Mode */
-  /* Logo color: #f2cb05 → oklch(0.88 0.18 95) */
-  --background: oklch(0.98 0.004 95);
-  --foreground: oklch(0.09 0.03 95);
-  --card: oklch(0.98 0.004 95);
-  --card-foreground: oklch(0.09 0.03 95);
-  --popover: oklch(0.98 0.004 95);
-  --popover-foreground: oklch(0.09 0.03 95);
+  --background: #fff;
+  --foreground: #000;
+  --card: #fff;
+  --card-foreground: #000;
+  --popover: #fff;
+  --popover-foreground: #000;
 
-  /* Primary: Yellow (#f2cb05) */
-  --primary: oklch(0.88 0.18 95);
-  --primary-foreground: oklch(0.15 0.05 95);
+  /* Primary: Yellow */
+  --primary: #ffdb33;
+  --primary-hover: #ffcc00;
+  --primary-foreground: #000;
 
-  --secondary: oklch(0.95 0.02 95);
-  --secondary-foreground: oklch(0.15 0.02 95);
-  --muted: oklch(0.96 0.01 95);
-  --muted-foreground: oklch(0.52 0.02 95);
+  --secondary: #000;
+  --secondary-foreground: #fff;
+  --muted: #cccccc;
+  --muted-foreground: #5a5a5a;
 
-  /* Accent: Light yellow */
-  --accent: oklch(0.92 0.08 95);
-  --accent-foreground: oklch(0.15 0.02 95);
+  --accent: #fae583;
+  --accent-foreground: #000;
 
-  --destructive: oklch(0.68 0.15 15);
-  --destructive-foreground: oklch(0.98 0.004 95);
-  --border: oklch(0.91 0.02 95);
-  --input: oklch(0.91 0.02 95);
-  --ring: oklch(0.88 0.18 95);
+  --destructive: #e63946;
+  --destructive-foreground: #fff;
+  --border: #000;
+  --input: #000;
+  --ring: #ffdb33;
 
-  /* Charts - Yellow-based palette */
-  --chart-1: oklch(0.88 0.18 95);
-  --chart-2: oklch(0.75 0.12 85);
-  --chart-3: oklch(0.65 0.10 75);
-  --chart-4: oklch(0.55 0.08 65);
-  --chart-5: oklch(0.45 0.06 55);
+  --chart-1: #ffdb33;
+  --chart-2: #fae583;
+  --chart-3: #e63946;
+  --chart-4: #000;
+  --chart-5: #5a5a5a;
 
-  /* Aurora colors for gradient effects */
-  --color-1: oklch(0.88 0.18 95);
-  --color-2: oklch(0.80 0.15 85);
-  --color-3: oklch(0.72 0.12 75);
-  --color-4: oklch(0.65 0.10 65);
-  --color-5: oklch(0.58 0.08 55);
+  /* Aurora colors */
+  --color-1: #ffdb33;
+  --color-2: #fae583;
+  --color-3: #e63946;
+  --color-4: #000;
+  --color-5: #5a5a5a;
 
   /* Sidebar */
-  --sidebar: oklch(0.984 0.006 95);
-  --sidebar-foreground: oklch(0.129 0.042 95);
-  --sidebar-primary: oklch(0.88 0.18 95);
-  --sidebar-primary-foreground: oklch(0.15 0.05 95);
-  --sidebar-accent: oklch(0.968 0.02 95);
-  --sidebar-accent-foreground: oklch(0.208 0.042 95);
-  --sidebar-border: oklch(0.929 0.02 95);
-  --sidebar-ring: oklch(0.88 0.18 95);
+  --sidebar: #fafafa;
+  --sidebar-foreground: #000;
+  --sidebar-primary: #ffdb33;
+  --sidebar-primary-foreground: #000;
+  --sidebar-accent: #f5f5f0;
+  --sidebar-accent-foreground: #1a1a1a;
+  --sidebar-border: #e5e5e5;
+  --sidebar-ring: #ffdb33;
 }
 
-/* =============================================
-   Dark Mode - Dev Tool Theme (MagicUI Style)
-   Deep Black backgrounds with subtle borders
-   ============================================= */
-
+/* Dark Mode */
 .dark {
-  /* Deep black backgrounds - Dev Tool aesthetic */
-  --background: oklch(0.08 0.005 0); /* Near black */
-  --foreground: oklch(0.98 0.004 0);
-  --card: oklch(0.10 0.005 0); /* Slightly lighter black */
-  --card-foreground: oklch(0.98 0.004 0);
-  --popover: oklch(0.10 0.005 0);
-  --popover-foreground: oklch(0.98 0.004 0);
+  --background: #1a1a1a;
+  --foreground: #f5f5f5;
+  --card: #242424;
+  --card-foreground: #f5f5f5;
+  --popover: #242424;
+  --popover-foreground: #f5f5f5;
 
-  /* Primary: Bright yellow for contrast */
-  --primary: oklch(0.88 0.18 95);
-  --primary-foreground: oklch(0.10 0.02 0);
+  --primary: #ffdb33;
+  --primary-hover: #ffcc00;
+  --primary-foreground: #000;
 
-  --secondary: oklch(0.18 0.005 0);
-  --secondary-foreground: oklch(0.98 0.004 0);
-  --muted: oklch(0.14 0.005 0);
-  --muted-foreground: oklch(0.60 0.01 0);
+  --secondary: #3a3a3a;
+  --secondary-foreground: #f5f5f5;
+  --muted: #3f3f46;
+  --muted-foreground: #a0a0a0;
 
-  /* Accent: Subtle highlight */
-  --accent: oklch(0.16 0.01 0);
-  --accent-foreground: oklch(0.98 0.004 0);
+  --accent: #fae583;
+  --accent-foreground: #000;
 
-  --destructive: oklch(0.55 0.20 25);
-  --destructive-foreground: oklch(0.98 0.004 0);
-  --border: oklch(0.22 0.005 0); /* zinc-800 equivalent */
-  --input: oklch(0.18 0.005 0);
-  --ring: oklch(0.88 0.18 95);
+  --destructive: #e63946;
+  --destructive-foreground: #fff;
+  --border: #5c5c5c;
+  --input: #5c5c5c;
+  --ring: #ffdb33;
 
-  /* Charts - Dark mode */
-  --chart-1: oklch(0.88 0.18 95);
-  --chart-2: oklch(0.70 0.12 85);
-  --chart-3: oklch(0.60 0.10 75);
-  --chart-4: oklch(0.50 0.08 65);
-  --chart-5: oklch(0.40 0.06 55);
+  --chart-1: #ffdb33;
+  --chart-2: #fae583;
+  --chart-3: #e63946;
+  --chart-4: #f5f5f5;
+  --chart-5: #a0a0a0;
 
-  /* Sidebar - Dev Tool Dark */
-  --sidebar: oklch(0.06 0.005 0); /* Even darker */
-  --sidebar-foreground: oklch(0.98 0.003 0);
-  --sidebar-primary: oklch(0.88 0.18 95);
-  --sidebar-primary-foreground: oklch(0.10 0.02 0);
-  --sidebar-accent: oklch(0.14 0.01 0);
-  --sidebar-accent-foreground: oklch(0.98 0.003 0);
-  --sidebar-border: oklch(0.20 0.005 0);
-  --sidebar-ring: oklch(0.88 0.18 95);
+  /* Sidebar - Dark */
+  --sidebar: #141414;
+  --sidebar-foreground: #f5f5f5;
+  --sidebar-primary: #ffdb33;
+  --sidebar-primary-foreground: #000;
+  --sidebar-accent: #2a2a2a;
+  --sidebar-accent-foreground: #f5f5f5;
+  --sidebar-border: #3a3a3a;
+  --sidebar-ring: #ffdb33;
 }
 
 /* =============================================
@@ -315,7 +283,7 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans;
   }
 
   /* Focus styles for accessibility */

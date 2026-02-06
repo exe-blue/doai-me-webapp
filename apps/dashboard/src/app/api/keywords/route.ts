@@ -7,6 +7,11 @@ import {
   getQueryParams,
 } from "@/lib/api-utils";
 
+// Escape special characters in LIKE patterns to prevent injection
+function escapeLike(str: string): string {
+  return str.replace(/[%_\\]/g, (char) => `\\${char}`);
+}
+
 // GET /api/keywords - 키워드 목록 조회
 export async function GET(request: NextRequest) {
   try {
@@ -24,7 +29,8 @@ export async function GET(request: NextRequest) {
       query = query.eq("category", category);
     }
     if (search) {
-      query = query.ilike("keyword", `%${search}%`);
+      const escapedSearch = escapeLike(search);
+      query = query.ilike("keyword", `%${escapedSearch}%`);
     }
 
     // 정렬
@@ -63,15 +69,15 @@ export async function POST(request: NextRequest) {
         return errorResponse("INVALID_KEYWORD", "키워드가 비어있습니다", 400);
       }
 
-      // 중복 확인 - use maybeSingle to properly handle "not found" vs real errors
+      // 중복 확인 - use maybeSingle to safely return null when no row is found
       const { data: existing, error: checkError } = await supabase
         .from("keywords")
         .select("id")
         .eq("keyword", keyword)
         .maybeSingle();
 
-      // Handle real DB errors (not just "not found")
-      if (checkError && checkError.code !== "PGRST116") {
+      // Handle real DB errors
+      if (checkError) {
         return errorResponse("DB_ERROR", checkError.message, 500);
       }
 

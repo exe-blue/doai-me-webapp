@@ -23,7 +23,8 @@ export async function GET(request: NextRequest) {
       sortOrder = "desc",
     } = getQueryParams(request);
 
-    let query = supabase.from("device_issues").select("*, devices!inner(device_id, name)", {
+    // Use left join to include orphaned device_issues (devices may be deleted)
+    let query = supabase.from("device_issues").select("*, devices(device_id, name)", {
       count: "exact",
     });
 

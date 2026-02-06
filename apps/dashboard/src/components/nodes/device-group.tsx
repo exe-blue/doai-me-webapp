@@ -24,12 +24,12 @@ export function DeviceGroup({
   const totalCount = devices.length;
 
   return (
-    <div className="rounded-md border border-zinc-800 bg-black dark:bg-zinc-950 overflow-hidden">
+    <div className="rounded-md border border-border bg-background overflow-hidden">
       {/* Header - Terminal style */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 bg-zinc-900/50">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card/50">
         <div className="flex items-center gap-3">
-          <Server className="h-4 w-4 text-zinc-500" />
-          <span className="font-mono text-sm font-bold text-white">
+          <Server className="h-4 w-4 text-muted-foreground" />
+          <span className="font-mono text-sm font-bold text-foreground">
             {pcId}
           </span>
         </div>
@@ -46,7 +46,7 @@ export function DeviceGroup({
               <span className="text-yellow-400">{workingCount}</span>
             </div>
           )}
-          <span className="text-zinc-600">/{totalCount}</span>
+          <span className="text-muted-foreground">/{totalCount}</span>
         </div>
       </div>
 

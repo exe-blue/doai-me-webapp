@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
       return errorResponse(error.message, 500);
     }
 
-    return successResponse(pc, '새 PC가 등록되었습니다');
+    return successResponse(pc);
   } catch (error) {
     console.error('[API] PCs POST error:', error);
     return errorResponse('Internal server error', 500);

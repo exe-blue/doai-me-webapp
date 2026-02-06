@@ -9,7 +9,7 @@ const meta: Meta<typeof Badge> = {
     layout: "centered",
     docs: {
       description: {
-        component: "RetroUI/NeoBrutalist 스타일 배지. 두꺼운 테두리와 다양한 상태 색상.",
+        component: "RetroUI NeoBrutalist 스타일 배지. 두꺼운 테두리와 다양한 상태 색상.",
       },
     },
   },
@@ -30,8 +30,10 @@ export const AllVariants: Story = {
       <Badge variant="default">Default</Badge>
       <Badge variant="primary">Primary</Badge>
       <Badge variant="secondary">Secondary</Badge>
-      <Badge variant="destructive">Destructive</Badge>
       <Badge variant="outline">Outline</Badge>
+      <Badge variant="solid">Solid</Badge>
+      <Badge variant="surface">Surface</Badge>
+      <Badge variant="destructive">Destructive</Badge>
     </div>
   ),
 };
@@ -51,7 +53,7 @@ export const AllSizes: Story = {
   render: () => (
     <div className="flex items-center gap-2">
       <Badge size="sm">Small</Badge>
-      <Badge size="default">Default</Badge>
+      <Badge size="md">Medium</Badge>
       <Badge size="lg">Large</Badge>
     </div>
   ),

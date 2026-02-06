@@ -191,7 +191,7 @@ export const JobCard = memo(function JobCard({
     
     if (job.status === 'paused') {
       return (
-        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono font-medium bg-zinc-500/20 text-zinc-400">
+        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono font-medium bg-zinc-500/20 text-muted-foreground">
           <PauseCircle className="h-3 w-3" />
           Paused
         </span>
@@ -208,7 +208,7 @@ export const JobCard = memo(function JobCard({
     }
     
     return (
-      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono font-medium bg-zinc-500/20 text-zinc-400">
+      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-mono font-medium bg-zinc-500/20 text-muted-foreground">
         <AlertCircle className="h-3 w-3" />
         {job.status}
       </span>
@@ -220,8 +220,8 @@ export const JobCard = memo(function JobCard({
       className={cn(
         'group relative overflow-hidden rounded-lg border transition-all duration-300',
         isRunning
-          ? 'border-green-500/50 bg-gradient-to-br from-green-500/5 via-zinc-900 to-zinc-900 shadow-lg shadow-green-500/10'
-          : 'border-zinc-800 bg-zinc-900/50 hover:border-zinc-700 hover:bg-zinc-900/80',
+          ? 'border-green-500/50 bg-gradient-to-br from-green-500/5 via-card to-card shadow-lg shadow-green-500/10'
+          : 'border-border bg-card/50 hover:border-border hover:bg-card/80',
         job.priority && !isRunning && 'border-l-2 border-l-yellow-500'
       )}
     >
@@ -233,7 +233,7 @@ export const JobCard = memo(function JobCard({
           href={job.target_url}
           target="_blank"
           rel="noopener noreferrer"
-          className="relative shrink-0 w-24 h-16 rounded-md overflow-hidden bg-zinc-800 cursor-pointer hover:opacity-80 transition-opacity"
+          className="relative shrink-0 w-24 h-16 rounded-md overflow-hidden bg-muted cursor-pointer hover:opacity-80 transition-opacity"
           title="YouTube에서 보기"
         >
           {thumbnailUrl ? (
@@ -245,7 +245,7 @@ export const JobCard = memo(function JobCard({
               loading="lazy"
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-zinc-600">
+            <div className="w-full h-full flex items-center justify-center text-muted-foreground">
               <PlayCircle className="h-6 w-6" />
             </div>
           )}
@@ -276,7 +276,7 @@ export const JobCard = memo(function JobCard({
                 href={job.target_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="font-mono text-sm font-semibold text-white truncate cursor-pointer hover:text-blue-400 transition-colors"
+                className="font-mono text-sm font-semibold text-foreground truncate cursor-pointer hover:text-blue-400 transition-colors"
                 title="YouTube에서 보기"
               >
                 {job.display_name || job.title}
@@ -285,7 +285,7 @@ export const JobCard = memo(function JobCard({
             </div>
             
             {/* Video Title (truncated) */}
-            <p className="font-mono text-[10px] text-zinc-500 truncate mt-0.5">
+            <p className="font-mono text-[10px] text-muted-foreground truncate mt-0.5">
               {job.title === job.display_name ? job.target_url : job.title}
             </p>
           </div>
@@ -303,10 +303,10 @@ export const JobCard = memo(function JobCard({
             ))}
             
             {/* Stats */}
-            <span className="font-mono text-[10px] text-zinc-500">
+            <span className="font-mono text-[10px] text-muted-foreground">
               <span className="text-green-400">{job.stats?.completed || 0}</span>
               /
-              <span className="text-zinc-400">{job.total_assigned || 0}</span>
+              <span className="text-muted-foreground">{job.total_assigned || 0}</span>
               {(job.stats?.failed || 0) > 0 && (
                 <span className="text-red-400 ml-1">({job.stats?.failed} fail)</span>
               )}
@@ -340,7 +340,7 @@ export const JobCard = memo(function JobCard({
                   </span>
                 </div>
                 {queuePosition > 0 && (
-                  <div className="font-mono text-[10px] text-zinc-500">
+                  <div className="font-mono text-[10px] text-muted-foreground">
                     ETA: {calculateETA(queuePosition, job.duration_sec + 30)}
                   </div>
                 )}
@@ -349,7 +349,7 @@ export const JobCard = memo(function JobCard({
             
             {/* Other: Duration */}
             {!isRunning && job.status !== 'active' && (
-              <span className="font-mono text-[10px] text-zinc-500">
+              <span className="font-mono text-[10px] text-muted-foreground">
                 {job.duration_sec}초
               </span>
             )}
@@ -362,7 +362,7 @@ export const JobCard = memo(function JobCard({
               <Button
                 size="sm"
                 variant="ghost"
-                className="h-7 w-7 p-0 hover:bg-zinc-800"
+                className="h-7 w-7 p-0 hover:bg-muted"
                 onClick={() => onOpenLogs(job)}
                 title="로그 보기"
               >
@@ -375,12 +375,12 @@ export const JobCard = memo(function JobCard({
               <Button
                 size="sm"
                 variant="ghost"
-                className="h-7 w-7 p-0 hover:bg-zinc-800"
+                className="h-7 w-7 p-0 hover:bg-muted"
                 onClick={() => onTogglePriority(job)}
                 disabled={isLoading}
                 title={job.priority ? '우선순위 해제' : '우선순위 설정'}
               >
-                <Zap className={cn('h-3.5 w-3.5', job.priority ? 'text-yellow-500' : 'text-zinc-600')} />
+                <Zap className={cn('h-3.5 w-3.5', job.priority ? 'text-yellow-500' : 'text-muted-foreground')} />
               </Button>
             )}
 
@@ -389,7 +389,7 @@ export const JobCard = memo(function JobCard({
               <Button
                 size="sm"
                 variant="ghost"
-                className="h-7 w-7 p-0 hover:bg-zinc-800"
+                className="h-7 w-7 p-0 hover:bg-muted"
                 disabled={isLoading}
                 onClick={() => onPauseResume(job)}
                 title={job.status === 'active' ? '일시정지' : '재개'}
@@ -404,7 +404,7 @@ export const JobCard = memo(function JobCard({
             <Button
               size="sm"
               variant="ghost"
-              className="h-7 w-7 p-0 hover:bg-zinc-800"
+              className="h-7 w-7 p-0 hover:bg-muted"
               disabled={isLoading}
               onClick={() => onDelete(job)}
               title="삭제"
@@ -418,7 +418,7 @@ export const JobCard = memo(function JobCard({
       {/* =========================================== */}
       {/* Bottom Progress Bar with Shimmer Animation */}
       {/* =========================================== */}
-      <div className="absolute bottom-0 left-0 w-full h-1 bg-zinc-800 overflow-hidden">
+      <div className="absolute bottom-0 left-0 w-full h-1 bg-muted overflow-hidden">
         <div
           className={cn(
             'h-full bg-gradient-to-r from-blue-500 via-purple-500 to-blue-500 transition-all duration-500 ease-out',

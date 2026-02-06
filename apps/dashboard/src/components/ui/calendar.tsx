@@ -52,6 +52,7 @@ function Calendar({
           size="icon"
           className="h-7 w-7"
           onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+          aria-label="Previous month"
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
@@ -63,6 +64,7 @@ function Calendar({
           size="icon"
           className="h-7 w-7"
           onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+          aria-label="Next month"
         >
           <ChevronRight className="h-4 w-4" />
         </Button>
@@ -81,15 +83,19 @@ function Calendar({
       </div>
 
       {/* Days */}
-      <div className="grid grid-cols-7 gap-1">
+      <div role="grid" className="grid grid-cols-7 gap-1">
         {days.map((day) => {
           const isSelected = selected && isSameDay(day, selected);
           const isCurrentDay = isToday(day);
 
           return (
             <button
+              type="button"
+              role="gridcell"
               key={day.toISOString()}
               onClick={() => onSelect?.(day)}
+              aria-pressed={isSelected}
+              aria-label={format(day, 'yyyy년 M월 d일', { locale: ko })}
               className={cn(
                 'h-9 w-9 rounded-md text-sm font-normal transition-colors',
                 'hover:bg-accent hover:text-accent-foreground',

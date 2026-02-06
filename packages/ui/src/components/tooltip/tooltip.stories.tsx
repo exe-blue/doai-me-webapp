@@ -10,7 +10,7 @@ const meta: Meta<typeof Tooltip> = {
     layout: "centered",
     docs: {
       description: {
-        component: "RetroUI/NeoBrutalist 스타일 툴팁.",
+        component: "RetroUI NeoBrutalist 스타일 툴팁.",
       },
     },
   },

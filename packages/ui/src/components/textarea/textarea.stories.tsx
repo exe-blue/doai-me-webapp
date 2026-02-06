@@ -10,7 +10,7 @@ const meta: Meta<typeof Textarea> = {
     layout: "centered",
     docs: {
       description: {
-        component: "RetroUI/NeoBrutalist 스타일 텍스트영역.",
+        component: "RetroUI NeoBrutalist 스타일 텍스트영역.",
       },
     },
   },

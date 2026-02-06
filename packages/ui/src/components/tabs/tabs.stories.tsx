@@ -9,7 +9,7 @@ const meta: Meta<typeof Tabs> = {
     layout: "centered",
     docs: {
       description: {
-        component: "RetroUI/NeoBrutalist 스타일 탭 네비게이션.",
+        component: "RetroUI NeoBrutalist 스타일 탭 네비게이션.",
       },
     },
   },

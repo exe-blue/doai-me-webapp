@@ -323,8 +323,9 @@ async function executeStep(step, context) {
           return await executeAdbCommand(deviceId, resolvedParams.command, step.timeout);
           
         case 'wait': {
+          // duration is already in milliseconds from YAML, no need to multiply by 1000
           const duration = parseInt(resolvedParams.duration) || 1000;
-          await sleep(duration * 1000);
+          await sleep(duration);
           return { waited: duration };
         }
           

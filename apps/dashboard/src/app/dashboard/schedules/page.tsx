@@ -56,6 +56,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { StatsCard } from "@/components/ui/stats-card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
@@ -836,18 +837,9 @@ export default function SchedulesPage() {
 
         {/* 통계 */}
         <div className="grid grid-cols-3 gap-4">
-          <div className="border-2 border-foreground bg-card shadow-[4px_4px_0px_0px] shadow-foreground p-4">
-            <div className="text-sm text-muted-foreground font-medium">전체 스케줄</div>
-            <div className="text-2xl font-bold text-foreground">{stats.total}</div>
-          </div>
-          <div className="border-2 border-green-600 bg-card shadow-[4px_4px_0px_0px] shadow-green-600 p-4">
-            <div className="text-sm text-muted-foreground font-medium">활성 스케줄</div>
-            <div className="text-2xl font-bold text-green-600">{stats.active}</div>
-          </div>
-          <div className="border-2 border-blue-600 bg-card shadow-[4px_4px_0px_0px] shadow-blue-600 p-4">
-            <div className="text-sm text-muted-foreground font-medium">총 실행 횟수</div>
-            <div className="text-2xl font-bold text-blue-600">{stats.totalRuns}</div>
-          </div>
+          <StatsCard label="전체 스케줄" value={stats.total} />
+          <StatsCard variant="success" label="활성 스케줄" value={stats.active} />
+          <StatsCard variant="info" label="총 실행 횟수" value={stats.totalRuns} />
         </div>
 
         {/* 검색 */}

@@ -11,7 +11,7 @@ const meta: Meta<typeof Label> = {
     layout: "centered",
     docs: {
       description: {
-        component: "RetroUI/NeoBrutalist 스타일 라벨.",
+        component: "RetroUI NeoBrutalist 스타일 라벨.",
       },
     },
   },

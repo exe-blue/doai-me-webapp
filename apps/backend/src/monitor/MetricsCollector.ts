@@ -211,31 +211,37 @@ export class MetricsCollector extends EventEmitter {
       }
     }
 
-    // Sorted Set이 없는 경우 device:* 키에서 직접 수집
+    // Sorted Set이 없는 경우 device:* 키에서 직접 수집 (using SCAN instead of KEYS to avoid blocking)
     if (result.total === 0) {
-      const deviceKeys = await this.redis.keys('device:*');
-      result.total = deviceKeys.length;
+      let cursor = '0';
+      do {
+        // Use SCAN with MATCH pattern to avoid blocking Redis
+        const [nextCursor, keys] = await this.redis.scan(cursor, 'MATCH', 'device:*', 'COUNT', 100);
+        cursor = nextCursor;
+        
+        result.total += keys.length;
 
-      for (const key of deviceKeys) {
-        const state = await this.redis.hget(key, 'state');
-        switch (state) {
-          case 'IDLE':
-            result.idle++;
-            break;
-          case 'RUNNING':
-            result.running++;
-            break;
-          case 'ERROR':
-            result.error++;
-            break;
-          case 'DISCONNECTED':
-            result.disconnected++;
-            break;
-          case 'QUARANTINE':
-            result.quarantine++;
-            break;
+        for (const key of keys) {
+          const state = await this.redis.hget(key, 'state');
+          switch (state) {
+            case 'IDLE':
+              result.idle++;
+              break;
+            case 'RUNNING':
+              result.running++;
+              break;
+            case 'ERROR':
+              result.error++;
+              break;
+            case 'DISCONNECTED':
+              result.disconnected++;
+              break;
+            case 'QUARANTINE':
+              result.quarantine++;
+              break;
+          }
         }
-      }
+      } while (cursor !== '0');
     }
 
     return result;
@@ -275,9 +281,15 @@ export class MetricsCollector extends EventEmitter {
     };
 
     try {
-      // 실행 중인 워크플로우 수
-      const runningKeys = await this.redis.keys('workflow:running:*');
-      stats.running = runningKeys.length;
+      // 실행 중인 워크플로우 수 (using SCAN instead of KEYS to avoid blocking)
+      let runningCount = 0;
+      let cursor = '0';
+      do {
+        const [nextCursor, keys] = await this.redis.scan(cursor, 'MATCH', 'workflow:running:*', 'COUNT', 100);
+        cursor = nextCursor;
+        runningCount += keys.length;
+      } while (cursor !== '0');
+      stats.running = runningCount;
 
       // 최근 5분간 완료/실패 수
       const [completedCount, failedCount] = await Promise.all([

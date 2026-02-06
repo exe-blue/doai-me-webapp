@@ -272,11 +272,19 @@ if [[ "$OS" == "macos" ]]; then
         MOUNT_POINT=$(echo "$MOUNT_OUTPUT" | grep -o '/Volumes/[^"]*' | tail -1)
         
         if [[ -n "$MOUNT_POINT" ]]; then
-            # Applications 폴더로 복사
-            cp -R "$MOUNT_POINT/DoAiMe-Agent.app" "/Applications/" 2>/dev/null || true
-            
-            hdiutil detach "$MOUNT_POINT" -quiet 2>/dev/null || true
-            print_success "설치 완료: /Applications/DoAiMe-Agent.app"
+            # Applications 폴더로 복사 with proper error handling
+            if cp -R "$MOUNT_POINT/DoAiMe-Agent.app" "/Applications/" 2>&1; then
+                # Always attempt to detach, even on success
+                hdiutil detach "$MOUNT_POINT" -quiet 2>/dev/null || true
+                print_success "설치 완료: /Applications/DoAiMe-Agent.app"
+            else
+                cp_exit_code=$?
+                # Attempt to detach before reporting error
+                hdiutil detach "$MOUNT_POINT" -quiet 2>/dev/null || true
+                print_error "Applications 폴더로 복사 실패 (exit code: $cp_exit_code)"
+                print_info "수동으로 설치해주세요: $INSTALLER_PATH"
+                exit 1
+            fi
         else
             print_warning "DMG 마운트 실패. 수동으로 설치해주세요."
         fi

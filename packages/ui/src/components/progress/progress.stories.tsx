@@ -9,7 +9,7 @@ const meta: Meta<typeof Progress> = {
     layout: "centered",
     docs: {
       description: {
-        component: "RetroUI/NeoBrutalist 스타일 진행률 표시 바.",
+        component: "RetroUI NeoBrutalist 스타일 진행률 표시 바.",
       },
     },
   },

@@ -430,8 +430,8 @@ export default function QueuePage() {
       {/* 헤더 */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">작업 대기열</h1>
-          <p className="text-sm text-zinc-400">
+          <h1 className="text-2xl font-head text-foreground">작업 대기열</h1>
+          <p className="text-sm text-muted-foreground">
             실행 대기 중인 작업을 관리합니다
           </p>
         </div>
@@ -637,24 +637,24 @@ export default function QueuePage() {
 
       {/* 통계 카드 */}
       <div className="grid grid-cols-5 gap-4">
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-          <div className="text-sm text-zinc-400">대기중</div>
-          <div className="text-2xl font-bold text-white">{stats.pending}</div>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <div className="text-sm text-muted-foreground">대기중</div>
+          <div className="text-2xl font-bold text-foreground">{stats.pending}</div>
         </div>
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-          <div className="text-sm text-zinc-400">실행중</div>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <div className="text-sm text-muted-foreground">실행중</div>
           <div className="text-2xl font-bold text-green-500">{stats.running}</div>
         </div>
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-          <div className="text-sm text-zinc-400">완료</div>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <div className="text-sm text-muted-foreground">완료</div>
           <div className="text-2xl font-bold text-emerald-500">{stats.completed}</div>
         </div>
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-          <div className="text-sm text-zinc-400">실패</div>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <div className="text-sm text-muted-foreground">실패</div>
           <div className="text-2xl font-bold text-red-500">{stats.failed}</div>
         </div>
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
-          <div className="text-sm text-zinc-400">가용 디바이스</div>
+        <div className="rounded-lg border border-border bg-card/50 p-4">
+          <div className="text-sm text-muted-foreground">가용 디바이스</div>
           <div className="text-2xl font-bold text-blue-500">{totalOnlineDevices}</div>
         </div>
       </div>
@@ -662,16 +662,16 @@ export default function QueuePage() {
       {/* 필터 & 검색 & 벌크 액션 */}
       <div className="flex items-center gap-4">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="영상 제목, ID 검색..."
-            className="pl-10 bg-zinc-900 border-zinc-700"
+            className="pl-10 bg-card border-border"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-32 bg-zinc-900 border-zinc-700">
+          <SelectTrigger className="w-32 bg-card border-border">
             <SelectValue placeholder="상태" />
           </SelectTrigger>
           <SelectContent>
@@ -689,8 +689,8 @@ export default function QueuePage() {
         </Button>
 
         {selectedItems.size > 0 && (
-          <div className="flex items-center gap-2 ml-4 pl-4 border-l border-zinc-700">
-            <span className="text-sm text-zinc-400">
+          <div className="flex items-center gap-2 ml-4 pl-4 border-l border-border">
+            <span className="text-sm text-muted-foreground">
               {selectedItems.size}개 선택
             </span>
             <Button
@@ -720,11 +720,11 @@ export default function QueuePage() {
       </div>
 
       {/* 테이블 */}
-      <div className="rounded-lg border border-zinc-800 bg-zinc-900/50">
+      <div className="rounded-lg border border-border bg-card/50">
         <Table>
           <TableHeader>
-            <TableRow className="border-zinc-800 hover:bg-transparent">
-              <TableHead className="text-zinc-400 w-[40px]">
+            <TableRow className="border-border hover:bg-transparent">
+              <TableHead className="text-muted-foreground w-[40px]">
                 <Checkbox
                   checked={
                     filteredItems.length > 0 &&
@@ -733,25 +733,25 @@ export default function QueuePage() {
                   onCheckedChange={toggleSelectAll}
                 />
               </TableHead>
-              <TableHead className="text-zinc-400 w-[300px]">영상</TableHead>
-              <TableHead className="text-zinc-400">노드/디바이스</TableHead>
-              <TableHead className="text-zinc-400">우선순위</TableHead>
-              <TableHead className="text-zinc-400">상태</TableHead>
-              <TableHead className="text-zinc-400">재시도</TableHead>
-              <TableHead className="text-zinc-400">생성일</TableHead>
-              <TableHead className="text-zinc-400 w-[50px]"></TableHead>
+              <TableHead className="text-muted-foreground w-[300px]">영상</TableHead>
+              <TableHead className="text-muted-foreground">노드/디바이스</TableHead>
+              <TableHead className="text-muted-foreground">우선순위</TableHead>
+              <TableHead className="text-muted-foreground">상태</TableHead>
+              <TableHead className="text-muted-foreground">재시도</TableHead>
+              <TableHead className="text-muted-foreground">생성일</TableHead>
+              <TableHead className="text-muted-foreground w-[50px]"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
                 <TableCell colSpan={8} className="text-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin mx-auto text-zinc-500" />
+                  <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
                 </TableCell>
               </TableRow>
             ) : filteredItems.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-zinc-500">
+                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                   대기열이 비어 있습니다
                 </TableCell>
               </TableRow>
@@ -759,7 +759,7 @@ export default function QueuePage() {
               filteredItems.map((item) => {
                 const StatusIcon = statusConfig[item.status]?.icon || Clock;
                 return (
-                  <TableRow key={item.id} className="border-zinc-800">
+                  <TableRow key={item.id} className="border-border">
                     {/* 체크박스 */}
                     <TableCell>
                       <Checkbox
@@ -778,13 +778,13 @@ export default function QueuePage() {
                             `https://img.youtube.com/vi/${item.video_id}/mqdefault.jpg`
                           }
                           alt=""
-                          className="h-10 w-16 rounded object-cover bg-zinc-800"
+                          className="h-10 w-16 rounded object-cover bg-muted"
                         />
                         <div className="flex-1 min-w-0">
-                          <div className="font-medium text-white truncate text-sm">
+                          <div className="font-medium text-foreground truncate text-sm">
                             {item.video?.title || item.video_id}
                           </div>
-                          <div className="text-xs text-zinc-500">
+                          <div className="text-xs text-muted-foreground">
                             {item.video?.channel_name}
                           </div>
                         </div>
@@ -796,20 +796,20 @@ export default function QueuePage() {
                       {item.node_id || item.device_id ? (
                         <div className="text-sm">
                           {item.node_id && (
-                            <div className="flex items-center gap-1 text-zinc-400">
+                            <div className="flex items-center gap-1 text-muted-foreground">
                               <Server className="h-3 w-3" />
                               {item.node_id}
                             </div>
                           )}
                           {item.device_id && (
-                            <div className="flex items-center gap-1 text-zinc-500">
+                            <div className="flex items-center gap-1 text-muted-foreground">
                               <Smartphone className="h-3 w-3" />
                               {item.device_id.slice(0, 8)}...
                             </div>
                           )}
                         </div>
                       ) : (
-                        <span className="text-zinc-500 text-sm">미할당</span>
+                        <span className="text-muted-foreground text-sm">미할당</span>
                       )}
                     </TableCell>
 
@@ -845,12 +845,12 @@ export default function QueuePage() {
                     </TableCell>
 
                     {/* 재시도 */}
-                    <TableCell className="text-zinc-400">
+                    <TableCell className="text-muted-foreground">
                       {item.retry_count || 0}/{item.max_retries || 3}
                     </TableCell>
 
                     {/* 생성일 */}
-                    <TableCell className="text-zinc-400">
+                    <TableCell className="text-muted-foreground">
                       {formatTimeAgo(item.created_at)}
                     </TableCell>
 

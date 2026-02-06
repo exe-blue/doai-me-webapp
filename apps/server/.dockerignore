@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+env/
+.env
+*.egg-info/
+.eggs/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitignore
+
+# Tests
+tests/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Docs
+docs/
+*.md
+!README.md
+
+# Other
+.DS_Store
+Thumbs.db
+*.log

@@ -48,6 +48,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { StatsCard } from "@/components/ui/stats-card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
@@ -317,6 +318,7 @@ export default function KeywordsPage() {
 
     if (error) {
       console.error("상태 변경 실패:", error);
+      alert(`키워드 상태 변경에 실패했습니다: ${error.message}`);
     } else {
       fetchKeywords();
     }
@@ -385,7 +387,7 @@ export default function KeywordsPage() {
             </DialogHeader>
 
             {/* 모드 전환 탭 */}
-            <div className="flex gap-2 border-b border-zinc-700 pb-2">
+            <div className="flex gap-2 border-b border-border pb-2">
               <Button
                 variant={isBulkMode ? "ghost" : "secondary"}
                 size="sm"
@@ -414,7 +416,7 @@ export default function KeywordsPage() {
                       onChange={(e) => setBulkKeywords(e.target.value)}
                       rows={8}
                     />
-                    <p className="text-xs text-zinc-500">
+                    <p className="text-xs text-muted-foreground">
                       {bulkKeywords.split("\n").filter((k) => k.trim()).length}개
                       키워드
                     </p>
@@ -503,8 +505,8 @@ export default function KeywordsPage() {
                     </div>
                   </div>
 
-                  <div className="space-y-4 rounded-lg border border-zinc-700 p-4">
-                    <h4 className="font-medium text-white">필터링 조건</h4>
+                  <div className="space-y-4 rounded-lg border border-border p-4">
+                    <h4 className="font-medium text-foreground">필터링 조건</h4>
 
                     <div className="space-y-2">
                       <Label>최소 조회수: {newKeyword.min_views.toLocaleString()}</Label>
@@ -578,20 +580,9 @@ export default function KeywordsPage() {
 
       {/* 통계 카드 */}
       <div className="grid grid-cols-3 gap-4">
-        <div className="border-2 border-foreground bg-card shadow-[4px_4px_0px_0px] shadow-foreground p-4">
-          <div className="text-sm text-muted-foreground font-medium">전체 키워드</div>
-          <div className="text-2xl font-bold text-foreground">{stats.total}</div>
-        </div>
-        <div className="border-2 border-foreground bg-card shadow-[4px_4px_0px_0px] shadow-foreground p-4">
-          <div className="text-sm text-muted-foreground font-medium">활성 키워드</div>
-          <div className="text-2xl font-bold text-green-600">{stats.active}</div>
-        </div>
-        <div className="border-2 border-foreground bg-card shadow-[4px_4px_0px_0px] shadow-foreground p-4">
-          <div className="text-sm text-muted-foreground font-medium">총 발견 영상</div>
-          <div className="text-2xl font-bold text-blue-600">
-            {stats.totalDiscovered.toLocaleString()}
-          </div>
-        </div>
+        <StatsCard label="전체 키워드" value={stats.total} />
+        <StatsCard variant="success" label="활성 키워드" value={stats.active} />
+        <StatsCard variant="info" label="총 발견 영상" value={stats.totalDiscovered.toLocaleString()} />
       </div>
 
       {/* 필터 & 검색 */}
@@ -829,8 +820,8 @@ export default function KeywordsPage() {
                 </div>
               </div>
 
-              <div className="space-y-4 rounded-lg border border-zinc-700 p-4">
-                <h4 className="font-medium text-white">필터링 조건</h4>
+              <div className="space-y-4 rounded-lg border border-border p-4">
+                <h4 className="font-medium text-foreground">필터링 조건</h4>
 
                 <div className="space-y-2">
                   <Label>최소 조회수: {editingKeyword.min_views.toLocaleString()}</Label>

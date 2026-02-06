@@ -302,24 +302,24 @@ export default function SystemLogsPage() {
         {/* 헤더 */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-white flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
               <ScrollText className="h-6 w-6" />
               시스템 로그
             </h1>
-            <p className="text-sm text-zinc-400">
+            <p className="text-sm text-muted-foreground">
               시스템 전체 로그를 실시간으로 모니터링합니다
             </p>
           </div>
 
           <div className="flex items-center gap-3">
             {/* 실시간 토글 */}
-            <div className="flex items-center gap-2 px-3 py-2 border border-zinc-700 rounded-lg bg-zinc-900">
+            <div className="flex items-center gap-2 px-3 py-2 border border-border rounded-lg bg-card">
               {isLive ? (
                 <Pause className="h-4 w-4 text-green-500" />
               ) : (
-                <Play className="h-4 w-4 text-zinc-400" />
+                <Play className="h-4 w-4 text-muted-foreground" />
               )}
-              <Label htmlFor="live-mode" className="text-sm cursor-pointer text-zinc-300">
+              <Label htmlFor="live-mode" className="text-sm cursor-pointer text-foreground">
                 실시간
               </Label>
               <Switch
@@ -358,8 +358,8 @@ export default function SystemLogsPage() {
             return (
               <div
                 key={level}
-                className={`cursor-pointer transition-all rounded-lg border p-4 bg-zinc-900/50 ${
-                  levelFilter === level ? config.borderColor + " border-2" : "border-zinc-800"
+                className={`cursor-pointer transition-all rounded-lg border p-4 bg-card/50 ${
+                  levelFilter === level ? config.borderColor + " border-2" : "border-border"
                 }`}
                 onClick={() =>
                   setLevelFilter(levelFilter === level ? "all" : level)
@@ -367,7 +367,7 @@ export default function SystemLogsPage() {
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs text-zinc-400">
+                    <p className="text-xs text-muted-foreground">
                       {config.label}
                     </p>
                     <p className={`text-2xl font-bold ${config.color}`}>
@@ -384,17 +384,17 @@ export default function SystemLogsPage() {
         {/* 필터 */}
         <div className="flex items-center gap-4">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="메시지, 컴포넌트 검색..."
-              className="pl-10 bg-zinc-900 border-zinc-700"
+              className="pl-10 bg-card border-border"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
 
           <Select value={timeRange} onValueChange={setTimeRange}>
-            <SelectTrigger className="w-32 bg-zinc-900 border-zinc-700">
+            <SelectTrigger className="w-32 bg-card border-border">
               <Calendar className="mr-2 h-4 w-4" />
               <SelectValue />
             </SelectTrigger>
@@ -407,7 +407,7 @@ export default function SystemLogsPage() {
           </Select>
 
           <Select value={sourceFilter} onValueChange={setSourceFilter}>
-            <SelectTrigger className="w-36 bg-zinc-900 border-zinc-700">
+            <SelectTrigger className="w-36 bg-card border-border">
               <SelectValue placeholder="소스" />
             </SelectTrigger>
             <SelectContent>
@@ -421,7 +421,7 @@ export default function SystemLogsPage() {
           </Select>
 
           <Select value={nodeFilter} onValueChange={setNodeFilter}>
-            <SelectTrigger className="w-28 bg-zinc-900 border-zinc-700">
+            <SelectTrigger className="w-28 bg-card border-border">
               <SelectValue placeholder="노드" />
             </SelectTrigger>
             <SelectContent>
@@ -453,20 +453,20 @@ export default function SystemLogsPage() {
             </Button>
           )}
 
-          <div className="text-sm text-zinc-500">
+          <div className="text-sm text-muted-foreground">
             {filteredLogs.length.toLocaleString()}건
           </div>
         </div>
 
         {/* 로그 목록 */}
-        <div className="border border-zinc-800 rounded-lg bg-black">
+        <div className="border border-border rounded-lg bg-background">
           <ScrollArea className="h-[600px]" ref={scrollRef}>
             {loading ? (
               <div className="flex items-center justify-center py-20">
-                <Loader2 className="h-8 w-8 animate-spin text-zinc-500" />
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
             ) : filteredLogs.length === 0 ? (
-              <div className="text-center py-20 text-zinc-500">
+              <div className="text-center py-20 text-muted-foreground">
                 로그가 없습니다
               </div>
             ) : (
@@ -483,7 +483,7 @@ export default function SystemLogsPage() {
                       onOpenChange={() => hasDetails && toggleExpand(log.id)}
                     >
                       <div
-                        className={`group border-b border-zinc-800 hover:bg-zinc-900/50 ${
+                        className={`group border-b border-border hover:bg-card/50 ${
                           log.level === "error" ? "bg-red-950/20" : ""
                         }`}
                       >
@@ -493,14 +493,14 @@ export default function SystemLogsPage() {
                             <div className="w-4 mt-0.5">
                               {hasDetails &&
                                 (isExpanded ? (
-                                  <ChevronDown className="h-4 w-4 text-zinc-500" />
+                                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
                                 ) : (
-                                  <ChevronRight className="h-4 w-4 text-zinc-500" />
+                                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
                                 ))}
                             </div>
 
                             {/* 타임스탬프 */}
-                            <span className="text-zinc-500 whitespace-nowrap">
+                            <span className="text-muted-foreground whitespace-nowrap">
                               {formatTime(new Date(log.timestamp))}
                             </span>
 
@@ -535,7 +535,7 @@ export default function SystemLogsPage() {
                             )}
 
                             {/* 메시지 */}
-                            <span className="text-zinc-200 flex-1 truncate">
+                            <span className="text-foreground flex-1 truncate">
                               {log.message}
                             </span>
 
@@ -571,9 +571,9 @@ export default function SystemLogsPage() {
                           <div className="px-4 pb-3 pl-10 space-y-2">
                             {/* 메타데이터 */}
                             {log.details && (
-                              <div className="p-3 bg-zinc-900 rounded text-xs">
-                                <div className="text-zinc-400 mb-1">Details:</div>
-                                <pre className="text-zinc-300">
+                              <div className="p-3 bg-card rounded text-xs">
+                                <div className="text-muted-foreground mb-1">Details:</div>
+                                <pre className="text-foreground">
                                   {JSON.stringify(log.details, null, 2)}
                                 </pre>
                               </div>
@@ -591,7 +591,7 @@ export default function SystemLogsPage() {
 
                             {/* Request ID */}
                             {log.request_id && (
-                              <div className="text-xs text-zinc-500">
+                              <div className="text-xs text-muted-foreground">
                                 Request ID: {log.request_id}
                               </div>
                             )}
@@ -607,7 +607,7 @@ export default function SystemLogsPage() {
         </div>
 
         {/* 하단 정보 */}
-        <div className="flex items-center justify-between text-sm text-zinc-500">
+        <div className="flex items-center justify-between text-sm text-muted-foreground">
           <div>
             표시 중: {filteredLogs.length.toLocaleString()} / 전체:{" "}
             {logs.length.toLocaleString()}건

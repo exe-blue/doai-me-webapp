@@ -125,5 +125,5 @@ main().catch((error) => {
 
 // Export for programmatic usage
 export { YouTubeWorker, YouTubeWorkerConfig } from './YouTubeWorker';
-export { WatchHandler, HumanSimulator } from './handlers';
-export type { WatchJobParams, WatchJobResultData, HumanSimulatorConfig, ScrollDirection } from './handlers';
+export { WatchHandler, HumanSimulator, SurfHandler } from './handlers';
+export type { WatchJobParams, WatchJobResultData, HumanSimulatorConfig, ScrollDirection, SurfJobParams, SurfJobResultData } from './handlers';

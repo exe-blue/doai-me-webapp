@@ -6,27 +6,31 @@ import { Check } from "lucide-react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@packages/ui/lib/utils";
 
+/**
+ * RetroUI Checkbox variants
+ * @see https://www.retroui.dev/docs/components/checkbox
+ */
 const checkboxVariants = cva(
-  "peer shrink-0 border-2 border-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+  "border-2 border-border rounded disabled:cursor-not-allowed disabled:opacity-50",
   {
     variants: {
       variant: {
         default:
           "data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground",
         outline:
-          "data-[state=checked]:bg-background data-[state=checked]:text-foreground",
+          "",
         solid:
           "data-[state=checked]:bg-foreground data-[state=checked]:text-background",
       },
       size: {
         sm: "h-4 w-4",
-        default: "h-5 w-5",
+        md: "h-5 w-5",
         lg: "h-6 w-6",
       },
     },
     defaultVariants: {
       variant: "default",
-      size: "default",
+      size: "md",
     },
   }
 );
@@ -36,7 +40,7 @@ export interface CheckboxProps
     VariantProps<typeof checkboxVariants> {}
 
 /**
- * Checkbox - RetroUI/NeoBrutalist 스타일 체크박스
+ * Checkbox - RetroUI NeoBrutalist 스타일 체크박스
  */
 const Checkbox = React.forwardRef<
   React.ElementRef<typeof CheckboxPrimitive.Root>,
@@ -47,10 +51,8 @@ const Checkbox = React.forwardRef<
     className={cn(checkboxVariants({ variant, size }), className)}
     {...props}
   >
-    <CheckboxPrimitive.Indicator
-      className={cn("flex items-center justify-center text-current")}
-    >
-      <Check className="h-4 w-4" strokeWidth={3} />
+    <CheckboxPrimitive.Indicator className="h-full w-full">
+      <Check className="h-full w-full" />
     </CheckboxPrimitive.Indicator>
   </CheckboxPrimitive.Root>
 ));

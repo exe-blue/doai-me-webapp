@@ -51,7 +51,7 @@ const DialogContent: React.FC<
       {...props}
     >
       {children}
-      <DialogPrimitive.Close className="absolute top-4 right-4 p-1 border-2 border-foreground hover:bg-primary hover:text-primary-foreground transition-colors disabled:pointer-events-none">
+      <DialogPrimitive.Close className="absolute top-4 right-4 p-1 border-2 border-foreground hover:bg-primary hover:text-primary-foreground transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:opacity-50 disabled:pointer-events-none">
         <X className="h-4 w-4" />
         <span className="sr-only">닫기</span>
       </DialogPrimitive.Close>

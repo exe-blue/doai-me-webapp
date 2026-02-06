@@ -52,10 +52,15 @@ export async function GET(request: NextRequest) {
       query = query.lte("started_at", dateTo);
     }
 
-    // 정렬
-    const validSortFields = ["started_at", "completed_at", "actual_watch_seconds"];
-    const sortField = validSortFields.includes(sortBy) ? sortBy : "started_at";
-    query = query.order(sortField, { ascending: sortOrder === "asc", nullsFirst: false });
+    // 정렬 - Map API field names to DB column names
+    const sortFieldMap: Record<string, string> = {
+      "started_at": "started_at",
+      "duration": "actual_watch_seconds",
+    };
+    const validApiSortFields = ["started_at", "duration"];
+    const apiSortField = validApiSortFields.includes(sortBy) ? sortBy : "started_at";
+    const dbSortField = sortFieldMap[apiSortField];
+    query = query.order(dbSortField, { ascending: sortOrder === "asc", nullsFirst: false });
 
     // 페이지네이션
     const from = (page - 1) * pageSize;

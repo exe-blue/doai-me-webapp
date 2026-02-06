@@ -59,16 +59,16 @@ export function BroadcastControl({
 
   return (
     <div className={cn(
-      'rounded-md border border-zinc-800 bg-black dark:bg-zinc-950 overflow-hidden transition-all',
+      'rounded-md border border-border bg-background overflow-hidden transition-all',
       isActive && 'ring-1 ring-blue-500/50 border-blue-500/50'
     )}>
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 bg-zinc-900/50">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card/50">
         <div className="flex items-center gap-3">
-          <Radio className="h-4 w-4 text-zinc-500" />
+          <Radio className="h-4 w-4 text-muted-foreground" />
           <div>
-            <span className="font-mono text-sm font-bold text-white">BROADCAST_CONTROL</span>
-            <p className="font-mono text-[10px] text-zinc-500 mt-0.5">
+            <span className="font-mono text-sm font-bold text-foreground">BROADCAST_CONTROL</span>
+            <p className="font-mono text-[10px] text-muted-foreground mt-0.5">
               Sync master actions to slaves
             </p>
           </div>
@@ -78,10 +78,10 @@ export function BroadcastControl({
           size="sm"
           onClick={onToggleActive}
           className={cn(
-            'font-mono text-xs border-zinc-700',
+            'font-mono text-xs border-border',
             isActive
               ? 'bg-blue-500/20 border-blue-500 text-blue-400 hover:bg-blue-500/30'
-              : 'hover:border-zinc-600 hover:bg-zinc-900'
+              : 'hover:border-border hover:bg-card'
           )}
         >
           {isActive ? (
@@ -101,7 +101,7 @@ export function BroadcastControl({
       <div className="p-4 space-y-4">
         {/* Master Selection */}
         <div>
-          <label className="font-mono text-[10px] text-zinc-500 uppercase block mb-2">
+          <label className="font-mono text-[10px] text-muted-foreground uppercase block mb-2">
             Master Device
           </label>
           <div className="flex flex-wrap gap-1.5">
@@ -111,10 +111,10 @@ export function BroadcastControl({
                 onClick={() => onMasterChange(masterDeviceId === device.id ? null : device.id)}
                 className={cn(
                   'px-2 py-1 rounded text-xs font-mono transition-all',
-                  'border border-zinc-700 hover:border-zinc-600',
+                  'border border-border hover:border-border',
                   masterDeviceId === device.id
                     ? 'bg-blue-500/20 border-blue-500 text-blue-400'
-                    : 'bg-zinc-900 text-zinc-400 hover:bg-zinc-800'
+                    : 'bg-card text-muted-foreground hover:bg-muted'
                 )}
               >
                 {getDeviceName(device)}
@@ -122,7 +122,7 @@ export function BroadcastControl({
             ))}
           </div>
           {masterDevice && (
-            <p className="font-mono text-[10px] text-zinc-600 mt-2">
+            <p className="font-mono text-[10px] text-muted-foreground mt-2">
               Selected: {getDeviceName(masterDevice)}
             </p>
           )}
@@ -131,7 +131,7 @@ export function BroadcastControl({
         {/* Slave Selection */}
         <div>
           <div className="flex items-center justify-between mb-2">
-            <label className="font-mono text-[10px] text-zinc-500 uppercase">
+            <label className="font-mono text-[10px] text-muted-foreground uppercase">
               Slave Devices
             </label>
             <button
@@ -145,7 +145,7 @@ export function BroadcastControl({
                   }
                 });
               }}
-              className="flex items-center gap-1 font-mono text-[10px] text-zinc-500 hover:text-zinc-400 transition-colors"
+              className="flex items-center gap-1 font-mono text-[10px] text-muted-foreground hover:text-muted-foreground transition-colors"
             >
               <Users className="h-3 w-3" />
               SELECT_ALL
@@ -163,16 +163,16 @@ export function BroadcastControl({
                     checked={slaveDeviceIds.includes(device.id)}
                     onCheckedChange={() => onSlaveToggle(device.id)}
                     disabled={!isActive}
-                    className="border-zinc-600 data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
+                    className="border-border data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
                   />
-                  <span className="font-mono text-xs text-zinc-500 group-hover:text-zinc-400 transition-colors">
+                  <span className="font-mono text-xs text-muted-foreground group-hover:text-muted-foreground transition-colors">
                     {getDeviceName(device)}
                   </span>
                 </label>
               ))}
           </div>
           {slaveDeviceIds.length > 0 && (
-            <p className="font-mono text-[10px] text-zinc-600 mt-2">
+            <p className="font-mono text-[10px] text-muted-foreground mt-2">
               {slaveDeviceIds.length} devices selected
             </p>
           )}
@@ -181,7 +181,7 @@ export function BroadcastControl({
         {/* Quick Commands */}
         {isActive && masterDeviceId && slaveDeviceIds.length > 0 && (
           <div>
-            <label className="font-mono text-[10px] text-zinc-500 uppercase block mb-2">
+            <label className="font-mono text-[10px] text-muted-foreground uppercase block mb-2">
               Quick Commands
             </label>
             <div className="flex gap-1.5">
@@ -190,7 +190,7 @@ export function BroadcastControl({
                 size="sm"
                 onClick={() => handleCommand('keyevent', { keycode: 4 })}
                 disabled={isBroadcasting}
-                className="font-mono text-xs border-zinc-700 hover:border-zinc-600 hover:bg-zinc-900"
+                className="font-mono text-xs border-border hover:border-border hover:bg-card"
               >
                 <ArrowLeft className="h-3 w-3 mr-1" />
                 BACK
@@ -200,7 +200,7 @@ export function BroadcastControl({
                 size="sm"
                 onClick={() => handleCommand('keyevent', { keycode: 3 })}
                 disabled={isBroadcasting}
-                className="font-mono text-xs border-zinc-700 hover:border-zinc-600 hover:bg-zinc-900"
+                className="font-mono text-xs border-border hover:border-border hover:bg-card"
               >
                 <Home className="h-3 w-3 mr-1" />
                 HOME
@@ -210,7 +210,7 @@ export function BroadcastControl({
                 size="sm"
                 onClick={() => handleCommand('tap', { x: 540, y: 1200 })}
                 disabled={isBroadcasting}
-                className="font-mono text-xs border-zinc-700 hover:border-zinc-600 hover:bg-zinc-900"
+                className="font-mono text-xs border-border hover:border-border hover:bg-card"
               >
                 <MousePointer className="h-3 w-3 mr-1" />
                 TAP
@@ -221,14 +221,14 @@ export function BroadcastControl({
 
         {/* Status */}
         {isActive && (
-          <div className="flex items-center gap-2 pt-3 border-t border-zinc-800">
+          <div className="flex items-center gap-2 pt-3 border-t border-border">
             <div className={cn(
               'w-2 h-2 rounded-full',
               masterDeviceId && slaveDeviceIds.length > 0
                 ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]'
                 : 'bg-yellow-500 shadow-[0_0_8px_rgba(234,179,8,0.5)]'
             )} />
-            <span className="font-mono text-xs text-zinc-500">
+            <span className="font-mono text-xs text-muted-foreground">
               {masterDeviceId && slaveDeviceIds.length > 0
                 ? 'BROADCAST_READY'
                 : 'SELECT_MASTER_AND_SLAVES'

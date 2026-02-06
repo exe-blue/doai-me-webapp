@@ -10,7 +10,7 @@ const meta: Meta<typeof Switch> = {
     layout: "centered",
     docs: {
       description: {
-        component: "RetroUI/NeoBrutalist 스타일 토글 스위치.",
+        component: "RetroUI NeoBrutalist 스타일 토글 스위치.",
       },
     },
   },

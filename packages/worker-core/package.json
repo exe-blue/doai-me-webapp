@@ -24,6 +24,11 @@
       "types": "./dist/DeviceManager.d.ts",
       "import": "./dist/DeviceManager.js",
       "require": "./dist/DeviceManager.js"
+    },
+    "./human-simulator": {
+      "types": "./dist/HumanSimulator.d.ts",
+      "import": "./dist/HumanSimulator.js",
+      "require": "./dist/HumanSimulator.js"
     }
   },
   "scripts": {

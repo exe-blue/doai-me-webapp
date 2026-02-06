@@ -9,7 +9,7 @@
 /**
  * Types of workers in the system
  */
-export type WorkerType = 'youtube' | 'install' | 'scrape' | 'generic';
+export type WorkerType = 'youtube' | 'install' | 'health' | 'scrape' | 'generic';
 
 /**
  * All available worker types as a const array for runtime validation
@@ -17,6 +17,7 @@ export type WorkerType = 'youtube' | 'install' | 'scrape' | 'generic';
 export const WORKER_TYPES: readonly WorkerType[] = [
   'youtube',
   'install',
+  'health',
   'scrape',
   'generic',
 ] as const;

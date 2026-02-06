@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS job_assignments (
   job_id UUID NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
   device_id UUID NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
   device_serial TEXT,  -- 호환성을 위해 유지 (non-FK, 정보성)
-  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'running', 'completed', 'failed')),
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'paused', 'running', 'completed', 'failed', 'cancelled')),
   progress_pct INTEGER NOT NULL DEFAULT 0,
   final_duration_sec INTEGER,
   did_like BOOLEAN DEFAULT false,
@@ -57,6 +57,8 @@ CREATE TABLE IF NOT EXISTS job_assignments (
   did_playlist BOOLEAN DEFAULT false,
   search_success BOOLEAN DEFAULT false,  -- 검색으로 영상을 찾았는지 여부
   error_log TEXT,
+  error_code TEXT,                        -- 에러 코드 (E1001~E4001)
+  retry_count INTEGER NOT NULL DEFAULT 0 CHECK (retry_count >= 0 AND retry_count <= 10),
   assigned_at TIMESTAMPTZ DEFAULT NOW(),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   started_at TIMESTAMPTZ,

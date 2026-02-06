@@ -3,7 +3,7 @@
 
 appId: com.doai.agent
 productName: DoAi.Me Agent
-copyright: Copyright © 2026 DoAi Inc.
+copyright: Copyright © 2024–2026 DoAi Inc.
 
 # 빌드 디렉토리 설정
 directories:
@@ -44,8 +44,8 @@ extraResources:
 win:
   target:
     - target: nsis
-      arch: [x64]
-  icon: resources/icons/icon.ico
+      arch: [x64, ia32]
+  icon: resources/icon.ico
   artifactName: "${productName}-Setup-${version}.${ext}"
   publisherName: "DoAi Inc."
   signAndEditExecutable: false
@@ -85,7 +85,7 @@ mac:
       arch: [x64, arm64]
     - target: zip
       arch: [x64, arm64]
-  icon: resources/icons/icon.icns
+  icon: resources/icon.icns
   category: public.app-category.utilities
   hardenedRuntime: true
   gatekeeperAssess: false
@@ -125,10 +125,7 @@ linux:
 
 deb:
   depends:
-    - gconf2
-    - gconf-service
     - libnotify4
-    - libappindicator1
     - libxtst6
     - libnss3
     - android-tools-adb
@@ -166,7 +163,9 @@ asarUnpack:
 compression: maximum
 
 # 빌드 버전 자동 증가 (CI/CD용)
-buildVersion: ${env.BUILD_NUMBER}
+# NOTE: CI pipeline must export BUILD_NUMBER environment variable
+# For local builds without BUILD_NUMBER, this will default to empty which uses package.json version
+buildVersion: ${env.BUILD_NUMBER:-0}
 
 # 프로토콜 핸들러 (deep link)
 protocols:

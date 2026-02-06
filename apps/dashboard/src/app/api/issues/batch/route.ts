@@ -66,46 +66,29 @@ export async function POST(request: NextRequest) {
         });
 
         if (error) {
-          // Fallback: if RPC doesn't exist, use raw SQL via rpc
-          const { data: fallbackData, error: fallbackError } = await supabase
+          // Fallback: Update status first, then call RPC to increment separately
+          const { data: statusData, error: statusError } = await supabase
             .from("device_issues")
-            .update({
-              status: "in_progress",
-              recovery_attempts: supabase.rpc("increment_recovery_attempts"),
-            } as never)
+            .update({ status: "in_progress" })
             .in("id", issue_ids)
             .eq("auto_recoverable", true)
-            .select();
+            .select("id");
 
-          // If fallback also fails, try simple update without increment
-          if (fallbackError) {
-            const { data: simpleData, error: simpleError } = await supabase
-              .from("device_issues")
-              .update({ status: "in_progress" })
-              .in("id", issue_ids)
-              .eq("auto_recoverable", true)
-              .select("id, recovery_attempts");
-
-            if (simpleError) {
-              return errorResponse("DB_ERROR", simpleError.message, 500);
-            }
-
-            // Atomic increment using raw SQL expression
-            if (simpleData && simpleData.length > 0) {
-              const ids = simpleData.map((d) => d.id);
-              await supabase.rpc("exec_sql", {
-                query: `UPDATE device_issues SET recovery_attempts = COALESCE(recovery_attempts, 0) + 1 WHERE id = ANY($1)`,
-                params: [ids],
-              }).catch(() => {
-                // If exec_sql doesn't exist, silently continue (status was already updated)
-              });
-            }
-
-            affected = simpleData?.length || 0;
-            break;
+          if (statusError) {
+            return errorResponse("DB_ERROR", statusError.message, 500);
           }
 
-          affected = fallbackData?.length || 0;
+          // Try to increment recovery_attempts via RPC
+          const { error: incrementError } = await supabase.rpc("increment_recovery_attempts", {
+            ids: issue_ids,
+          });
+
+          if (incrementError) {
+            // Log warning but don't fail - status update succeeded
+            console.warn("[API] Failed to increment recovery_attempts:", incrementError.message);
+          }
+
+          affected = statusData?.length || 0;
           break;
         }
 

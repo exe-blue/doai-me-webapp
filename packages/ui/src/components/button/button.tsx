@@ -6,37 +6,37 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@packages/ui/lib/utils";
 
 /**
- * RetroUI 스타일 버튼 variants
- * NeoBrutalist 디자인: 두꺼운 테두리, 그림자, 호버 시 이동 효과
+ * RetroUI 버튼 variants
+ * @see https://www.retroui.dev/docs/components/button
  */
 export const buttonVariants = cva(
-  "font-medium transition-all duration-200 inline-flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed disabled:pointer-events-none",
+  "font-head transition-all rounded outline-hidden cursor-pointer duration-200 font-medium flex justify-center items-center disabled:opacity-60 disabled:cursor-not-allowed",
   {
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground border-2 border-foreground shadow-[4px_4px_0px_0px] shadow-foreground hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px] active:translate-x-[4px] active:translate-y-[4px] active:shadow-none",
+          "shadow-md hover:shadow active:shadow-none bg-primary text-primary-foreground border-2 border-border transition hover:translate-y-1 active:translate-y-2 active:translate-x-1 hover:bg-primary-hover",
         secondary:
-          "bg-secondary text-secondary-foreground border-2 border-foreground shadow-[4px_4px_0px_0px] shadow-primary hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px] active:translate-x-[4px] active:translate-y-[4px] active:shadow-none",
+          "shadow-md hover:shadow active:shadow-none bg-secondary shadow-primary text-secondary-foreground border-2 border-border transition hover:translate-y-1 active:translate-y-2 active:translate-x-1",
         destructive:
-          "bg-destructive text-destructive-foreground border-2 border-foreground shadow-[4px_4px_0px_0px] shadow-foreground hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px] active:translate-x-[4px] active:translate-y-[4px] active:shadow-none",
+          "shadow-md hover:shadow active:shadow-none bg-destructive text-destructive-foreground border-2 border-border transition hover:translate-y-1 active:translate-y-2 active:translate-x-1",
         outline:
-          "bg-background text-foreground border-2 border-foreground shadow-[4px_4px_0px_0px] shadow-foreground hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px] active:translate-x-[4px] active:translate-y-[4px] active:shadow-none",
+          "shadow-md hover:shadow active:shadow-none bg-transparent border-2 border-border transition hover:translate-y-1 active:translate-y-2 active:translate-x-1",
         ghost:
           "bg-transparent hover:bg-accent border-2 border-transparent",
         link:
-          "bg-transparent text-primary underline-offset-4 hover:underline border-none",
+          "bg-transparent hover:underline",
       },
       size: {
-        sm: "h-8 px-3 text-sm",
-        default: "h-10 px-4 text-base",
-        lg: "h-12 px-6 text-lg",
-        icon: "h-10 w-10 p-2",
+        sm: "px-3 py-1 text-sm shadow hover:shadow-none",
+        md: "px-4 py-1.5 text-base",
+        lg: "px-6 lg:px-8 py-2 lg:py-3 text-md lg:text-lg",
+        icon: "p-2",
       },
     },
     defaultVariants: {
       variant: "default",
-      size: "default",
+      size: "md",
     },
   }
 );
@@ -48,8 +48,7 @@ export interface ButtonProps
 }
 
 /**
- * Button - RetroUI/NeoBrutalist 스타일 버튼
- * 두꺼운 테두리와 그림자, 호버 시 이동 효과
+ * Button - RetroUI NeoBrutalist 스타일 버튼
  */
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, asChild = false, ...props }, ref) => {

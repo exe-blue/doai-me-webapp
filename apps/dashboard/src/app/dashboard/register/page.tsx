@@ -215,7 +215,7 @@ export default function RegisterPage() {
     <div className="space-y-6 max-w-2xl mx-auto">
       {/* Header */}
       <div className="text-center">
-        <h1 className="text-2xl font-mono font-bold text-foreground flex items-center justify-center gap-2">
+        <h1 className="text-2xl font-head text-foreground flex items-center justify-center gap-2">
           <Sparkles className="h-6 w-6 text-primary" />
           작업등록
         </h1>
@@ -226,7 +226,7 @@ export default function RegisterPage() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'video' | 'channel')}>
-        <TabsList className="w-full bg-black border border-zinc-800">
+        <TabsList className="w-full bg-background border border-border">
           <TabsTrigger
             value="video"
             className="flex-1 gap-2 font-mono data-[state=active]:bg-blue-600 data-[state=active]:text-white"
@@ -246,7 +246,7 @@ export default function RegisterPage() {
         {/* Tab A: 단일 영상 (Target Attack) */}
         <TabsContent value="video" className="space-y-4 mt-4">
           {/* 기본 정보 Card */}
-          <Card className="bg-black border-zinc-800">
+          <Card className="bg-background border-border">
             <CardHeader className="pb-4">
               <CardTitle className="font-mono text-sm flex items-center gap-2">
                 <Youtube className="h-4 w-4 text-red-500" />
@@ -259,7 +259,7 @@ export default function RegisterPage() {
             <CardContent className="space-y-4">
               {/* Video URL */}
               <div className="space-y-2">
-                <Label className="font-mono text-xs text-zinc-400 uppercase">
+                <Label className="font-mono text-xs text-muted-foreground uppercase">
                   영상 URL <span className="text-red-500">*</span>
                 </Label>
                 <Input
@@ -267,14 +267,14 @@ export default function RegisterPage() {
                   placeholder="https://youtu.be/..."
                   value={videoUrl}
                   onChange={(e) => setVideoUrl(e.target.value)}
-                  className="font-mono text-sm bg-zinc-900 border-zinc-800 focus:border-primary"
+                  className="font-mono text-sm bg-card border-border focus:border-primary"
                 />
               </div>
 
               {/* Target Views & Display Name */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label className="font-mono text-xs text-zinc-400 uppercase flex items-center gap-2">
+                  <Label className="font-mono text-xs text-muted-foreground uppercase flex items-center gap-2">
                     <Target className="h-3 w-3 text-orange-500" />
                     목표 조회수
                   </Label>
@@ -284,11 +284,11 @@ export default function RegisterPage() {
                     value={targetViews}
                     onChange={(e) => setTargetViews(e.target.value)}
                     min={1}
-                    className="font-mono text-sm bg-zinc-900 border-zinc-800"
+                    className="font-mono text-sm bg-card border-border"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="font-mono text-xs text-zinc-400 uppercase flex items-center gap-2">
+                  <Label className="font-mono text-xs text-muted-foreground uppercase flex items-center gap-2">
                     <FileText className="h-3 w-3 text-purple-500" />
                     작업명 (비워두면 자동 생성)
                   </Label>
@@ -297,7 +297,7 @@ export default function RegisterPage() {
                     placeholder="자동 생성됨"
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
-                    className="font-mono text-sm bg-zinc-900 border-zinc-800"
+                    className="font-mono text-sm bg-card border-border"
                   />
                 </div>
               </div>
@@ -305,7 +305,7 @@ export default function RegisterPage() {
           </Card>
 
           {/* 행동 패턴 설정 Accordion */}
-          <Card className="bg-black border-zinc-800">
+          <Card className="bg-background border-border">
             <Accordion type="single" collapsible defaultValue="behavior">
               <AccordionItem value="behavior" className="border-b-0">
                 <CardHeader className="pb-0">
@@ -321,7 +321,7 @@ export default function RegisterPage() {
                     {/* Watch Duration - Dual Thumb Slider */}
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
-                        <Label className="font-mono text-xs text-zinc-400 uppercase flex items-center gap-2">
+                        <Label className="font-mono text-xs text-muted-foreground uppercase flex items-center gap-2">
                           <Clock className="h-3 w-3 text-cyan-500" />
                           시청 시간 범위
                         </Label>
@@ -337,22 +337,22 @@ export default function RegisterPage() {
                         step={10}
                         className="w-full"
                       />
-                      <p className="font-mono text-[10px] text-zinc-500">
+                      <p className="font-mono text-[10px] text-muted-foreground">
                         각 기기가 무작위로 이 범위 내에서 시청합니다 (10초 ~ 10분)
                       </p>
                     </div>
 
-                    <div className="h-px bg-zinc-800" />
+                    <div className="h-px bg-border" />
 
                     {/* Interactions Header */}
-                    <p className="font-mono text-xs text-zinc-500 uppercase">상호작용 확률</p>
+                    <p className="font-mono text-xs text-muted-foreground uppercase">상호작용 확률</p>
 
                     {/* Like Probability */}
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <ThumbsUp className="h-4 w-4 text-blue-500" />
-                          <span className="font-mono text-sm text-zinc-300">👍 좋아요</span>
+                          <span className="font-mono text-sm text-foreground">👍 좋아요</span>
                         </div>
                         <span className="font-mono text-sm font-bold text-blue-400">{likeProb[0]}%</span>
                       </div>
@@ -370,7 +370,7 @@ export default function RegisterPage() {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <MessageSquare className="h-4 w-4 text-green-500" />
-                          <span className="font-mono text-sm text-zinc-300">💬 댓글</span>
+                          <span className="font-mono text-sm text-foreground">💬 댓글</span>
                         </div>
                         <span className="font-mono text-sm font-bold text-green-400">{commentProb[0]}%</span>
                       </div>
@@ -388,7 +388,7 @@ export default function RegisterPage() {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <UserPlus className="h-4 w-4 text-red-500" />
-                          <span className="font-mono text-sm text-zinc-300">🔔 구독</span>
+                          <span className="font-mono text-sm text-foreground">🔔 구독</span>
                         </div>
                         <span className="font-mono text-sm font-bold text-red-400">{subscribeProb[0]}%</span>
                       </div>
@@ -407,12 +407,12 @@ export default function RegisterPage() {
           </Card>
 
           {/* 댓글 관리 Card */}
-          <Card className="bg-black border-zinc-800">
+          <Card className="bg-background border-border">
             <CardHeader className="pb-4">
               <CardTitle className="font-mono text-sm flex items-center gap-2">
                 <MessageSquare className="h-4 w-4 text-green-500" />
                 댓글 관리
-                <span className="text-[10px] text-zinc-500 font-normal">(선택사항)</span>
+                <span className="text-[10px] text-muted-foreground font-normal">(선택사항)</span>
               </CardTitle>
               <CardDescription className="font-mono text-xs">
                 직접 입력하거나 비워두면 AI가 자동 생성합니다
@@ -424,12 +424,12 @@ export default function RegisterPage() {
                 value={comments}
                 onChange={(e) => setComments(e.target.value)}
                 rows={4}
-                className="font-mono text-sm bg-zinc-900 border-zinc-800 resize-none"
+                className="font-mono text-sm bg-card border-border resize-none"
               />
               {comments.trim() && (
                 <div className="flex items-center gap-2">
                   <AlertCircle className="h-3 w-3 text-amber-500" />
-                  <p className="font-mono text-[10px] text-zinc-500">
+                  <p className="font-mono text-[10px] text-muted-foreground">
                     수동 입력:{' '}
                     <span className="text-amber-400 font-bold">
                       {comments.split('\n').filter((c) => c.trim()).length}개
@@ -479,7 +479,7 @@ export default function RegisterPage() {
                 <Tv className="h-5 w-5 text-green-500 mt-0.5 shrink-0" />
                 <div>
                   <p className="font-mono text-sm text-green-400 font-bold">채널 자동 모니터링</p>
-                  <p className="font-mono text-xs text-zinc-400 mt-1">
+                  <p className="font-mono text-xs text-muted-foreground mt-1">
                     등록된 채널에서 새 영상이 업로드되면 자동으로 작업이 생성됩니다.
                     채널 확인 주기는 약 30분입니다.
                   </p>
@@ -489,7 +489,7 @@ export default function RegisterPage() {
           </Card>
 
           {/* Channel Info Card */}
-          <Card className="bg-black border-zinc-800">
+          <Card className="bg-background border-border">
             <CardHeader className="pb-4">
               <CardTitle className="font-mono text-sm flex items-center gap-2">
                 <Youtube className="h-4 w-4 text-red-500" />
@@ -502,7 +502,7 @@ export default function RegisterPage() {
             <CardContent className="space-y-4">
               {/* Channel Name */}
               <div className="space-y-2">
-                <Label className="font-mono text-xs text-zinc-400 uppercase flex items-center gap-2">
+                <Label className="font-mono text-xs text-muted-foreground uppercase flex items-center gap-2">
                   <FileText className="h-3 w-3 text-purple-500" />
                   채널명 <span className="text-red-500">*</span>
                 </Label>
@@ -511,13 +511,13 @@ export default function RegisterPage() {
                   placeholder="예: 맛있는 요리 채널"
                   value={channelName}
                   onChange={(e) => setChannelName(e.target.value)}
-                  className="font-mono text-sm bg-zinc-900 border-zinc-800"
+                  className="font-mono text-sm bg-card border-border"
                 />
               </div>
 
               {/* Channel URL */}
               <div className="space-y-2">
-                <Label className="font-mono text-xs text-zinc-400 uppercase flex items-center gap-2">
+                <Label className="font-mono text-xs text-muted-foreground uppercase flex items-center gap-2">
                   <Youtube className="h-3 w-3 text-red-500" />
                   채널 URL <span className="text-red-500">*</span>
                 </Label>
@@ -526,9 +526,9 @@ export default function RegisterPage() {
                   placeholder="https://youtube.com/@channel"
                   value={channelUrl}
                   onChange={(e) => setChannelUrl(e.target.value)}
-                  className="font-mono text-sm bg-zinc-900 border-zinc-800"
+                  className="font-mono text-sm bg-card border-border"
                 />
-                <p className="font-mono text-[10px] text-zinc-500">
+                <p className="font-mono text-[10px] text-muted-foreground">
                   @핸들, /channel/ID, /c/이름 형식 모두 지원됩니다
                 </p>
               </div>

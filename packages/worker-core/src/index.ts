@@ -48,3 +48,11 @@ export {
   BaseWorker,
   type BaseWorkerEvents,
 } from './BaseWorker';
+
+// HumanSimulator exports
+export {
+  HumanSimulator,
+  DEFAULT_HUMAN_SIMULATOR_CONFIG,
+  type HumanSimulatorConfig,
+  type ScrollDirection,
+} from './HumanSimulator';
