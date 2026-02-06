@@ -189,8 +189,12 @@ export class ScreenMirrorSocketService extends EventEmitter {
           resolve();
         });
 
-        this.httpServer.on('error', reject);
+        this.httpServer.on('error', (error) => {
+          console.error(`[SocketService] HTTP 서버 오류:`, error);
+          reject(error);
+        });
       } catch (error) {
+        console.error(`[SocketService] 서버 시작 실패:`, error);
         reject(error);
       }
     });
@@ -232,14 +236,23 @@ export class ScreenMirrorSocketService extends EventEmitter {
       });
 
       ws.on('error', (error) => {
-        console.error(`[SocketService] 클라이언트 오류 (${sessionId}):`, error.message);
+        console.error(`[SocketService] 클라이언트 오류 (${sessionId}, device=${deviceSerial}):`, error.message);
+        this.sessions.delete(sessionId);
       });
 
       // Pong 타임스탬프로 RTT 측정
       ws.on('pong', (data: Buffer) => {
-        const sentTime = data.readDoubleLE(0);
-        const rtt = Date.now() - sentTime;
-        this.latencyTracker.record(rtt / 2); // 단방향 레이턴시 추정
+        try {
+          if (data.length < 8) {
+            console.error(`[SocketService] Pong 데이터 크기 부족 (${sessionId}): ${data.length} < 8`);
+            return;
+          }
+          const sentTime = data.readDoubleLE(0);
+          const rtt = Date.now() - sentTime;
+          this.latencyTracker.record(rtt / 2); // 단방향 레이턴시 추정
+        } catch (error) {
+          console.error(`[SocketService] Pong 처리 오류 (${sessionId}):`, error);
+        }
       });
     });
   }
@@ -271,8 +284,14 @@ export class ScreenMirrorSocketService extends EventEmitter {
     }
 
     // 헤더 파싱 (Zero-copy)
-    const header = parseFrameHeader(buffer);
-    
+    let header: FrameHeader;
+    try {
+      header = parseFrameHeader(buffer);
+    } catch (error) {
+      console.error(`[SocketService] 프레임 헤더 파싱 실패 (${session.id}):`, error);
+      return;
+    }
+
     // 레이턴시 계산 (클라이언트 타임스탬프 기준)
     const latency = receiveTime - header.timestamp;
     this.latencyTracker.record(latency);
@@ -320,8 +339,8 @@ export class ScreenMirrorSocketService extends EventEmitter {
         default:
           console.log(`[SocketService] 알 수 없는 명령: ${cmd.type}`);
       }
-    } catch {
-      console.warn(`[SocketService] 잘못된 제어 메시지: ${message.substring(0, 50)}`);
+    } catch (error) {
+      console.error(`[SocketService] 제어 메시지 처리 오류 (${session.id}):`, error, `| 원본: ${message.substring(0, 100)}`);
     }
   }
 
@@ -340,7 +359,11 @@ export class ScreenMirrorSocketService extends EventEmitter {
     // 해당 디바이스를 보는 모든 클라이언트에게 전송
     for (const session of this.sessions.values()) {
       if (session.deviceSerial === deviceSerial && session.ws.readyState === WebSocket.OPEN) {
-        session.ws.send(frameBuffer);
+        session.ws.send(frameBuffer, (error) => {
+          if (error) {
+            console.error(`[SocketService] 프레임 전송 실패 (${session.id}, device=${deviceSerial}):`, error.message);
+          }
+        });
       }
     }
   }
@@ -359,14 +382,24 @@ export class ScreenMirrorSocketService extends EventEmitter {
     return new Promise((resolve) => {
       // 모든 연결 종료
       for (const session of this.sessions.values()) {
-        session.ws.close();
+        try {
+          session.ws.close();
+        } catch (error) {
+          console.error(`[SocketService] 세션 종료 실패 (${session.id}):`, error);
+        }
       }
       this.sessions.clear();
 
       if (this.wss) {
-        this.wss.close(() => {
+        this.wss.close((error) => {
+          if (error) {
+            console.error('[SocketService] WebSocket 서버 종료 오류:', error);
+          }
           if (this.httpServer) {
-            this.httpServer.close(() => {
+            this.httpServer.close((error) => {
+              if (error) {
+                console.error('[SocketService] HTTP 서버 종료 오류:', error);
+              }
               console.log('[SocketService] 서버 중지됨');
               resolve();
             });

@@ -25,6 +25,7 @@ import {
   Server,
   Cpu,
   UserPlus,
+  PlusCircle,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -55,9 +56,11 @@ const navigation: NavigationGroup[] = [
         href: '/dashboard/queue',
         icon: ListTodo,
         children: [
+          { label: '작업 관리', href: '/dashboard/jobs', icon: ListTodo },
           { label: '대기열', href: '/dashboard/queue', icon: Clock },
           { label: '진행 중', href: '/dashboard/running', icon: Activity },
           { label: '스케줄러', href: '/dashboard/schedules', icon: Calendar },
+          { label: '작업 등록', href: '/dashboard/register', icon: PlusCircle },
         ],
       },
     ],
@@ -85,6 +88,7 @@ const navigation: NavigationGroup[] = [
         href: '/dashboard/reports/daily',
         icon: BarChart3,
         children: [
+          { label: '진행 보기', href: '/dashboard/analytics', icon: Activity },
           { label: '일일 리포트', href: '/dashboard/reports/daily', icon: FileText },
           { label: '완료 내역', href: '/dashboard/reports/history', icon: CheckCircle },
         ],
@@ -107,13 +111,13 @@ export default function DashboardLayout({
   return (
     <SocketProvider>
       <SidebarProvider>
-        <div className="flex h-screen overflow-hidden bg-black dark:bg-zinc-950">
+        <div className="flex h-screen overflow-hidden bg-background">
           {/* Sidebar */}
           <AppSidebar
             navigation={navigation}
             logo={
               <Link href="/dashboard" className="flex items-center gap-2">
-                <span className="font-mono text-lg font-bold text-white">DoAi.Me</span>
+                <span className="font-head text-lg font-bold text-sidebar-foreground">DoAi.Me</span>
               </Link>
             }
           />
@@ -127,7 +131,7 @@ export default function DashboardLayout({
             />
 
             {/* Page content */}
-            <main id="main-content" className="flex-1 overflow-y-auto p-4 bg-zinc-950">
+            <main id="main-content" className="flex-1 overflow-y-auto p-4 bg-background">
               {children}
             </main>
           </div>
