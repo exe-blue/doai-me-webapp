@@ -23,17 +23,24 @@ import * as path from 'path';
 // ============================================
 
 const CONFIG = {
-  BACKEND_URL: process.env.BACKEND_URL || 'http://158.247.210.152:4000',
-  // Backend가 사용하는 Supabase 프로젝트 (vyfxrplzhskncigyfkaz)
-  // 로컬 .env.local과 다를 수 있으므로 여기서 명시
-  SUPABASE_URL: process.env.E2E_SUPABASE_URL || 'https://vyfxrplzhskncigyfkaz.supabase.co',
-  SUPABASE_SERVICE_ROLE_KEY: process.env.E2E_SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ5ZnhycGx6aHNrbmNpZ3lma2F6Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2NzAxMTMyOSwiZXhwIjoyMDgyNTg3MzI5fQ.CSRg_9dPTxuMMwCSIhyB9Z6Zh4601BRiOy4WAd-yZo0',
+  get BACKEND_URL() { return process.env.BACKEND_URL || 'http://158.247.210.152:4000'; },
+  get SUPABASE_URL() { return process.env.E2E_SUPABASE_URL || ''; },
+  get SUPABASE_SERVICE_ROLE_KEY() { return process.env.E2E_SUPABASE_SERVICE_ROLE_KEY || ''; },
   TEST_VIDEO_URL: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
   TEST_DURATION_SEC: 30,
   MAX_DEVICES: 5,
   POLL_INTERVAL_MS: 3000,
   TIMEOUT_MS: 120_000, // 2분
 };
+
+function validateConfig(): void {
+  if (!CONFIG.SUPABASE_URL) {
+    throw new Error('E2E_SUPABASE_URL environment variable is required');
+  }
+  if (!CONFIG.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error('E2E_SUPABASE_SERVICE_ROLE_KEY environment variable is required');
+  }
+}
 
 // .env.local에서 환경변수 로드
 function loadEnv(): void {
@@ -261,7 +268,7 @@ async function ensureDevicesInDb(
           serial_number: d.serial,
           name: d.deviceId,
           state: 'IDLE',
-          ip_address: d.serial.replace(':5555', ''),
+          ip_address: d.serial.split(':')[0],
           connection_type: 'wifi',
         })
         .select('id')
@@ -520,6 +527,10 @@ function verifyResults(results: AssignmentResult[]): boolean {
   }
 
   // 50% 이상 성공이면 PASS (네트워크/디바이스 이슈 허용)
+  if (results.length === 0) {
+    log('=== TEST FAILED (no assignments to verify) ===');
+    return false;
+  }
   const successRate = completed.length / results.length;
   const passed = successRate >= 0.5;
 
@@ -564,6 +575,7 @@ async function main(): Promise<void> {
 
   // 환경변수 로드
   loadEnv();
+  validateConfig();
 
   const supabaseUrl = CONFIG.SUPABASE_URL;
   const supabaseKey = CONFIG.SUPABASE_SERVICE_ROLE_KEY;

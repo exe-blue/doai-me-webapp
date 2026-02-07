@@ -10,7 +10,7 @@ DO $$ BEGIN
   ) THEN
     ALTER TABLE devices ADD CONSTRAINT devices_serial_number_unique UNIQUE (serial_number);
   END IF;
-EXCEPTION WHEN duplicate_table THEN NULL;
+EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
 -- 2. video_executions.video_id → videos.id (TEXT → TEXT)

@@ -14,7 +14,6 @@ for (const p of candidates) {
     const token = fs.readFileSync(p, 'utf8').trim();
     if (token) {
       console.log('FOUND at', p);
-      console.log('TOKEN=' + token.substring(0, 15) + '...');
       process.exit(0);
     }
   } catch {}
@@ -31,7 +30,6 @@ for (const p of settingsCandidates) {
     const token = settings.access_token || settings.token || '';
     if (token) {
       console.log('FOUND in', p);
-      console.log('TOKEN=' + token.substring(0, 15) + '...');
       process.exit(0);
     }
   } catch {}

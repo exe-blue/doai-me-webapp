@@ -47,8 +47,6 @@ function BreadcrumbPage({ className, ...props }: React.ComponentProps<"span">) {
   return (
     <span
       data-slot="breadcrumb-page"
-      role="link"
-      aria-disabled="true"
       aria-current="page"
       className={cn(className)}
       {...props}
@@ -82,7 +80,6 @@ function BreadcrumbEllipsis({
     <span
       data-slot="breadcrumb-ellipsis"
       role="presentation"
-      aria-hidden="true"
       className={cn("flex size-9 items-center justify-center", className)}
       {...props}
     >

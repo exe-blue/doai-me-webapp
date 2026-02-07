@@ -11,31 +11,6 @@ if (!SERVICE_ROLE_KEY) {
   process.exit(1);
 }
 
-async function query(sql) {
-  // Use the Supabase Management API via the project's DB connection
-  // POST to /rest/v1/rpc/exec_sql won't work unless we create that function
-  // Instead, use pg_net extension or direct DB pooler connection
-
-  // Try using the Supabase pooler connection string
-  const dbUrl = `postgresql://postgres.zmvwwwrslkbcafyzfuhb:${process.env.DB_PASSWORD}@aws-0-ap-south-1.pooler.supabase.com:6543/postgres`;
-
-  // Since we might not have pg client, let's use the Management API
-  const resp = await fetch(`${SUPABASE_URL}/rest/v1/rpc/exec_sql`, {
-    method: 'POST',
-    headers: {
-      'apikey': SERVICE_ROLE_KEY,
-      'Authorization': `Bearer ${SERVICE_ROLE_KEY}`,
-      'Content-Type': 'application/json',
-      'Prefer': 'return=representation',
-    },
-    body: JSON.stringify({ sql }),
-  });
-
-  if (resp.ok) {
-    return { success: true, data: await resp.json() };
-  }
-  return { success: false, error: await resp.text(), status: resp.status };
-}
 
 async function main() {
   console.log('=== Step 1: Create exec_sql function ===');
@@ -46,12 +21,6 @@ async function main() {
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
     db: { schema: 'public' },
   });
-
-  // Check current constraints first
-  console.log('\n=== Checking existing constraints ===');
-  const { data: constraints, error: cErr } = await supabase
-    .from('information_schema.table_constraints' in {} ? 'table_constraints' : 'pg_catalog.pg_constraint')
-    .select('*');
 
   // Direct approach: try the FK join and see what happens
   console.log('\n=== Testing video_executions → videos FK ===');
@@ -98,21 +67,24 @@ $$;
       process.exit(1);
     }
 
-    // exec_sql exists, run migrations
+    // exec_sql exists, run migrations atomically
+    const statements = [];
     if (e1) {
-      console.log('\nAdding FK: video_executions.video_id → videos.id');
-      const { error } = await supabase.rpc('exec_sql', {
-        sql: `ALTER TABLE video_executions ADD CONSTRAINT fk_video_executions_video_id FOREIGN KEY (video_id) REFERENCES videos(id) ON DELETE CASCADE;`
-      });
-      console.log(error ? `FAIL: ${error.message}` : 'OK');
+      statements.push(`ALTER TABLE video_executions ADD CONSTRAINT fk_video_executions_video_id FOREIGN KEY (video_id) REFERENCES videos(id) ON DELETE CASCADE;`);
+    }
+    if (e2) {
+      statements.push(`ALTER TABLE device_issues ADD CONSTRAINT fk_device_issues_device_serial FOREIGN KEY (device_id) REFERENCES devices(serial_number) ON DELETE CASCADE;`);
     }
 
-    if (e2) {
-      console.log('\nAdding FK: device_issues.device_id → devices.serial_number');
-      const { error } = await supabase.rpc('exec_sql', {
-        sql: `ALTER TABLE device_issues ADD CONSTRAINT fk_device_issues_device_serial FOREIGN KEY (device_id) REFERENCES devices(serial_number) ON DELETE CASCADE;`
-      });
-      console.log(error ? `FAIL: ${error.message}` : 'OK');
+    if (statements.length > 0) {
+      const sql = `BEGIN; ${statements.join(' ')} COMMIT;`;
+      console.log('\nExecuting migration transaction...');
+      const { error } = await supabase.rpc('exec_sql', { sql });
+      if (error) {
+        console.error(`Migration FAILED: ${error.message}`);
+        process.exit(1);
+      }
+      console.log('Migration completed successfully.');
     }
   }
 

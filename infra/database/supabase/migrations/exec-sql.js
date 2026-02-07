@@ -5,26 +5,6 @@
 const { execSync } = require('child_process');
 const PROJECT_REF = 'zmvwwwrslkbcafyzfuhb';
 
-// Get access token from supabase CLI by reading its stored credentials
-function getAccessToken() {
-  try {
-    // The CLI stores its token; we can extract it by calling the CLI
-    // and intercepting the API call. Let's use the v1 API directly.
-    const output = execSync('npx supabase --debug projects list 2>&1', {
-      encoding: 'utf8',
-      timeout: 15000,
-    });
-    // Extract the access token from debug output
-    const match = output.match(/Bearer\s+(\S+)/);
-    if (match) return match[1];
-
-    // Alternative: the CLI might use OS credential store
-    // Let's just use the Management API endpoint directly
-    return null;
-  } catch {
-    return null;
-  }
-}
 
 async function runSQL(sql, accessToken) {
   const url = `https://api.supabase.com/v1/projects/${PROJECT_REF}/database/query`;
@@ -70,7 +50,11 @@ async function main() {
         const content = fs.readFileSync(p, 'utf8').trim();
         if (content.startsWith('{')) {
           const creds = JSON.parse(content);
-          token = creds.access_token || creds.token || Object.values(creds)[0];
+          token = creds.access_token || creds.token;
+          if (!token) {
+            console.warn(`Unknown credential format in ${p}, skipping`);
+            continue;
+          }
         } else {
           token = content;
         }
@@ -82,18 +66,8 @@ async function main() {
     }
   }
 
-  // Last resort: use wincred or keytar to read from Windows Credential Manager
-  if (!token) {
-    try {
-      // Supabase CLI v2 stores tokens in the OS keychain
-      // On Windows, it uses wincred via keyring
-      const output = execSync(
-        'powershell -Command "[System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String((cmdkey /list | Select-String supabase).ToString().Split()[0]))"',
-        { encoding: 'utf8', timeout: 5000 }
-      );
-      if (output.trim()) token = output.trim();
-    } catch {}
-  }
+  // Windows Credential Manager extraction not implemented.
+  // Use SUPABASE_ACCESS_TOKEN env var or run: npx supabase login
 
   if (!token) {
     console.error('Cannot find Supabase access token.');
@@ -147,7 +121,9 @@ async function main() {
         SELECT 1 FROM pg_constraint
         WHERE conname = 'devices_serial_number_unique'
         OR (conrelid = 'devices'::regclass AND contype = 'u'
-            AND array_length(conkey, 1) = 1)
+            AND conkey @> ARRAY[(SELECT attnum FROM pg_attribute
+                                 WHERE attrelid = 'devices'::regclass
+                                 AND attname = 'serial_number')])
       ) THEN
         ALTER TABLE devices ADD CONSTRAINT devices_serial_number_unique UNIQUE (serial_number);
         RAISE NOTICE 'UNIQUE constraint added to devices.serial_number';
