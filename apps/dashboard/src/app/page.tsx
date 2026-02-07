@@ -1,5 +1,11 @@
+"use client";
+
+import { useEffect, useState } from 'react';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { LoginButton } from '@/components/auth/login-button';
+import { WarpBackground } from '@/components/ui/warp-background';
+import { useSocket } from '@/hooks/use-socket';
+import { Loader } from '@packages/ui';
 import Link from 'next/link';
 import Image from 'next/image';
 import {
@@ -19,7 +25,6 @@ import {
   CheckCircle,
   ScrollText,
   Settings,
-  Skull,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -28,6 +33,14 @@ interface BentoLink {
   href: string;
   icon: LucideIcon;
   description: string;
+}
+
+interface DeviceStats {
+  total: number;
+  online: number;
+  offline: number;
+  busy: number;
+  error: number;
 }
 
 const menuLinks: BentoLink[] = [
@@ -52,8 +65,53 @@ const menuLinks: BentoLink[] = [
 const placeholderCount = 4;
 
 export default function BentoPage() {
+  const { isConnected } = useSocket();
+  const [deviceStats, setDeviceStats] = useState<DeviceStats | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchDeviceStats() {
+      try {
+        const response = await fetch('/api/devices/overview?limit=1000');
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.data?.stats) {
+            setDeviceStats(data.data.stats);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch device stats:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    fetchDeviceStats();
+  }, []);
+
+  const stats = [
+    {
+      label: '디바이스',
+      value: deviceStats?.total?.toString() || '0',
+      isLoading,
+    },
+    { label: '네트워크', value: '독립형' },
+    { label: '에이전트', value: 'AI' },
+    {
+      label: '상태',
+      value: isConnected ? 'Active' : 'Error',
+      isStatus: true,
+    },
+  ];
+
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4 sm:p-6 lg:p-10">
+    <WarpBackground
+      className="flex min-h-screen flex-col items-center justify-center border-0 bg-background p-4 sm:p-6 lg:p-10"
+      beamsPerSide={4}
+      beamSize={5}
+      beamDelayMax={3}
+      beamDuration={4}
+    >
       {/* Top toolbar */}
       <div className="fixed top-4 right-4 z-50 flex items-center gap-2">
         <ThemeToggle />
@@ -96,17 +154,22 @@ export default function BentoPage() {
               Quick Stats
             </h2>
             <div className="grid grid-cols-2 gap-3">
-              {[
-                { label: '디바이스', value: '600+' },
-                { label: '네트워크', value: '독립형' },
-                { label: '에이전트', value: 'AI' },
-                { label: '상태', value: 'Active' },
-              ].map((stat) => (
+              {stats.map((stat) => (
                 <div
                   key={stat.label}
                   className="rounded border-2 border-border bg-background p-2 text-center"
                 >
-                  <div className="text-lg font-bold text-primary">{stat.value}</div>
+                  <div className={`text-lg font-bold flex items-center justify-center min-h-[1.75rem] ${
+                    stat.isStatus
+                      ? (stat.value === 'Active' ? 'text-green-500' : 'text-destructive')
+                      : 'text-primary'
+                  }`}>
+                    {stat.isLoading ? (
+                      <Loader count={3} duration={0.4} delayStep={80} />
+                    ) : (
+                      stat.value
+                    )}
+                  </div>
                   <div className="text-xs text-muted-foreground">{stat.label}</div>
                 </div>
               ))}
@@ -142,14 +205,14 @@ export default function BentoPage() {
           {Array.from({ length: placeholderCount }).map((_, i) => (
             <div
               key={`placeholder-${i}`}
-              className="flex flex-col items-center justify-center gap-3 rounded-md border-2 border-dashed border-border bg-muted/30 p-5 opacity-60"
+              className="group flex flex-col gap-3 rounded-md border-2 border-border bg-card p-5 shadow-[4px_4px_0px_0px] shadow-border opacity-60"
             >
-              <div className="flex h-10 w-10 items-center justify-center rounded border-2 border-border bg-destructive text-destructive-foreground">
-                <Skull className="h-5 w-5" />
+              <div className="flex h-10 w-10 items-center justify-center rounded border-2 border-border bg-muted text-muted-foreground shadow-[2px_2px_0px_0px] shadow-border">
+                <Clock className="h-5 w-5" />
               </div>
-              <div className="text-center">
-                <h3 className="font-bold text-muted-foreground">GAME OVER</h3>
-                <p className="mt-1 text-xs text-muted-foreground">
+              <div>
+                <h3 className="font-bold text-muted-foreground">WAIT</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
                   to be continued...
                 </p>
               </div>
@@ -157,6 +220,6 @@ export default function BentoPage() {
           ))}
         </main>
       </div>
-    </div>
+    </WarpBackground>
   );
 }
