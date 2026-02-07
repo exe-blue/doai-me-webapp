@@ -132,6 +132,30 @@
       50% { opacity: 0.5; }
     }
 
+    /* Header Action Buttons */
+    .header-action-btn {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      padding: 4px 8px;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.2s;
+    }
+    .header-action-btn:hover {
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+      border-color: var(--text-secondary);
+    }
+    .header-action-btn.btn-restart:hover {
+      border-color: var(--warning);
+      color: var(--warning);
+    }
+
     /* Node Status Banner */
     .node-status-banner {
       padding: 4px 16px;
@@ -1043,6 +1067,8 @@
         <span class="node-id" id="nodeId">NODE-1</span>
       </div>
       <div class="header-right">
+        <button class="header-action-btn" onclick="handleRefresh()" title="서버 재연결">&#x21bb; 새로고침</button>
+        <button class="header-action-btn btn-restart" onclick="handleRestart()" title="앱 재시작">&#x23fb; 재시작</button>
         <div class="status-badge connecting" id="serverStatus">
           <span class="status-dot pulse"></span>
           <span id="serverStatusText">연결 중...</span>
@@ -2150,6 +2176,24 @@
     window.openDevicePanel = openDevicePanel;
     window.refreshDevice = refreshDevice;
     window.installApk = installApk;
+
+    // 새로고침 (서버 재연결)
+    function handleRefresh() {
+      addLog({ level: 'INFO', category: 'SYSTEM', message: '서버 재연결 시도...' });
+      updateServerStatus(false, '연결 중...');
+      api.reconnectServer();
+    }
+
+    // 재시작 (앱 전체 재시작)
+    function handleRestart() {
+      if (confirm('앱을 재시작하시겠습니까?')) {
+        addLog({ level: 'INFO', category: 'SYSTEM', message: '앱 재시작 중...' });
+        api.restartApp();
+      }
+    }
+
+    window.handleRefresh = handleRefresh;
+    window.handleRestart = handleRestart;
 
     // Start
     init();

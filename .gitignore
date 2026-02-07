@@ -27,6 +27,9 @@ apk/
 # Claude Code local settings (user-specific paths/permissions)
 .claude/settings.local.json
 
+# OMC runtime state (agent sessions, checkpoints)
+.omc/
+
 # Docker & Nginx
 nginx/ssl/*.pem
 nginx/logs/*.log

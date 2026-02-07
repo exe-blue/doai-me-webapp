@@ -136,6 +136,9 @@ contextBridge.exposeInMainWorld('api', {
   // 수동 재연결
   reconnectServer: () => ipcRenderer.invoke('reconnect-server'),
 
+  // 앱 재시작 (클라이언트 + 서버 모두 재시작)
+  restartApp: () => ipcRenderer.invoke('restart-app'),
+
   // ========================================================================
   // v1.1.0: 디바이스 상세 + 히트맵
   // ========================================================================

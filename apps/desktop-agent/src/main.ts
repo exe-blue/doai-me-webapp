@@ -679,6 +679,13 @@ async function initializeManagerComponents(): Promise<void> {
 // ============================================
 
 function setupIPC(): void {
+  // 앱 재시작
+  ipcMain.handle('restart-app', () => {
+    logger.info('Restarting app via IPC');
+    app.relaunch();
+    app.quit();
+  });
+
   // 에이전트 상태 조회 (기존 채널 유지)
   ipcMain.handle('agent:getStatus', () => {
     return {

@@ -1532,7 +1532,7 @@ idempotencyKey = campaignId
 idempotencyKey = watchId
 
 // watch.progress
-idempotencyKey = `${watchId}_${deviceId}_${Math.floor(timestamp / 60000)}`  // 분 단위
+idempotencyKey = `${watchId}_${deviceId}_${Math.floor(timestamp / 1000)}`  // 초 단위 (1초 1회 throttle과 일치)
 
 // action.requested
 idempotencyKey = `${watchId}_${actionType}`

@@ -1064,7 +1064,12 @@ BEGIN
   v_prefix := TO_CHAR(p_date, 'YYYYMMDD') || '_' ||
               LOWER(REGEXP_REPLACE(p_handle, '[^a-zA-Z0-9_.-]', '_', 'g'));
 
-  -- Get next sequence
+  -- Advisory lock per prefix to prevent race conditions
+  -- hashtext() returns a stable int4 hash; concurrent calls with
+  -- the same prefix serialize here, different prefixes proceed in parallel.
+  PERFORM pg_advisory_xact_lock(hashtext(v_prefix));
+
+  -- Get next sequence (safe under advisory lock)
   SELECT COALESCE(MAX(CAST(SPLIT_PART(watch_id, '_', -1) AS INT)), 0) + 1
   INTO v_seq
   FROM watch_sessions

@@ -3,10 +3,10 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import type { Device } from '@/lib/supabase';
-import { 
-  DASHBOARD_EVENTS, 
-  SOCKET_NAMESPACES, 
-  TIMING 
+import {
+  DASHBOARD_EVENTS,
+  SOCKET_NAMESPACES,
+  TIMING
 } from '@doai/shared';
 
 interface SocketHookOptions {
@@ -26,11 +26,8 @@ interface CommandResult {
   error?: string;
 }
 
-// Socket.io server URL: env var → same-origin fallback → localhost dev
-const SOCKET_SERVER_URL = process.env.NEXT_PUBLIC_SOCKET_URL
-  || (typeof window !== 'undefined' && window.location.hostname !== 'localhost'
-    ? `${window.location.protocol}//${window.location.host}`
-    : 'http://localhost:4000');
+// Socket.io server URL: env var → same-origin (empty string = current host)
+const SOCKET_SERVER_URL = process.env.NEXT_PUBLIC_SOCKET_URL || '';
 
 // Strict naming convention: P01-001, P02-015 etc.
 const VALID_PC_ID_PATTERN = /^P\d{1,2}-\d{3}$/;
@@ -42,12 +39,21 @@ interface UseSocketOptions extends SocketHookOptions {
 export function useSocket(options: UseSocketOptions = {}) {
   const { autoConnect = true, authToken } = options;
   const socketRef = useRef<Socket | null>(null);
+  const authTokenRef = useRef(authToken);
   const [isConnected, setIsConnected] = useState(false);
   const [devices, setDevices] = useState<Device[]>([]);
 
   // Event listeners
   const frameListenersRef = useRef<Map<string, (frame: StreamFrame) => void>>(new Map());
   const commandResultListenersRef = useRef<((result: CommandResult) => void)[]>([]);
+
+  // Keep auth token ref in sync without triggering socket reconnection
+  useEffect(() => {
+    authTokenRef.current = authToken;
+    if (socketRef.current) {
+      socketRef.current.auth = authToken ? { token: authToken } : {};
+    }
+  }, [authToken]);
 
   // Fetch persisted devices from Supabase API on mount (for device persistence)
   useEffect(() => {
@@ -86,12 +92,14 @@ export function useSocket(options: UseSocketOptions = {}) {
   useEffect(() => {
     if (!autoConnect) return;
 
+    const token = authTokenRef.current;
     const socket = io(`${SOCKET_SERVER_URL}${SOCKET_NAMESPACES.DASHBOARD}`, {
       transports: ['websocket', 'polling'],
       reconnection: true,
-      reconnectionAttempts: 5,
+      reconnectionAttempts: Infinity,
       reconnectionDelay: TIMING.RECONNECT_DELAY,
-      ...(authToken ? { auth: { token: authToken } } : {}),
+      reconnectionDelayMax: 30000,
+      ...(token ? { auth: { token } } : {}),
     });
 
     socketRef.current = socket;
@@ -107,7 +115,7 @@ export function useSocket(options: UseSocketOptions = {}) {
     });
 
     socket.on('connect_error', (error) => {
-      console.error('[Socket] Connection error:', error);
+      console.error('[Socket] Connection error:', error.message);
     });
 
     // Initial device list from Socket - merge with persisted data
@@ -182,7 +190,8 @@ export function useSocket(options: UseSocketOptions = {}) {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [autoConnect, authToken]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoConnect]);
 
   // Start streaming for a device
   const startStream = useCallback((deviceId: string, onFrame: (frame: StreamFrame) => void) => {

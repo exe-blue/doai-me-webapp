@@ -82,8 +82,9 @@ app.prepare().then(() => {
       const session = streamingSessions.get(deviceId);
       if (session && session.dashboardSockets.size > 0) {
         // Forward frame to all dashboard clients watching this device
+        // Event name matches DASHBOARD_EVENTS.STREAM_DATA ('stream:data')
         session.dashboardSockets.forEach(dashSocket => {
-          dashSocket.emit('stream:frame', { deviceId, frame, timestamp });
+          dashSocket.emit('stream:data', { deviceId, frame, timestamp });
         });
       }
     });

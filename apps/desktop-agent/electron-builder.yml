@@ -62,7 +62,6 @@ win:
       arch: [x64, ia32]
   icon: resources/icon.ico
   artifactName: "${productName}-Setup-${version}.${ext}"
-  publisherName: "DoAi Inc."
   signAndEditExecutable: false
   requestedExecutionLevel: asInvoker
 

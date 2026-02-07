@@ -62,7 +62,14 @@ function loadEnvConfig(): Partial<AppConfig> {
   if (nodeId) env.nodeId = nodeId;
 
   const port = process.env.WORKER_SERVER_PORT;
-  if (port) env.workerServerPort = parseInt(port, 10);
+  if (port) {
+    const parsedPort = parseInt(port, 10);
+    if (Number.isFinite(parsedPort) && parsedPort > 0 && parsedPort <= 65535) {
+      env.workerServerPort = parsedPort;
+    } else {
+      logger.warn('[AppConfig] Invalid WORKER_SERVER_PORT, ignoring', { value: port });
+    }
+  }
 
   const logLevel = process.env.LOG_LEVEL;
   if (logLevel) env.logLevel = logLevel;
