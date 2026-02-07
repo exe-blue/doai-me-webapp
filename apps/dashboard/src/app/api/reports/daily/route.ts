@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     // 해당 날짜의 실행 통계 조회
     const { data: executions, error } = await supabase
       .from("video_executions")
-      .select("status, actual_watch_seconds, started_at, video_id")
+      .select("status, actual_watch_duration_sec, started_at, video_id")
       .gte("started_at", startOfDay)
       .lte("started_at", endOfDay);
 
@@ -33,8 +33,8 @@ export async function GET(request: NextRequest) {
     const cancelledTasks = data.filter((e) => e.status === "cancelled").length;
 
     const watchTimes = data
-      .filter((e) => e.actual_watch_seconds)
-      .map((e) => e.actual_watch_seconds as number);
+      .filter((e) => e.actual_watch_duration_sec)
+      .map((e) => e.actual_watch_duration_sec as number);
 
     const totalWatchTime = watchTimes.reduce((sum, t) => sum + t, 0);
     const avgWatchTime = watchTimes.length > 0 ? totalWatchTime / watchTimes.length : 0;
@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
     const { count, error: deviceCountError } = await supabase
       .from("devices")
       .select("*", { count: "exact", head: true })
-      .in("status", ["IDLE", "RUNNING", "BUSY"]);
+      .in("state", ["IDLE", "RUNNING", "QUEUED"]);
 
     if (deviceCountError) {
       return errorResponse("DB_ERROR", deviceCountError.message, 500);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -26,7 +26,7 @@ import {
   XCircle,
   Activity
 } from 'lucide-react';
-import { toast } from 'sonner';
+import { useJobAnalyticsQuery, useDeviceAnalyticsQuery } from '@/hooks/queries';
 
 type ViewMode = 'jobs' | 'devices';
 type DateRange = '1' | '7' | '30';
@@ -34,106 +34,31 @@ type DateRange = '1' | '7' | '30';
 export default function AnalyticsPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('jobs');
   const [dateRange, setDateRange] = useState<DateRange>('7');
-  const [isLoading, setIsLoading] = useState(true);
-  const [jobs, setJobs] = useState<JobAnalyticsData[]>([]);
-  const [devices, setDevices] = useState<DeviceAnalyticsData[]>([]);
 
-  // Summary stats
-  const [stats, setStats] = useState({
-    totalJobs: 0,
-    completedAssignments: 0,
-    failedAssignments: 0,
-    activeDevices: 0,
-    avgCompletionRate: 0
-  });
+  // React Query hooks
+  const { data: jobs = [], isLoading: jobsLoading, refetch: refetchJobs } = useJobAnalyticsQuery(dateRange);
+  const { data: devices = [], isLoading: devicesLoading, refetch: refetchDevices } = useDeviceAnalyticsQuery();
+  const isLoading = jobsLoading || devicesLoading;
 
-  // Load job analytics
-  const loadJobAnalytics = useCallback(async () => {
-    try {
-      const response = await fetch(`/api/analytics/jobs?days=${dateRange}`);
-      if (response.ok) {
-        const data = await response.json();
-        setJobs(data.jobs || []);
+  // Calculate stats from query data
+  const stats = useMemo(() => {
+    const totalCompleted = jobs.reduce((sum, j) => sum + j.completed_count, 0);
+    const totalFailed = jobs.reduce((sum, j) => sum + j.failed_count, 0);
+    const totalAssignments = jobs.reduce((sum, j) => sum + j.total_assignments, 0);
+    const activeDevices = devices.filter(
+      (d) => d.status !== 'offline' && d.status !== 'error'
+    ).length;
 
-        // Calculate stats
-        const totalCompleted = data.jobs.reduce((sum: number, j: JobAnalyticsData) => sum + j.completed_count, 0);
-        const totalFailed = data.jobs.reduce((sum: number, j: JobAnalyticsData) => sum + j.failed_count, 0);
-        const totalAssignments = data.jobs.reduce((sum: number, j: JobAnalyticsData) => sum + j.total_assignments, 0);
-
-        setStats(prev => ({
-          ...prev,
-          totalJobs: data.jobs.length,
-          completedAssignments: totalCompleted,
-          failedAssignments: totalFailed,
-          avgCompletionRate: totalAssignments > 0
-            ? Math.round((totalCompleted / totalAssignments) * 100)
-            : 0
-        }));
-      }
-    } catch (error) {
-      console.error('Failed to load job analytics:', error);
-      toast.error('작업 통계 로드 실패');
-    }
-  }, [dateRange]);
-
-  // Load device analytics
-  const loadDeviceAnalytics = useCallback(async () => {
-    try {
-      const response = await fetch('/api/analytics/devices');
-      if (response.ok) {
-        const data = await response.json();
-        setDevices(data.devices || []);
-
-        // Calculate active devices
-        const active = data.devices.filter(
-          (d: DeviceAnalyticsData) => d.status !== 'offline' && d.status !== 'error'
-        ).length;
-
-        setStats(prev => ({
-          ...prev,
-          activeDevices: active
-        }));
-      }
-    } catch (error) {
-      console.error('Failed to load device analytics:', error);
-      toast.error('기기 통계 로드 실패');
-    }
-  }, []);
-
-  // Load data based on view mode
-  const loadData = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      await Promise.all([loadJobAnalytics(), loadDeviceAnalytics()]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [loadJobAnalytics, loadDeviceAnalytics]);
-
-  // Initial load
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
-
-  // Reload when date range changes (for job view)
-  useEffect(() => {
-    if (viewMode === 'jobs') {
-      loadJobAnalytics();
-    }
-  }, [dateRange, viewMode, loadJobAnalytics]);
-
-  // Auto-refresh every 30 seconds
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (viewMode === 'jobs') {
-        loadJobAnalytics();
-      } else {
-        loadDeviceAnalytics();
-      }
-    }, 30000);
-
-    return () => clearInterval(interval);
-  }, [viewMode, loadJobAnalytics, loadDeviceAnalytics]);
+    return {
+      totalJobs: jobs.length,
+      completedAssignments: totalCompleted,
+      failedAssignments: totalFailed,
+      activeDevices,
+      avgCompletionRate: totalAssignments > 0
+        ? Math.round((totalCompleted / totalAssignments) * 100)
+        : 0,
+    };
+  }, [jobs, devices]);
 
   return (
     <div className="space-y-6">
@@ -159,7 +84,7 @@ export default function AnalyticsPage() {
           )}
           <Button
             variant="outline"
-            onClick={loadData}
+            onClick={() => { refetchJobs(); refetchDevices(); }}
             disabled={isLoading}
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />

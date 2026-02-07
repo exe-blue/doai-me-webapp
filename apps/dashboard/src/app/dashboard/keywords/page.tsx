@@ -1,7 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { useQueryClient } from "@tanstack/react-query";
+import { useKeywordsQuery, keywordKeys } from "@/hooks/queries";
+import type { Keyword } from "@/hooks/queries";
 import {
   Plus,
   Search,
@@ -53,24 +56,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { StatsCard } from "@/components/ui/stats-card";
 import { Switch } from "@/components/ui/switch";
-
-interface Keyword {
-  id: number;
-  keyword: string;
-  category: string | null;
-  is_active: boolean;
-  collect_interval_hours: number;
-  max_results: number;
-  discovered_count: number;
-  used_count: number;
-  last_collected_at: string | null;
-  min_views: number;
-  min_duration_sec: number;
-  max_duration_sec: number;
-  exclude_keywords: string[];
-  metadata: Record<string, unknown>;
-  created_at: string;
-}
 
 const categoryOptions = [
   { value: "tech", label: "테크" },
@@ -127,13 +112,14 @@ function formatDuration(seconds: number): string {
 }
 
 export default function KeywordsPage() {
-  const [keywords, setKeywords] = useState<Keyword[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingKeyword, setEditingKeyword] = useState<Keyword | null>(null);
+
+  const { data: keywords = [], isLoading: loading } = useKeywordsQuery({ categoryFilter });
 
   // 새 키워드 등록 폼
   const [newKeyword, setNewKeyword] = useState({
@@ -151,37 +137,6 @@ export default function KeywordsPage() {
   // 대량 등록 모드
   const [isBulkMode, setIsBulkMode] = useState(false);
   const [bulkKeywords, setBulkKeywords] = useState("");
-
-  useEffect(() => {
-    fetchKeywords();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [categoryFilter]);
-
-  async function fetchKeywords() {
-    setLoading(true);
-    try {
-      let query = supabase
-        .from("keywords")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (categoryFilter !== "all") {
-        query = query.eq("category", categoryFilter);
-      }
-
-      const { data, error } = await query;
-
-      if (error) {
-        console.error("키워드 목록 로드 실패:", error);
-      } else {
-        setKeywords(data || []);
-      }
-    } catch (err) {
-      console.error("키워드 목록 로드 실패:", err);
-    } finally {
-      setLoading(false);
-    }
-  }
 
   async function handleAddKeyword() {
     if (!newKeyword.keyword.trim()) {
@@ -217,7 +172,7 @@ export default function KeywordsPage() {
 
     setIsAddDialogOpen(false);
     resetNewKeywordForm();
-    fetchKeywords();
+    queryClient.invalidateQueries({ queryKey: keywordKeys.all });
   }
 
   async function handleBulkAdd() {
@@ -258,7 +213,7 @@ export default function KeywordsPage() {
     setBulkKeywords("");
     setIsBulkMode(false);
     resetNewKeywordForm();
-    fetchKeywords();
+    queryClient.invalidateQueries({ queryKey: keywordKeys.all });
   }
 
   function resetNewKeywordForm() {
@@ -307,7 +262,7 @@ export default function KeywordsPage() {
 
     setIsEditDialogOpen(false);
     setEditingKeyword(null);
-    fetchKeywords();
+    queryClient.invalidateQueries({ queryKey: keywordKeys.all });
   }
 
   async function toggleKeywordActive(id: number, isActive: boolean) {
@@ -320,7 +275,7 @@ export default function KeywordsPage() {
       console.error("상태 변경 실패:", error);
       alert(`키워드 상태 변경에 실패했습니다: ${error.message}`);
     } else {
-      fetchKeywords();
+      queryClient.invalidateQueries({ queryKey: keywordKeys.all });
     }
   }
 
@@ -333,7 +288,7 @@ export default function KeywordsPage() {
       const result = await res.json();
       if (result.success) {
         alert(result.data.message);
-        fetchKeywords();
+        queryClient.invalidateQueries({ queryKey: keywordKeys.all });
       } else {
         alert(result.error?.message || "수집에 실패했습니다");
       }
@@ -353,7 +308,7 @@ export default function KeywordsPage() {
       console.error("삭제 실패:", error);
       alert(`키워드 삭제에 실패했습니다: ${error.message}`);
     } else {
-      fetchKeywords();
+      queryClient.invalidateQueries({ queryKey: keywordKeys.all });
     }
   }
 

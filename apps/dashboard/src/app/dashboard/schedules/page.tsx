@@ -70,28 +70,9 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Checkbox } from "@/components/ui/checkbox";
-
-interface Schedule {
-  id: string;
-  name: string;
-  description: string | null;
-  schedule_type: "interval" | "cron" | "once";
-  cron_expression: string | null;
-  interval_minutes: number | null;
-  target_type: "all_videos" | "by_channel" | "by_keyword" | "specific_videos";
-  target_ids: string[] | null;
-  task_config: {
-    priority: "high" | "normal" | "low";
-    batch_size: number;
-    max_concurrent: number;
-    distribute_evenly: boolean;
-  } | null;
-  is_active: boolean;
-  last_run_at: string | null;
-  next_run_at: string | null;
-  run_count: number;
-  created_at: string;
-}
+import { useSchedulesQuery, scheduleKeys } from "@/hooks/queries";
+import type { Schedule } from "@/hooks/queries";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface ScheduleRun {
   id: string;
@@ -186,8 +167,8 @@ function formatDateTime(dateString: string): string {
 }
 
 export default function SchedulesPage() {
-  const [schedules, setSchedules] = useState<Schedule[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data: schedules = [], isLoading: loading } = useSchedulesQuery();
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -230,29 +211,8 @@ export default function SchedulesPage() {
   const [keywords, setKeywords] = useState<KeywordOption[]>([]);
 
   useEffect(() => {
-    fetchSchedules();
     fetchTargetOptions();
   }, []);
-
-  async function fetchSchedules() {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from("schedules")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (error) {
-        console.error("스케줄 로드 실패:", error);
-      } else {
-        setSchedules(data || []);
-      }
-    } catch (err) {
-      console.error("스케줄 로드 실패:", err);
-    } finally {
-      setLoading(false);
-    }
-  }
 
   async function fetchTargetOptions() {
     const [videosRes, channelsRes, keywordsRes] = await Promise.all([
@@ -378,7 +338,7 @@ export default function SchedulesPage() {
     } else {
       setIsAddDialogOpen(false);
       resetForm();
-      fetchSchedules();
+      queryClient.invalidateQueries({ queryKey: scheduleKeys.all });
     }
   }
 
@@ -417,7 +377,7 @@ export default function SchedulesPage() {
     } else {
       setIsEditDialogOpen(false);
       setEditingSchedule(null);
-      fetchSchedules();
+      queryClient.invalidateQueries({ queryKey: scheduleKeys.all });
     }
   }
 
@@ -430,7 +390,7 @@ export default function SchedulesPage() {
     if (error) {
       console.error("상태 변경 실패:", error);
     } else {
-      fetchSchedules();
+      queryClient.invalidateQueries({ queryKey: scheduleKeys.all });
     }
   }
 
@@ -458,7 +418,7 @@ export default function SchedulesPage() {
     if (error) {
       alert("복제에 실패했습니다: " + error.message);
     } else {
-      fetchSchedules();
+      queryClient.invalidateQueries({ queryKey: scheduleKeys.all });
     }
   }
 
@@ -470,7 +430,7 @@ export default function SchedulesPage() {
     if (error) {
       console.error("삭제 실패:", error);
     } else {
-      fetchSchedules();
+      queryClient.invalidateQueries({ queryKey: scheduleKeys.all });
     }
   }
 

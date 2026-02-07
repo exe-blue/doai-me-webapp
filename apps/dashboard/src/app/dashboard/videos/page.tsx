@@ -1,8 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useSocketContext } from "@/contexts/socket-context";
+import { useVideosQuery, videoKeys } from '@/hooks/queries';
+import type { Video } from '@/hooks/queries';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Plus,
   Search,
@@ -58,32 +61,6 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { VideoKpiStrip } from "@/components/video/video-kpi-strip";
 
-interface Video {
-  id: string;
-  title: string;
-  channel_id: string;
-  channel_name: string;
-  thumbnail_url: string;
-  video_duration_sec: number;
-  target_views: number;
-  completed_views: number;
-  failed_views: number;
-  watch_duration_sec: number;
-  watch_duration_min_pct: number;
-  watch_duration_max_pct: number;
-  prob_like: number;
-  prob_comment: number;
-  prob_subscribe: number;
-  status: "active" | "paused" | "completed" | "archived";
-  priority: "urgent" | "high" | "normal" | "low";
-  priority_enabled?: boolean;
-  priority_updated_at?: string;
-  registration_method?: string;
-  search_keyword: string;
-  tags: string[];
-  created_at: string;
-}
-
 const statusColors: Record<string, string> = {
   active: "bg-green-400 text-green-900 border-green-900",
   paused: "bg-yellow-400 text-yellow-900 border-yellow-900",
@@ -101,15 +78,20 @@ const statusLabels: Record<string, string> = {
 const PAGE_SIZE = 20;
 
 export default function VideosPage() {
-  const [videos, setVideos] = useState<Video[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
 
   // Pagination
   const [page, setPage] = useState(1);
-  const [totalCount, setTotalCount] = useState(0);
+
+  // Query client for cache invalidation
+  const queryClient = useQueryClient();
+
+  // Fetch videos using the query hook
+  const { data, isLoading: loading } = useVideosQuery({ page, statusFilter, searchQuery });
+  const videos = data?.items ?? [];
+  const totalCount = data?.totalCount ?? 0;
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
   // Socket for device data
@@ -131,47 +113,6 @@ export default function VideosPage() {
     priority: "normal" as "urgent" | "high" | "normal" | "low",
     search_keyword: "",
   });
-
-  const fetchVideos = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({
-        page: String(page),
-        pageSize: String(PAGE_SIZE),
-        sortBy: "created_at",
-        sortOrder: "desc",
-      });
-
-      if (statusFilter !== "all") {
-        params.set("status", statusFilter);
-      }
-      if (searchQuery.trim()) {
-        params.set("search", searchQuery.trim());
-      }
-
-      const response = await fetch(`/api/videos?${params.toString()}`);
-      const result = await response.json();
-
-      if (result.success && result.data) {
-        setVideos(result.data.items || []);
-        setTotalCount(result.data.total || 0);
-      } else {
-        console.error("영상 목록 로드 실패:", result.error);
-        setVideos([]);
-        setTotalCount(0);
-      }
-    } catch (err) {
-      console.error("영상 목록 로드 실패:", err);
-      setVideos([]);
-      setTotalCount(0);
-    } finally {
-      setLoading(false);
-    }
-  }, [page, statusFilter, searchQuery]);
-
-  useEffect(() => {
-    fetchVideos();
-  }, [fetchVideos]);
 
   // Reset to page 1 when filters change
   useEffect(() => {
@@ -236,7 +177,7 @@ export default function VideosPage() {
         priority: "normal",
         search_keyword: "",
       });
-      fetchVideos();
+      queryClient.invalidateQueries({ queryKey: videoKeys.all });
     } catch (err) {
       console.error("Failed to register video:", err);
       alert("영상 등록에 실패했습니다");
@@ -253,7 +194,7 @@ export default function VideosPage() {
       console.error("상태 변경 실패:", error);
       alert(`영상 상태 변경에 실패했습니다: ${error.message}`);
     } else {
-      fetchVideos();
+      queryClient.invalidateQueries({ queryKey: videoKeys.all });
     }
   }
 
@@ -274,7 +215,7 @@ export default function VideosPage() {
       console.error("우선순위 변경 실패:", error);
       alert(`우선순위 변경에 실패했습니다: ${error.message}`);
     } else {
-      fetchVideos();
+      queryClient.invalidateQueries({ queryKey: videoKeys.all });
     }
   }
 
@@ -287,7 +228,7 @@ export default function VideosPage() {
       console.error("삭제 실패:", error);
       alert(`영상 삭제에 실패했습니다: ${error.message}`);
     } else {
-      fetchVideos();
+      queryClient.invalidateQueries({ queryKey: videoKeys.all });
     }
   }
 

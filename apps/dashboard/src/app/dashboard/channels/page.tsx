@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { useChannelsQuery, channelKeys, type Channel } from "@/hooks/queries";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Plus,
   Search,
@@ -59,27 +61,6 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { WatchSettingsReadonly } from "@/components/watch-settings/watch-settings-readonly";
 
-interface Channel {
-  id: string;
-  name: string;
-  handle: string;
-  profile_url: string;
-  banner_url: string;
-  subscriber_count: string;
-  video_count: number;
-  auto_collect: boolean;
-  push_status: 'active' | 'pending' | 'expired' | 'none';
-  push_expires_at: string | null;
-  last_collected_at: string | null;
-  default_watch_duration_sec: number;
-  default_prob_like: number;
-  default_prob_comment: number;
-  default_prob_subscribe: number;
-  status: "active" | "paused" | "archived";
-  metadata: Record<string, unknown>;
-  created_at: string;
-}
-
 interface ChannelVideo {
   id: string;
   title: string;
@@ -118,8 +99,7 @@ function formatTimeAgo(dateString: string): string {
 }
 
 export default function ChannelsPage() {
-  const [channels, setChannels] = useState<Channel[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -132,37 +112,9 @@ export default function ChannelsPage() {
     url: "",
     auto_collect: true,
   });
+  const [collecting, setCollecting] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchChannels();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter]);
-
-  async function fetchChannels() {
-    setLoading(true);
-    try {
-      let query = supabase
-        .from("channels")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (statusFilter !== "all") {
-        query = query.eq("status", statusFilter);
-      }
-
-      const { data, error } = await query;
-
-      if (error) {
-        console.error("채널 목록 로드 실패:", error);
-      } else {
-        setChannels(data || []);
-      }
-    } catch (err) {
-      console.error("채널 목록 로드 실패:", err);
-    } finally {
-      setLoading(false);
-    }
-  }
+  const { data: channels = [], isLoading: loading } = useChannelsQuery({ statusFilter });
 
   // YouTube URL에서 Channel ID 또는 Handle 추출
   function extractChannelInfo(url: string): { type: "id" | "handle"; value: string } | null {
@@ -227,7 +179,7 @@ export default function ChannelsPage() {
         url: "",
         auto_collect: true,
       });
-      fetchChannels();
+      queryClient.invalidateQueries({ queryKey: channelKeys.all });
     } catch {
       alert("채널 등록에 실패했습니다");
     }
@@ -242,7 +194,7 @@ export default function ChannelsPage() {
     if (error) {
       console.error("상태 변경 실패:", error);
     } else {
-      fetchChannels();
+      queryClient.invalidateQueries({ queryKey: channelKeys.all });
     }
   }
 
@@ -255,11 +207,9 @@ export default function ChannelsPage() {
     if (error) {
       console.error("자동 수집 설정 변경 실패:", error);
     } else {
-      fetchChannels();
+      queryClient.invalidateQueries({ queryKey: channelKeys.all });
     }
   }
-
-  const [collecting, setCollecting] = useState<string | null>(null);
 
   async function collectChannelVideos(channelId: string) {
     setCollecting(channelId);
@@ -268,7 +218,7 @@ export default function ChannelsPage() {
       const result = await res.json();
       if (result.success) {
         alert(result.data.message);
-        fetchChannels();
+        queryClient.invalidateQueries({ queryKey: channelKeys.all });
       } else {
         alert(result.error?.message || "수집에 실패했습니다");
       }
@@ -308,7 +258,7 @@ export default function ChannelsPage() {
     if (error) {
       console.error("삭제 실패:", error);
     } else {
-      fetchChannels();
+      queryClient.invalidateQueries({ queryKey: channelKeys.all });
     }
   }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import {
   BarChart3,
   ChevronLeft,
@@ -45,46 +45,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
-interface DailyStats {
-  date: string;
-  total_tasks: number;
-  completed_tasks: number;
-  failed_tasks: number;
-  cancelled_tasks: number;
-  total_watch_time: number;
-  avg_watch_time: number;
-  unique_videos: number;
-  unique_devices: number;
-  active_devices: number;
-  error_rate: number;
-  avg_task_duration: number;
-  peak_concurrent: number;
-  tasks_per_hour: number[];
-}
-
-interface VideoPerformance {
-  video_id: string;
-  title: string;
-  channel: string;
-  executions: number;
-  completed: number;
-  failed: number;
-  total_watch_time: number;
-  avg_watch_time: number;
-  success_rate: number;
-}
-
-interface NodePerformance {
-  node_id: string;
-  name: string;
-  total_tasks: number;
-  completed: number;
-  failed: number;
-  avg_duration: number;
-  devices_used: number;
-  error_rate: number;
-}
+import { useDailyReportQuery } from "@/hooks/queries";
+import type { DailyStats, VideoPerformance, NodePerformance } from "@/hooks/queries";
 
 interface HourlyData {
   hour: number;
@@ -131,107 +93,23 @@ function isToday(date: Date): boolean {
 
 export default function DailyReportPage() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [stats, setStats] = useState<DailyStats | null>(null);
-  const [prevStats, setPrevStats] = useState<DailyStats | null>(null);
-  const [videoPerformance, setVideoPerformance] = useState<VideoPerformance[]>([]);
-  const [nodePerformance, setNodePerformance] = useState<NodePerformance[]>([]);
-  const [hourlyData, setHourlyData] = useState<HourlyData[]>([]);
-  const [loading, setLoading] = useState(true);
   const [compareMode, setCompareMode] = useState<"prev_day" | "prev_week">("prev_day");
 
-  useEffect(() => {
-    fetchDailyReport();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDate, compareMode]);
+  const { data, isLoading: loading } = useDailyReportQuery(selectedDate, compareMode);
+  const stats = data?.stats ?? null;
+  const prevStats = data?.prevStats ?? null;
+  const videoPerformance = data?.videoPerformance ?? [];
+  const nodePerformance = data?.nodePerformance ?? [];
 
-  async function fetchDailyReport() {
-    setLoading(true);
-
-    try {
-      const dateStr = formatDate(selectedDate, "yyyy-MM-dd");
-      const prevDateStr = formatDate(
-        compareMode === "prev_day" ? subDays(selectedDate, 1) : subDays(selectedDate, 7),
-        "yyyy-MM-dd"
-      );
-
-      // 현재일과 비교일 데이터 병렬 조회
-      const [currentRes, prevRes] = await Promise.all([
-        fetch(`/api/reports/daily?date=${dateStr}`),
-        fetch(`/api/reports/daily?date=${prevDateStr}`),
-      ]);
-
-      const currentResult = await currentRes.json();
-      const prevResult = await prevRes.json();
-
-      // 현재일 통계
-      const currentData = currentResult.success && currentResult.data ? currentResult.data : null;
-      const currentStats: DailyStats = {
-        date: dateStr,
-        total_tasks: currentData?.total_tasks ?? 0,
-        completed_tasks: currentData?.completed_tasks ?? 0,
-        failed_tasks: currentData?.failed_tasks ?? 0,
-        cancelled_tasks: currentData?.cancelled_tasks ?? 0,
-        total_watch_time: currentData?.total_watch_time ?? 0,
-        avg_watch_time: currentData?.avg_watch_time ?? 0,
-        unique_videos: currentData?.unique_videos ?? 0,
-        unique_devices: currentData?.unique_devices ?? 0,
-        active_devices: currentData?.active_devices ?? 0,
-        error_rate: currentData?.error_rate ?? 0,
-        avg_task_duration: currentData?.avg_task_duration ?? 0,
-        peak_concurrent: currentData?.peak_concurrent ?? 0,
-        tasks_per_hour: currentData?.tasks_per_hour ?? Array(24).fill(0),
-      };
-
-      // 비교일 통계
-      const prevData = prevResult.success && prevResult.data ? prevResult.data : null;
-      const previousStats: DailyStats = {
-        date: prevDateStr,
-        total_tasks: prevData?.total_tasks ?? 0,
-        completed_tasks: prevData?.completed_tasks ?? 0,
-        failed_tasks: prevData?.failed_tasks ?? 0,
-        cancelled_tasks: prevData?.cancelled_tasks ?? 0,
-        total_watch_time: prevData?.total_watch_time ?? 0,
-        avg_watch_time: prevData?.avg_watch_time ?? 0,
-        unique_videos: prevData?.unique_videos ?? 0,
-        unique_devices: prevData?.unique_devices ?? 0,
-        active_devices: prevData?.active_devices ?? 0,
-        error_rate: prevData?.error_rate ?? 0,
-        avg_task_duration: prevData?.avg_task_duration ?? 0,
-        peak_concurrent: prevData?.peak_concurrent ?? 0,
-        tasks_per_hour: prevData?.tasks_per_hour ?? Array(24).fill(0),
-      };
-
-      setStats(currentStats);
-      setPrevStats(previousStats);
-
-      // 시간대별 데이터 생성
-      const hourly: HourlyData[] = currentStats.tasks_per_hour.map((tasks, hour) => ({
-        hour,
-        tasks,
-        completed: Math.floor(tasks * (currentStats.total_tasks > 0 ? currentStats.completed_tasks / currentStats.total_tasks : 0.95)),
-        failed: Math.floor(tasks * (currentStats.total_tasks > 0 ? currentStats.failed_tasks / currentStats.total_tasks : 0.05)),
-      }));
-      setHourlyData(hourly);
-
-      // 영상별 성과 (별도 API가 없으면 빈 배열)
-      const videos: VideoPerformance[] = currentData?.video_performance ?? [];
-      setVideoPerformance(videos);
-
-      // 노드별 성과 (별도 API가 없으면 빈 배열)
-      const nodes: NodePerformance[] = currentData?.node_performance ?? [];
-      setNodePerformance(nodes);
-    } catch (error) {
-      console.error("Error fetching daily report:", error);
-      // 오류 시 빈 데이터
-      setStats(null);
-      setPrevStats(null);
-      setHourlyData([]);
-      setVideoPerformance([]);
-      setNodePerformance([]);
-    } finally {
-      setLoading(false);
-    }
-  }
+  const hourlyData: HourlyData[] = useMemo(() => {
+    if (!stats) return [];
+    return stats.tasks_per_hour.map((tasks, hour) => ({
+      hour,
+      tasks,
+      completed: Math.floor(tasks * (stats.total_tasks > 0 ? stats.completed_tasks / stats.total_tasks : 0.95)),
+      failed: Math.floor(tasks * (stats.total_tasks > 0 ? stats.failed_tasks / stats.total_tasks : 0.05)),
+    }));
+  }, [stats]);
 
   function calculateChange(current: number, previous: number): { value: number; type: "up" | "down" | "same" } {
     if (previous === 0) return { value: 0, type: "same" };

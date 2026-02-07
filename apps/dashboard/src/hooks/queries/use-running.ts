@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { fetchRunningTasks, fetchNodes, fetchTodayStats, type NodeRow } from '@/lib/api';
 import type { JobProgressMap } from '@/hooks/use-socket';
+import { REFRESH_INTERVALS } from '@/lib/refresh-intervals';
 
 export const runningKeys = {
   all: ['running'] as const,
@@ -160,7 +161,7 @@ export function useRunningTasksQuery(
   });
 }
 
-export function useNodesQuery() {
+export function useNodesQuery(refetchInterval?: number | false) {
   return useQuery({
     queryKey: runningKeys.nodes(),
     queryFn: async () => {
@@ -168,6 +169,7 @@ export function useNodesQuery() {
       return data.map(mapNode);
     },
     staleTime: 10_000,
+    refetchInterval: refetchInterval ?? REFRESH_INTERVALS.OPERATIONAL,
   });
 }
 

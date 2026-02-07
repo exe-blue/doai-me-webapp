@@ -64,33 +64,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-
-interface ExecutionHistory {
-  id: string;
-  video_id: string;
-  video_title: string;
-  video_thumbnail: string;
-  channel_name: string;
-  device_id: string;
-  device_name: string;
-  node_id: string;
-  status: "completed" | "failed" | "cancelled";
-  started_at: string;
-  completed_at: string | null;
-  duration_seconds: number | null;
-  watch_duration_seconds: number | null;
-  target_watch_seconds: number;
-  error_message: string | null;
-  error_code: string | null;
-  retry_count: number;
-  metadata: {
-    ip_address?: string;
-    resolution?: string;
-    playback_quality?: string;
-    buffering_count?: number;
-    ads_skipped?: number;
-  };
-}
+import { useExecutionHistoryQuery } from "@/hooks/queries";
+import type { ExecutionHistory } from "@/hooks/queries";
 
 interface DateRange {
   from?: Date;
@@ -152,8 +127,6 @@ function formatDate(date: Date, format: string): string {
 }
 
 export default function ExecutionHistoryPage() {
-  const [executions, setExecutions] = useState<ExecutionHistory[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [filters, setFilters] = useState<FilterState>({
@@ -167,8 +140,6 @@ export default function ExecutionHistoryPage() {
   const [sortField, setSortField] = useState<"started_at" | "duration">("started_at");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalCount, setTotalCount] = useState(0);
   const [selectedExecution, setSelectedExecution] = useState<ExecutionHistory | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const pageSize = 50;
@@ -181,95 +152,17 @@ export default function ExecutionHistoryPage() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  useEffect(() => {
-    fetchExecutions();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters, sortField, sortOrder, currentPage, debouncedSearch]);
-
-  async function fetchExecutions() {
-    setLoading(true);
-
-    try {
-      // 쿼리 파라미터 구성
-      const params = new URLSearchParams({
-        page: currentPage.toString(),
-        pageSize: pageSize.toString(),
-        sortBy: sortField,
-        sortOrder: sortOrder,
-      });
-
-      if (filters.status !== "all") params.append("status", filters.status);
-      if (filters.node !== "all") params.append("nodeId", filters.node);
-      if (filters.dateRange?.from) params.append("dateFrom", filters.dateRange.from.toISOString());
-      if (filters.dateRange?.to) params.append("dateTo", filters.dateRange.to.toISOString());
-      if (debouncedSearch.trim()) params.append("search", debouncedSearch.trim());
-
-      const response = await fetch(`/api/executions?${params.toString()}`);
-      const result = await response.json();
-
-      if (!result.success || !result.data) {
-        console.error("Failed to fetch executions:", result.error);
-        setExecutions([]);
-        setTotalCount(0);
-        setTotalPages(0);
-        setLoading(false);
-        return;
-      }
-
-      const { items, total, totalPages: tp } = result.data;
-      setTotalCount(total);
-      setTotalPages(tp);
-
-      // DB 데이터를 UI 타입으로 매핑
-      const fetchedExecutions: ExecutionHistory[] = items.map((d: Record<string, unknown>) => {
-        const startedAt = (d.started_at as string) || (d.created_at as string);
-        const completedAt = d.completed_at as string | null;
-        const duration = startedAt && completedAt
-          ? Math.floor((new Date(completedAt).getTime() - new Date(startedAt).getTime()) / 1000)
-          : null;
-
-        return {
-          id: d.id as string,
-          video_id: d.video_id as string,
-          video_title: ((d.videos as Record<string, unknown>)?.title as string) || `Video ${d.video_id}`,
-          video_thumbnail: `https://img.youtube.com/vi/${d.video_id}/default.jpg`,
-          channel_name: ((d.videos as Record<string, unknown>)?.channel_name as string) || "Unknown",
-          device_id: d.device_id as string,
-          device_name: ((d.devices as Record<string, unknown>)?.name as string) || `Device ${d.device_id}`,
-          node_id: (d.node_id as string) || "unknown",
-          status: (d.status as ExecutionHistory["status"]) || "completed",
-          started_at: startedAt || new Date().toISOString(),
-          completed_at: completedAt,
-          duration_seconds: duration,
-          watch_duration_seconds: (d.actual_watch_duration_sec as number) || null,
-          target_watch_seconds: (d.target_watch_seconds as number) || 60,
-          error_message: (d.error_message as string) || null,
-          error_code: (d.error_code as string) || null,
-          retry_count: (d.retry_count as number) || 0,
-          metadata: {
-            ip_address: ((d.metadata as Record<string, unknown>)?.ip_address as string) || undefined,
-            resolution: ((d.metadata as Record<string, unknown>)?.resolution as string) || undefined,
-            playback_quality: ((d.metadata as Record<string, unknown>)?.playback_quality as string) || undefined,
-            buffering_count: ((d.metadata as Record<string, unknown>)?.buffering_count as number) || undefined,
-            ads_skipped: ((d.metadata as Record<string, unknown>)?.ads_skipped as number) || undefined,
-          },
-        };
-      });
-
-      // Note: searchQuery is sent to the backend (line 197), so we don't filter client-side
-      // to avoid inconsistent pagination. If backend doesn't support search, implement
-      // client-side search with proper re-pagination of filtered results.
-
-      setExecutions(fetchedExecutions);
-    } catch (error) {
-      console.error("Error fetching executions:", error);
-      setExecutions([]);
-      setTotalCount(0);
-      setTotalPages(0);
-    } finally {
-      setLoading(false);
-    }
-  }
+  const { data, isLoading: loading, refetch } = useExecutionHistoryQuery({
+    filters,
+    search: debouncedSearch,
+    sortField,
+    sortOrder,
+    page: currentPage,
+    pageSize,
+  });
+  const executions = data?.items ?? [];
+  const totalCount = data?.totalCount ?? 0;
+  const totalPages = data?.totalPages ?? 0;
 
   function formatDuration(seconds: number | null): string {
     if (seconds === null) return "-";
@@ -338,7 +231,7 @@ export default function ExecutionHistoryPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => fetchExecutions()}>
+            <Button variant="outline" onClick={() => refetch()}>
               <RefreshCw className="mr-2 h-4 w-4" />
               새로고침
             </Button>
