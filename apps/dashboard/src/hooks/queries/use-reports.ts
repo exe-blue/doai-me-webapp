@@ -107,6 +107,10 @@ export function useDailyReportQuery(
         fetch(`/api/reports/daily?date=${prevDateStr}`),
       ]);
 
+      if (!currentRes.ok || !prevRes.ok) {
+        throw new Error(`Failed to fetch reports: ${!currentRes.ok ? currentRes.statusText : prevRes.statusText}`);
+      }
+
       const currentResult = await currentRes.json();
       const prevResult = await prevRes.json();
 
@@ -199,6 +203,9 @@ export function useExecutionHistoryQuery(
       if (search.trim()) params.append('search', search.trim());
 
       const response = await fetch(`/api/executions?${params.toString()}`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch executions: ${response.statusText}`);
+      }
       const result = await response.json();
 
       if (!result.success || !result.data) {
@@ -210,9 +217,14 @@ export function useExecutionHistoryQuery(
       const mapped: ExecutionHistory[] = items.map((d: Record<string, unknown>) => {
         const startedAt = (d.started_at as string) || (d.created_at as string);
         const completedAt = d.completed_at as string | null;
-        const duration = startedAt && completedAt
-          ? Math.floor((new Date(completedAt).getTime() - new Date(startedAt).getTime()) / 1000)
-          : null;
+        let duration: number | null = null;
+        if (startedAt && completedAt) {
+          const startTime = new Date(startedAt).getTime();
+          const endTime = new Date(completedAt).getTime();
+          if (!isNaN(startTime) && !isNaN(endTime)) {
+            duration = Math.floor((endTime - startTime) / 1000);
+          }
+        }
 
         return {
           id: d.id as string,
@@ -224,7 +236,7 @@ export function useExecutionHistoryQuery(
           device_name: ((d.devices as Record<string, unknown>)?.name as string) || `Device ${d.device_id}`,
           node_id: (d.node_id as string) || 'unknown',
           status: (d.status as ExecutionHistory['status']) || 'completed',
-          started_at: startedAt || new Date().toISOString(),
+          started_at: startedAt || null,
           completed_at: completedAt,
           duration_seconds: duration,
           watch_duration_seconds: (d.actual_watch_duration_sec as number) || null,

@@ -67,6 +67,9 @@ export function useVideosQuery(opts: {
       }
 
       const response = await fetch(`/api/videos?${params.toString()}`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch videos: ${response.status}`);
+      }
       const result = await response.json();
 
       if (result.success && result.data) {

@@ -37,7 +37,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
     const { id } = await params;
     const supabase = getServerClient();
-    
+
     let body;
     try {
       body = await request.json();
@@ -45,18 +45,17 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       return errorResponse("INVALID_JSON", "유효하지 않은 JSON 본문", 400);
     }
 
-    const allowedFields = ["name", "config", "video_ids", "status"];
+    const allowedFields = [
+      "name", "description", "schedule_type", "cron_expression",
+      "interval_minutes", "target_type", "target_ids", "task_config",
+      "is_active", "next_run_at",
+    ];
     const updateData: Record<string, unknown> = {};
 
     for (const field of allowedFields) {
       if (body[field] !== undefined) {
         updateData[field] = body[field];
       }
-    }
-
-    // video_ids가 변경되면 video_count도 업데이트
-    if (body.video_ids && Array.isArray(body.video_ids)) {
-      updateData.video_count = body.video_ids.length;
     }
 
     if (Object.keys(updateData).length === 0) {

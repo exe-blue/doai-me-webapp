@@ -51,7 +51,7 @@ export async function POST(
     // 1. 채널 정보 확인
     const { data: channel, error: channelError } = await supabase
       .from("channels")
-      .select("id, name, handle, default_watch_duration_sec, default_prob_like, default_prob_comment, default_prob_subscribe")
+      .select("id, name, handle, default_watch_duration_sec, default_prob_like, default_prob_comment, default_prob_subscribe, video_count")
       .eq("id", channelId)
       .single();
 
@@ -60,8 +60,8 @@ export async function POST(
     }
 
     // 2. YouTube API로 최신 영상 검색
-    const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&maxResults=10&order=date&type=video&key=${YOUTUBE_API_KEY}`;
-    const searchRes = await fetch(searchUrl);
+    const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${encodeURIComponent(channelId)}&maxResults=10&order=date&type=video&key=${encodeURIComponent(YOUTUBE_API_KEY)}`;
+    const searchRes = await fetch(searchUrl, { signal: AbortSignal.timeout(10000) });
 
     if (!searchRes.ok) {
       const err = await searchRes.text();
@@ -84,8 +84,15 @@ export async function POST(
 
     // 3. 영상 상세 정보 가져오기 (duration)
     const videoIds = items.map((item) => item.id.videoId).join(",");
-    const detailUrl = `https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=${videoIds}&key=${YOUTUBE_API_KEY}`;
-    const detailRes = await fetch(detailUrl);
+    const detailUrl = `https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=${encodeURIComponent(videoIds)}&key=${encodeURIComponent(YOUTUBE_API_KEY)}`;
+    const detailRes = await fetch(detailUrl, { signal: AbortSignal.timeout(10000) });
+
+    if (!detailRes.ok) {
+      const err = await detailRes.text();
+      console.error("YouTube Videos API error:", err);
+      return errorResponse("YOUTUBE_API_ERROR", "YouTube 영상 상세정보 API 요청 실패", 502);
+    }
+
     const detailData = await detailRes.json();
     const durationMap = new Map<string, number>();
 
@@ -129,9 +136,7 @@ export async function POST(
       .from("channels")
       .update({
         last_collected_at: new Date().toISOString(),
-        video_count: (channel as Record<string, unknown>).video_count
-          ? ((channel as Record<string, unknown>).video_count as number) + (inserted?.length || 0)
-          : inserted?.length || 0,
+        video_count: ((channel.video_count as number) ?? 0) + (inserted?.length || 0),
       })
       .eq("id", channelId);
 

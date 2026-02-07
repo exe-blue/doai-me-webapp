@@ -39,7 +39,11 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     const supabase = getServerClient();
     const body = await request.json();
 
-    const allowedFields = ["auto_collect", "status", "category", "max_results"];
+    const allowedFields = [
+      "keyword", "category", "is_active", "collect_interval_hours",
+      "max_results", "min_views", "min_duration_sec", "max_duration_sec",
+      "exclude_keywords",
+    ];
     const updateData: Record<string, unknown> = {};
 
     for (const field of allowedFields) {

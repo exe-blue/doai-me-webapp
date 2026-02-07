@@ -26,17 +26,47 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return errorResponse("DB_ERROR", fetchError.message, 500);
     }
 
-    if (!schedule.video_ids || schedule.video_ids.length === 0) {
-      return errorResponse("NO_VIDEOS", "스케줄에 영상이 없습니다", 400);
+    // target_type에 따라 대상 영상 조회
+    let videoIds: string[] = [];
+
+    if (schedule.target_type === "specific_videos" && schedule.target_ids?.length) {
+      videoIds = schedule.target_ids;
+    } else if (schedule.target_type === "by_channel" && schedule.target_ids?.length) {
+      const { data: videos } = await supabase
+        .from("videos")
+        .select("id")
+        .in("channel_id", schedule.target_ids)
+        .eq("status", "active");
+      videoIds = (videos || []).map((v: { id: string }) => v.id);
+    } else if (schedule.target_type === "by_keyword" && schedule.target_ids?.length) {
+      const { data: videos } = await supabase
+        .from("videos")
+        .select("id")
+        .in("keyword_id", schedule.target_ids)
+        .eq("status", "active");
+      videoIds = (videos || []).map((v: { id: string }) => v.id);
+    } else {
+      // all_videos
+      const { data: videos } = await supabase
+        .from("videos")
+        .select("id")
+        .eq("status", "active")
+        .limit(schedule.task_config?.batch_size || 100);
+      videoIds = (videos || []).map((v: { id: string }) => v.id);
+    }
+
+    if (videoIds.length === 0) {
+      return errorResponse("NO_VIDEOS", "실행 대상 영상이 없습니다", 400);
     }
 
     // 대기열에 추가
-    const executions = schedule.video_ids.map((videoId: string) => ({
+    const taskConfig = schedule.task_config || {};
+    const executions = videoIds.map((videoId: string) => ({
       video_id: videoId,
       schedule_id: id,
       status: "pending",
-      priority: schedule.config?.priority || 50,
-      target_watch_seconds: schedule.config?.target_watch_seconds || 60,
+      priority: taskConfig.priority === "high" ? 80 : taskConfig.priority === "low" ? 20 : 50,
+      target_watch_seconds: 60,
       actual_watch_seconds: null,
       progress: 0,
       retry_count: 0,
@@ -57,13 +87,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       .from("schedules")
       .update({
         last_run_at: new Date().toISOString(),
-        total_runs: schedule.total_runs + 1,
+        run_count: (schedule.run_count || 0) + 1,
       })
       .eq("id", id);
 
     if (updateError) {
       console.error("Failed to update schedule after run:", updateError);
-      return errorResponse("DB_ERROR", "스케줄 업데이트 실패: " + updateError.message, 500);
     }
 
     return successResponse({ queued: data?.length || 0 });

@@ -305,40 +305,37 @@ export default function SchedulesPage() {
       return;
     }
 
-    const nextRun = calculateNextRun(
-      formData.schedule_type,
-      formData.interval_minutes,
-      formData.cron_expression,
-      formData.once_datetime
-    );
+    try {
+      const res = await fetch("/api/schedules", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: formData.name,
+          description: formData.description || null,
+          schedule_type: formData.schedule_type,
+          cron_expression: formData.schedule_type === "cron" ? formData.cron_expression : null,
+          interval_minutes: formData.schedule_type === "interval" ? formData.interval_minutes : null,
+          target_type: formData.target_type,
+          target_ids: formData.target_type !== "all_videos" ? formData.target_ids : null,
+          task_config: {
+            priority: formData.priority,
+            batch_size: formData.batch_size,
+            max_concurrent: formData.max_concurrent,
+            distribute_evenly: formData.distribute_evenly,
+          },
+        }),
+      });
+      const result = await res.json();
 
-    const scheduleData = {
-      name: formData.name,
-      description: formData.description || null,
-      schedule_type: formData.schedule_type,
-      cron_expression: formData.schedule_type === "cron" ? formData.cron_expression : null,
-      interval_minutes: formData.schedule_type === "interval" ? formData.interval_minutes : null,
-      target_type: formData.target_type,
-      target_ids: formData.target_type !== "all_videos" ? formData.target_ids : null,
-      task_config: {
-        priority: formData.priority,
-        batch_size: formData.batch_size,
-        max_concurrent: formData.max_concurrent,
-        distribute_evenly: formData.distribute_evenly,
-      },
-      is_active: true,
-      next_run_at: nextRun,
-      run_count: 0,
-    };
-
-    const { error } = await supabase.from("schedules").insert(scheduleData);
-
-    if (error) {
-      alert("스케줄 생성에 실패했습니다: " + error.message);
-    } else {
-      setIsAddDialogOpen(false);
-      resetForm();
-      queryClient.invalidateQueries({ queryKey: scheduleKeys.all });
+      if (!res.ok) {
+        alert(result.error?.message || "스케줄 생성에 실패했습니다");
+      } else {
+        setIsAddDialogOpen(false);
+        resetForm();
+        queryClient.invalidateQueries({ queryKey: scheduleKeys.all });
+      }
+    } catch {
+      alert("스케줄 생성에 실패했습니다");
     }
   }
 
@@ -352,85 +349,114 @@ export default function SchedulesPage() {
       formData.once_datetime
     );
 
-    const { error } = await supabase
-      .from("schedules")
-      .update({
-        name: formData.name,
-        description: formData.description || null,
-        schedule_type: formData.schedule_type,
-        cron_expression: formData.schedule_type === "cron" ? formData.cron_expression : null,
-        interval_minutes: formData.schedule_type === "interval" ? formData.interval_minutes : null,
-        target_type: formData.target_type,
-        target_ids: formData.target_type !== "all_videos" ? formData.target_ids : null,
-        task_config: {
-          priority: formData.priority,
-          batch_size: formData.batch_size,
-          max_concurrent: formData.max_concurrent,
-          distribute_evenly: formData.distribute_evenly,
-        },
-        next_run_at: nextRun,
-      })
-      .eq("id", editingSchedule.id);
+    try {
+      const res = await fetch(`/api/schedules/${editingSchedule.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: formData.name,
+          description: formData.description || null,
+          schedule_type: formData.schedule_type,
+          cron_expression: formData.schedule_type === "cron" ? formData.cron_expression : null,
+          interval_minutes: formData.schedule_type === "interval" ? formData.interval_minutes : null,
+          target_type: formData.target_type,
+          target_ids: formData.target_type !== "all_videos" ? formData.target_ids : null,
+          task_config: {
+            priority: formData.priority,
+            batch_size: formData.batch_size,
+            max_concurrent: formData.max_concurrent,
+            distribute_evenly: formData.distribute_evenly,
+          },
+          next_run_at: nextRun,
+        }),
+      });
+      const result = await res.json();
 
-    if (error) {
-      alert("수정에 실패했습니다: " + error.message);
-    } else {
-      setIsEditDialogOpen(false);
-      setEditingSchedule(null);
-      queryClient.invalidateQueries({ queryKey: scheduleKeys.all });
+      if (!res.ok) {
+        alert(result.error?.message || "수정에 실패했습니다");
+      } else {
+        setIsEditDialogOpen(false);
+        setEditingSchedule(null);
+        queryClient.invalidateQueries({ queryKey: scheduleKeys.all });
+      }
+    } catch {
+      alert("수정에 실패했습니다");
     }
   }
 
   async function toggleSchedule(id: string, isActive: boolean) {
-    const { error } = await supabase
-      .from("schedules")
-      .update({ is_active: isActive })
-      .eq("id", id);
-
-    if (error) {
-      console.error("상태 변경 실패:", error);
-    } else {
-      queryClient.invalidateQueries({ queryKey: scheduleKeys.all });
+    try {
+      const res = await fetch(`/api/schedules/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_active: isActive }),
+      });
+      if (res.ok) {
+        queryClient.invalidateQueries({ queryKey: scheduleKeys.all });
+      } else {
+        console.error("상태 변경 실패");
+      }
+    } catch {
+      console.error("상태 변경 실패");
     }
   }
 
   async function runNow(schedule: Schedule) {
-    alert(`스케줄 "${schedule.name}" 즉시 실행 기능은 백엔드 API가 필요합니다`);
+    if (!confirm(`"${schedule.name}" 스케줄을 지금 실행하시겠습니까?`)) return;
+
+    try {
+      const res = await fetch(`/api/schedules/${schedule.id}/run`, { method: "POST" });
+      const result = await res.json();
+      if (res.ok) {
+        alert(`${result.data?.queued || 0}개의 작업이 대기열에 추가되었습니다`);
+        queryClient.invalidateQueries({ queryKey: scheduleKeys.all });
+      } else {
+        alert(result.error?.message || "실행에 실패했습니다");
+      }
+    } catch {
+      alert("실행 중 오류가 발생했습니다");
+    }
   }
 
   async function duplicateSchedule(schedule: Schedule) {
-    const newSchedule = {
-      name: `${schedule.name} (복사본)`,
-      description: schedule.description,
-      schedule_type: schedule.schedule_type,
-      cron_expression: schedule.cron_expression,
-      interval_minutes: schedule.interval_minutes,
-      target_type: schedule.target_type,
-      target_ids: schedule.target_ids,
-      task_config: schedule.task_config,
-      is_active: false,
-      next_run_at: schedule.next_run_at,
-      run_count: 0,
-    };
-
-    const { error } = await supabase.from("schedules").insert(newSchedule);
-
-    if (error) {
-      alert("복제에 실패했습니다: " + error.message);
-    } else {
-      queryClient.invalidateQueries({ queryKey: scheduleKeys.all });
+    try {
+      const res = await fetch("/api/schedules", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: `${schedule.name} (복사본)`,
+          description: schedule.description,
+          schedule_type: schedule.schedule_type,
+          cron_expression: schedule.cron_expression,
+          interval_minutes: schedule.interval_minutes,
+          target_type: schedule.target_type,
+          target_ids: schedule.target_ids,
+          task_config: schedule.task_config,
+        }),
+      });
+      if (res.ok) {
+        queryClient.invalidateQueries({ queryKey: scheduleKeys.all });
+      } else {
+        const result = await res.json();
+        alert(result.error?.message || "복제에 실패했습니다");
+      }
+    } catch {
+      alert("복제에 실패했습니다");
     }
   }
 
   async function deleteSchedule(id: string) {
     if (!confirm("정말 삭제하시겠습니까?")) return;
 
-    const { error } = await supabase.from("schedules").delete().eq("id", id);
-
-    if (error) {
-      console.error("삭제 실패:", error);
-    } else {
-      queryClient.invalidateQueries({ queryKey: scheduleKeys.all });
+    try {
+      const res = await fetch(`/api/schedules/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        queryClient.invalidateQueries({ queryKey: scheduleKeys.all });
+      } else {
+        console.error("삭제 실패");
+      }
+    } catch {
+      console.error("삭제 실패");
     }
   }
 

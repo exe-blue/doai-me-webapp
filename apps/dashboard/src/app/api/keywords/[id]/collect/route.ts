@@ -86,6 +86,13 @@ export async function POST(
     const videoIds = items.map((item) => item.id.videoId).join(",");
     const detailUrl = `https://www.googleapis.com/youtube/v3/videos?part=contentDetails,statistics&id=${videoIds}&key=${YOUTUBE_API_KEY}`;
     const detailRes = await fetch(detailUrl);
+
+    if (!detailRes.ok) {
+      const err = await detailRes.text();
+      console.error("YouTube Videos API error:", err);
+      return errorResponse("YOUTUBE_API_ERROR", "YouTube 영상 상세정보 API 요청 실패", 502);
+    }
+
     const detailData = await detailRes.json();
 
     const videoDetails = new Map<string, { duration: number; views: number }>();

@@ -132,6 +132,7 @@ export function extractYouTubeChannelId(url: string): string | null {
     /youtube\.com\/@([a-zA-Z0-9_-]+)/,
     /youtube\.com\/c\/([a-zA-Z0-9_-]+)/,
     /^(UC[a-zA-Z0-9_-]{22})$/, // 직접 Channel ID 입력
+    /^@([a-zA-Z0-9_-]+)$/, // @handle 직접 입력
   ];
 
   for (const pattern of patterns) {

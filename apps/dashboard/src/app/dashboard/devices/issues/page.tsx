@@ -328,8 +328,8 @@ export default function DeviceIssuesPage() {
         body: JSON.stringify({ resolution_note: note, resolved_by: "manual" }),
       });
       if (!response.ok) throw new Error("이슈 해결 실패");
-      setIssues(
-        issues.map((issue) =>
+      setIssues((prev) =>
+        prev.map((issue) =>
           issue.id === issueId
             ? {
                 ...issue,
@@ -341,11 +341,11 @@ export default function DeviceIssuesPage() {
             : issue
         )
       );
+      setIsResolveOpen(false);
+      setResolutionNote("");
     } catch (err) {
       console.error("resolveIssue error:", err);
     }
-    setIsResolveOpen(false);
-    setResolutionNote("");
   }
 
   async function bulkResolve(issueIds: string[]) {
@@ -356,8 +356,8 @@ export default function DeviceIssuesPage() {
         body: JSON.stringify({ issue_ids: issueIds, action: "resolve" }),
       });
       if (!response.ok) throw new Error("일괄 해결 실패");
-      setIssues(
-        issues.map((issue) =>
+      setIssues((prev) =>
+        prev.map((issue) =>
           issueIds.includes(issue.id)
             ? {
                 ...issue,
@@ -369,10 +369,10 @@ export default function DeviceIssuesPage() {
             : issue
         )
       );
+      setSelectedIssues([]);
     } catch (err) {
       console.error("bulkResolve error:", err);
     }
-    setSelectedIssues([]);
   }
 
   async function ignoreIssue(issueId: string) {
@@ -383,8 +383,8 @@ export default function DeviceIssuesPage() {
         body: JSON.stringify({ issue_ids: [issueId], action: "ignore" }),
       });
       if (!response.ok) throw new Error("이슈 무시 실패");
-      setIssues(
-        issues.map((issue) =>
+      setIssues((prev) =>
+        prev.map((issue) =>
           issue.id === issueId ? { ...issue, status: "ignored" as const } : issue
         )
       );
@@ -401,8 +401,8 @@ export default function DeviceIssuesPage() {
         body: JSON.stringify({ issue_ids: [issue.id], action: "retry" }),
       });
       if (!response.ok) throw new Error("재시도 실패");
-      setIssues(
-        issues.map((i) =>
+      setIssues((prev) =>
+        prev.map((i) =>
           i.id === issue.id
             ? { ...i, status: "in_progress" as const, auto_retry_count: i.auto_retry_count + 1 }
             : i

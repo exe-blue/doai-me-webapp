@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { supabase } from "@/lib/supabase";
 import { useChannelsQuery, channelKeys, type Channel } from "@/hooks/queries";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -151,25 +150,23 @@ export default function ChannelsPage() {
     }
 
     try {
-      // Use real channel ID if available, otherwise use handle as identifier
-      // Note: For handle-based entries, a backend resolver should be used to fetch the real channel ID
-      const channelId = channelInfo.type === "id" ? channelInfo.value : null;
-      const channelHandle = channelInfo.value;
-      
-      const { error } = await supabase.from("channels").insert({
-        // Only set id if we have a real YouTube channel ID (starts with UC)
-        ...(channelId ? { id: channelId } : {}),
-        name: channelHandle,
-        handle: channelHandle,
-        auto_collect: newChannel.auto_collect,
-        status: "active",
+      const res = await fetch("/api/channels", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          youtube_url: newChannel.url,
+          name: channelInfo.value,
+          handle: channelInfo.value,
+          auto_collect: newChannel.auto_collect,
+        }),
       });
+      const result = await res.json();
 
-      if (error) {
-        if (error.code === "23505") {
+      if (!res.ok) {
+        if (result.error?.code === "DUPLICATE") {
           alert("이미 등록된 채널입니다");
         } else {
-          alert("채널 등록에 실패했습니다: " + error.message);
+          alert(result.error?.message || "채널 등록에 실패했습니다");
         }
         return;
       }
@@ -186,28 +183,36 @@ export default function ChannelsPage() {
   }
 
   async function updateChannelStatus(channelId: string, status: Channel["status"]) {
-    const { error } = await supabase
-      .from("channels")
-      .update({ status })
-      .eq("id", channelId);
-
-    if (error) {
-      console.error("상태 변경 실패:", error);
-    } else {
-      queryClient.invalidateQueries({ queryKey: channelKeys.all });
+    try {
+      const res = await fetch(`/api/channels/${channelId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      if (res.ok) {
+        queryClient.invalidateQueries({ queryKey: channelKeys.all });
+      } else {
+        console.error("상태 변경 실패");
+      }
+    } catch {
+      console.error("상태 변경 실패");
     }
   }
 
   async function toggleAutoCollect(channelId: string, autoCollect: boolean) {
-    const { error } = await supabase
-      .from("channels")
-      .update({ auto_collect: autoCollect })
-      .eq("id", channelId);
-
-    if (error) {
-      console.error("자동 수집 설정 변경 실패:", error);
-    } else {
-      queryClient.invalidateQueries({ queryKey: channelKeys.all });
+    try {
+      const res = await fetch(`/api/channels/${channelId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ auto_collect: autoCollect }),
+      });
+      if (res.ok) {
+        queryClient.invalidateQueries({ queryKey: channelKeys.all });
+      } else {
+        console.error("자동 수집 설정 변경 실패");
+      }
+    } catch {
+      console.error("자동 수집 설정 변경 실패");
     }
   }
 
@@ -234,31 +239,28 @@ export default function ChannelsPage() {
     setIsDetailOpen(true);
 
     // 채널의 등록된 영상 목록 가져오기
-    const { data, error } = await supabase
-      .from("videos")
-      .select("id, title, thumbnail_url, completed_views, target_views, status")
-      .eq("channel_id", channel.id)
-      .order("created_at", { ascending: false })
-      .limit(20);
-
-    if (error) {
-      console.error("채널 영상 로드 실패:", error);
+    try {
+      const res = await fetch(`/api/videos?channelId=${channel.id}&pageSize=20`);
+      const result = await res.json();
+      setChannelVideos(result.data?.items || []);
+    } catch {
+      console.error("채널 영상 로드 실패");
       setChannelVideos([]);
-      return;
     }
-
-    setChannelVideos(data || []);
   }
 
   async function deleteChannel(channelId: string) {
     if (!confirm("정말 삭제하시겠습니까?")) return;
 
-    const { error } = await supabase.from("channels").delete().eq("id", channelId);
-
-    if (error) {
-      console.error("삭제 실패:", error);
-    } else {
-      queryClient.invalidateQueries({ queryKey: channelKeys.all });
+    try {
+      const res = await fetch(`/api/channels/${channelId}`, { method: "DELETE" });
+      if (res.ok) {
+        queryClient.invalidateQueries({ queryKey: channelKeys.all });
+      } else {
+        console.error("삭제 실패");
+      }
+    } catch {
+      console.error("삭제 실패");
     }
   }
 
@@ -662,10 +664,11 @@ export default function ChannelsPage() {
                         variant="outline"
                         size="sm"
                         className="w-full mt-2 text-xs"
-                        onClick={() => alert('WebSub 연동 필요')}
+                        disabled
+                        title="WebSub 연동이 구현되면 활성화됩니다"
                       >
                         <Bell className="h-3 w-3 mr-1.5" />
-                        알림 갱신
+                        알림 갱신 (준비중)
                       </Button>
                     </div>
 

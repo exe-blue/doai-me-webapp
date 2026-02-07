@@ -12,18 +12,10 @@ import { parseExpression } from "cron-parser";
 export async function GET(request: NextRequest) {
   try {
     const supabase = getServerClient();
-    const { page, pageSize, status, type, sortBy = "created_at", sortOrder = "desc" } =
+    const { page, pageSize, sortBy = "created_at", sortOrder = "desc" } =
       getQueryParams(request);
 
     let query = supabase.from("schedules").select("*", { count: "exact" });
-
-    // 필터링
-    if (status && status !== "all") {
-      query = query.eq("status", status);
-    }
-    if (type && type !== "all") {
-      query = query.eq("type", type);
-    }
 
     // 정렬
     const validSortFields = ["created_at", "name", "next_run_at"];
@@ -52,7 +44,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const supabase = getServerClient();
-    
+
     let body;
     try {
       body = await request.json();
@@ -60,29 +52,22 @@ export async function POST(request: NextRequest) {
       return errorResponse("INVALID_JSON", "요청 본문이 유효한 JSON이 아닙니다", 400);
     }
 
-    const { name, type, config, video_ids } = body;
+    const { name, schedule_type, cron_expression, interval_minutes, target_type, target_ids, task_config, description } = body;
 
     if (!name) {
       return errorResponse("INVALID_REQUEST", "name이 필요합니다", 400);
     }
-    if (!type || !["once", "interval", "cron"].includes(type)) {
-      return errorResponse("INVALID_TYPE", "유효한 type이 필요합니다 (once, interval, cron)", 400);
-    }
-    if (!video_ids || !Array.isArray(video_ids)) {
-      return errorResponse("INVALID_REQUEST", "video_ids가 필요합니다", 400);
+    if (!schedule_type || !["interval", "cron", "once"].includes(schedule_type)) {
+      return errorResponse("INVALID_TYPE", "유효한 schedule_type이 필요합니다 (interval, cron, once)", 400);
     }
 
     // next_run_at 계산
     let nextRunAt: string | null = null;
-    if (type === "once" && config?.run_at) {
-      nextRunAt = config.run_at;
-    } else if (type === "interval" && config?.interval_minutes) {
-      nextRunAt = new Date(
-        Date.now() + config.interval_minutes * 60 * 1000
-      ).toISOString();
-    } else if (type === "cron" && config?.cron) {
+    if (schedule_type === "interval" && interval_minutes) {
+      nextRunAt = new Date(Date.now() + interval_minutes * 60 * 1000).toISOString();
+    } else if (schedule_type === "cron" && cron_expression) {
       try {
-        const interval = parseExpression(config.cron);
+        const interval = parseExpression(cron_expression);
         nextRunAt = interval.next().toISOString();
       } catch {
         return errorResponse("INVALID_CRON", "유효하지 않은 cron 표현식입니다", 400);
@@ -91,14 +76,16 @@ export async function POST(request: NextRequest) {
 
     const scheduleData = {
       name,
-      type,
-      config: config || {},
-      video_ids,
-      video_count: video_ids.length,
-      status: "active",
-      last_run_at: null,
+      description: description || null,
+      schedule_type,
+      cron_expression: schedule_type === "cron" ? cron_expression : null,
+      interval_minutes: schedule_type === "interval" ? interval_minutes : null,
+      target_type: target_type || "all_videos",
+      target_ids: target_type !== "all_videos" ? target_ids : null,
+      task_config: task_config || {},
+      is_active: true,
       next_run_at: nextRunAt,
-      total_runs: 0,
+      run_count: 0,
     };
 
     const { data, error } = await supabase

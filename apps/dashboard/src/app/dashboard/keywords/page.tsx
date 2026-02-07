@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { supabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
 import { useKeywordsQuery, keywordKeys } from "@/hooks/queries";
 import type { Keyword } from "@/hooks/queries";
@@ -144,35 +143,33 @@ export default function KeywordsPage() {
       return;
     }
 
-    const excludeArr = newKeyword.exclude_keywords
-      .split(",")
-      .map((k) => k.trim())
-      .filter((k) => k);
+    try {
+      const res = await fetch("/api/keywords", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          keyword: newKeyword.keyword.trim(),
+          category: newKeyword.category,
+          max_results: newKeyword.max_results,
+        }),
+      });
+      const result = await res.json();
 
-    const { error } = await supabase.from("keywords").insert({
-      keyword: newKeyword.keyword.trim(),
-      category: newKeyword.category,
-      is_active: newKeyword.is_active,
-      collect_interval_hours: newKeyword.collect_interval_hours,
-      max_results: newKeyword.max_results,
-      min_views: newKeyword.min_views,
-      min_duration_sec: newKeyword.min_duration_sec,
-      max_duration_sec: newKeyword.max_duration_sec,
-      exclude_keywords: excludeArr,
-    });
-
-    if (error) {
-      if (error.code === "23505") {
-        alert("이미 등록된 키워드입니다");
-      } else {
-        alert("키워드 등록에 실패했습니다: " + error.message);
+      if (!res.ok) {
+        if (result.error?.code === "DUPLICATE") {
+          alert("이미 등록된 키워드입니다");
+        } else {
+          alert(result.error?.message || "키워드 등록에 실패했습니다");
+        }
+        return;
       }
-      return;
-    }
 
-    setIsAddDialogOpen(false);
-    resetNewKeywordForm();
-    queryClient.invalidateQueries({ queryKey: keywordKeys.all });
+      setIsAddDialogOpen(false);
+      resetNewKeywordForm();
+      queryClient.invalidateQueries({ queryKey: keywordKeys.all });
+    } catch {
+      alert("키워드 등록에 실패했습니다");
+    }
   }
 
   async function handleBulkAdd() {
@@ -186,34 +183,32 @@ export default function KeywordsPage() {
       return;
     }
 
-    const insertData = keywordList.map((keyword) => ({
-      keyword,
-      category: newKeyword.category,
-      is_active: true,
-      collect_interval_hours: newKeyword.collect_interval_hours,
-      max_results: newKeyword.max_results,
-      min_views: newKeyword.min_views,
-      min_duration_sec: newKeyword.min_duration_sec,
-      max_duration_sec: newKeyword.max_duration_sec,
-      exclude_keywords: [],
-    }));
+    try {
+      const res = await fetch("/api/keywords", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          keywords: keywordList,
+          category: newKeyword.category,
+          max_results: newKeyword.max_results,
+        }),
+      });
+      const result = await res.json();
 
-    const { data, error } = await supabase
-      .from("keywords")
-      .upsert(insertData, { onConflict: "keyword", ignoreDuplicates: true })
-      .select();
+      if (!res.ok) {
+        alert(result.error?.message || "대량 등록에 실패했습니다");
+        return;
+      }
 
-    if (error) {
-      alert("대량 등록에 실패했습니다: " + error.message);
-      return;
+      alert(`${result.data?.created || 0}개의 키워드가 등록되었습니다`);
+      setIsAddDialogOpen(false);
+      setBulkKeywords("");
+      setIsBulkMode(false);
+      resetNewKeywordForm();
+      queryClient.invalidateQueries({ queryKey: keywordKeys.all });
+    } catch {
+      alert("대량 등록에 실패했습니다");
     }
-
-    alert(`${data?.length || 0}개의 키워드가 등록되었습니다`);
-    setIsAddDialogOpen(false);
-    setBulkKeywords("");
-    setIsBulkMode(false);
-    resetNewKeywordForm();
-    queryClient.invalidateQueries({ queryKey: keywordKeys.all });
   }
 
   function resetNewKeywordForm() {
@@ -241,41 +236,51 @@ export default function KeywordsPage() {
             .filter((k) => k)
         : editingKeyword.exclude_keywords;
 
-    const { error } = await supabase
-      .from("keywords")
-      .update({
-        keyword: editingKeyword.keyword,
-        category: editingKeyword.category,
-        collect_interval_hours: editingKeyword.collect_interval_hours,
-        max_results: editingKeyword.max_results,
-        min_views: editingKeyword.min_views,
-        min_duration_sec: editingKeyword.min_duration_sec,
-        max_duration_sec: editingKeyword.max_duration_sec,
-        exclude_keywords: excludeArr,
-      })
-      .eq("id", editingKeyword.id);
+    try {
+      const res = await fetch(`/api/keywords/${editingKeyword.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          keyword: editingKeyword.keyword,
+          category: editingKeyword.category,
+          collect_interval_hours: editingKeyword.collect_interval_hours,
+          max_results: editingKeyword.max_results,
+          min_views: editingKeyword.min_views,
+          min_duration_sec: editingKeyword.min_duration_sec,
+          max_duration_sec: editingKeyword.max_duration_sec,
+          exclude_keywords: excludeArr,
+        }),
+      });
+      const result = await res.json();
 
-    if (error) {
-      alert("수정에 실패했습니다: " + error.message);
-      return;
+      if (!res.ok) {
+        alert(result.error?.message || "수정에 실패했습니다");
+        return;
+      }
+
+      setIsEditDialogOpen(false);
+      setEditingKeyword(null);
+      queryClient.invalidateQueries({ queryKey: keywordKeys.all });
+    } catch {
+      alert("수정에 실패했습니다");
     }
-
-    setIsEditDialogOpen(false);
-    setEditingKeyword(null);
-    queryClient.invalidateQueries({ queryKey: keywordKeys.all });
   }
 
   async function toggleKeywordActive(id: number, isActive: boolean) {
-    const { error } = await supabase
-      .from("keywords")
-      .update({ is_active: isActive })
-      .eq("id", id);
-
-    if (error) {
-      console.error("상태 변경 실패:", error);
-      alert(`키워드 상태 변경에 실패했습니다: ${error.message}`);
-    } else {
-      queryClient.invalidateQueries({ queryKey: keywordKeys.all });
+    try {
+      const res = await fetch(`/api/keywords/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_active: isActive }),
+      });
+      if (res.ok) {
+        queryClient.invalidateQueries({ queryKey: keywordKeys.all });
+      } else {
+        const result = await res.json();
+        alert(`키워드 상태 변경에 실패했습니다: ${result.error?.message || ""}`);
+      }
+    } catch {
+      alert("키워드 상태 변경에 실패했습니다");
     }
   }
 
@@ -302,13 +307,16 @@ export default function KeywordsPage() {
   async function deleteKeyword(id: number) {
     if (!confirm("정말 삭제하시겠습니까?")) return;
 
-    const { error } = await supabase.from("keywords").delete().eq("id", id);
-
-    if (error) {
-      console.error("삭제 실패:", error);
-      alert(`키워드 삭제에 실패했습니다: ${error.message}`);
-    } else {
-      queryClient.invalidateQueries({ queryKey: keywordKeys.all });
+    try {
+      const res = await fetch(`/api/keywords/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        queryClient.invalidateQueries({ queryKey: keywordKeys.all });
+      } else {
+        const result = await res.json();
+        alert(`키워드 삭제에 실패했습니다: ${result.error?.message || ""}`);
+      }
+    } catch {
+      alert("키워드 삭제에 실패했습니다");
     }
   }
 
