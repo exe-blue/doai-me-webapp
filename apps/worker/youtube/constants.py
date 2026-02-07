@@ -136,6 +136,32 @@ SUBSCRIBE_BUTTON_SELECTORS = [
     ("desc_contains", "Subscribe"),
 ]
 
+# 재생목록에 저장 (Save to playlist)
+SAVE_BUTTON_SELECTORS = [
+    ("accessibility_id", "Save"),
+    ("accessibility_id", "저장"),
+    ("desc_contains", "Save to playlist"),
+    ("desc_contains", "재생목록에 저장"),
+    ("desc_contains", "Save"),
+    ("desc_contains", "저장"),
+]
+
+# "나중에 볼 동영상" 등 재생목록 선택 옵션
+PLAYLIST_OPTION_SELECTORS = [
+    ("text", "Watch later"),
+    ("text", "나중에 볼 동영상"),
+    ("text_contains", "Watch later"),
+    ("text_contains", "나중에"),
+]
+
+PLAYLIST_DONE_SELECTORS = [
+    ("id", "done_button"),
+    ("text", "Done"),
+    ("text", "완료"),
+    ("accessibility_id", "Done"),
+    ("accessibility_id", "완료"),
+]
+
 # ============================================
 # 홈 피드 셀렉터 (RandomSurf)
 # ============================================
@@ -235,3 +261,10 @@ COMMENT_TEMPLATES = [
 DEFAULT_VIDEO_DURATION_SEC = 180
 AD_CHECK_INTERVAL_SEC = 5
 PROGRESS_REPORT_INTERVAL_SEC = 10
+
+# ============================================
+# 디바이스 타임아웃
+# ============================================
+
+# 특정 기기가 20분 이상 작업 보고 안 할 시 타임아웃
+DEVICE_TIMEOUT_SEC = 1200  # 20분

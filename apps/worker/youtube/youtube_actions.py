@@ -20,6 +20,9 @@ from youtube.constants import (
     COMMENT_INPUT_SELECTORS,
     COMMENT_POST_BUTTON_SELECTORS,
     SUBSCRIBE_BUTTON_SELECTORS,
+    SAVE_BUTTON_SELECTORS,
+    PLAYLIST_OPTION_SELECTORS,
+    PLAYLIST_DONE_SELECTORS,
     COMMENT_TEMPLATES,
     TIMEOUT_ELEMENT_DEFAULT,
     TIMEOUT_ELEMENT_SHORT,
@@ -30,9 +33,9 @@ logger = logging.getLogger(__name__)
 
 class YouTubeInteractions:
     """
-    YouTube 확률적 상호작용 (좋아요, 댓글, 구독).
+    YouTube 확률적 상호작용 (좋아요, 구독, 재생목록 담기, 댓글).
 
-    AutoX.js YouTubeActions.js 포팅:
+    실행 순서 (중복 시): 좋아요 → 구독 → 재생목록 담기 → 댓글
     - 각 액션은 확률에 따라 실행 (prob_like, prob_comment 등)
     - 실패해도 전체 워크플로우에 영향 없음
     """
@@ -49,6 +52,7 @@ class YouTubeInteractions:
         self._did_like = False
         self._did_comment = False
         self._did_subscribe = False
+        self._did_playlist = False
 
     @property
     def did_like(self) -> bool:
@@ -62,49 +66,64 @@ class YouTubeInteractions:
     def did_subscribe(self) -> bool:
         return self._did_subscribe
 
+    @property
+    def did_playlist(self) -> bool:
+        return self._did_playlist
+
     def perform_interactions(
         self,
         prob_like: int = 0,
         prob_comment: int = 0,
         prob_subscribe: int = 0,
+        prob_playlist: int = 0,
         comment_text: Optional[str] = None,
     ) -> dict:
         """
         확률적 상호작용 수행.
 
+        실행 순서: 좋아요 → 구독 → 재생목록 담기 → 댓글
+        (중복 시에도 이 순서를 따름)
+
         Args:
             prob_like: 좋아요 확률 (0-100)
             prob_comment: 댓글 확률 (0-100)
             prob_subscribe: 구독 확률 (0-100)
+            prob_playlist: 재생목록 담기 확률 (0-100)
             comment_text: 댓글 텍스트 (None이면 랜덤 템플릿)
 
         Returns:
-            {did_like, did_comment, did_subscribe} 결과
+            {did_like, did_comment, did_subscribe, did_playlist} 결과
         """
         logger.info(
-            "Performing interactions: like=%d%%, comment=%d%%, subscribe=%d%%",
+            "Performing interactions: like=%d%%, subscribe=%d%%, playlist=%d%%, comment=%d%%",
             prob_like,
-            prob_comment,
             prob_subscribe,
+            prob_playlist,
+            prob_comment,
         )
 
-        # 좋아요
+        # 순서 1: 좋아요
         if prob_like > 0 and random.randint(1, 100) <= prob_like:
             self._try_like()
 
-        # 댓글
+        # 순서 2: 구독
+        if prob_subscribe > 0 and random.randint(1, 100) <= prob_subscribe:
+            self._try_subscribe()
+
+        # 순서 3: 재생목록 담기
+        if prob_playlist > 0 and random.randint(1, 100) <= prob_playlist:
+            self._try_add_to_playlist()
+
+        # 순서 4: 댓글 (직접 입력 형태)
         if prob_comment > 0 and random.randint(1, 100) <= prob_comment:
             text = comment_text or random.choice(COMMENT_TEMPLATES)
             self._try_comment(text)
 
-        # 구독
-        if prob_subscribe > 0 and random.randint(1, 100) <= prob_subscribe:
-            self._try_subscribe()
-
         result = {
             "did_like": self._did_like,
-            "did_comment": self._did_comment,
             "did_subscribe": self._did_subscribe,
+            "did_playlist": self._did_playlist,
+            "did_comment": self._did_comment,
         }
         logger.info("Interactions result: %s", result)
         return result
@@ -209,10 +228,48 @@ class YouTubeInteractions:
         except Exception as e:
             logger.warning("Subscribe failed: %s", e)
 
+    def _try_add_to_playlist(self) -> None:
+        """재생목록에 저장 시도 (나중에 볼 동영상)."""
+        try:
+            save_btn = self.selectors.find_with_fallback(
+                SAVE_BUTTON_SELECTORS,
+                timeout=TIMEOUT_ELEMENT_DEFAULT,
+            )
+            if not save_btn:
+                logger.warning("Save/Playlist button not found")
+                return
+
+            self.actions.tap(save_btn)
+            time.sleep(1.5)
+
+            # "나중에 볼 동영상" 옵션 선택
+            playlist_option = self.selectors.find_with_fallback(
+                PLAYLIST_OPTION_SELECTORS,
+                timeout=TIMEOUT_ELEMENT_SHORT,
+            )
+            if playlist_option:
+                self.actions.tap(playlist_option)
+                time.sleep(0.5)
+
+            # 완료 버튼 (있으면 탭)
+            done_btn = self.selectors.find_with_fallback(
+                PLAYLIST_DONE_SELECTORS,
+                timeout=TIMEOUT_ELEMENT_SHORT,
+            )
+            if done_btn:
+                self.actions.tap(done_btn)
+
+            self._did_playlist = True
+            logger.info("Added to playlist (Watch Later)")
+            time.sleep(1)
+        except Exception as e:
+            logger.warning("Add to playlist failed: %s", e)
+
     def get_results(self) -> dict:
         """상호작용 결과 반환."""
         return {
             "did_like": self._did_like,
             "did_comment": self._did_comment,
             "did_subscribe": self._did_subscribe,
+            "did_playlist": self._did_playlist,
         }

@@ -135,6 +135,16 @@ class AppiumActions:
         h = self.screen_size["height"]
         self.swipe(int(w * 0.2), h // 2, int(w * 0.8), h // 2, duration_ms)
 
+    def double_tap_at(self, x: int, y: int) -> None:
+        """
+        좌표 기반 더블탭 (YouTube 앞으로/뒤로 가기).
+        YouTube에서 오른쪽 더블탭 = 10초 앞으로, 왼쪽 더블탭 = 10초 뒤로.
+        """
+        from appium.webdriver.common.touch_action import TouchAction
+
+        action = TouchAction(self.driver)
+        action.tap(x=x, y=y, count=2).perform()
+
     def activate_app(self, package: str) -> None:
         """
         앱 활성화 (이미 설치된 앱 실행/전환).

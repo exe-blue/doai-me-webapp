@@ -35,8 +35,8 @@ def _get_session_manager():
     bind=True,
     max_retries=2,
     default_retry_delay=30,
-    soft_time_limit=600,
-    time_limit=660,
+    soft_time_limit=1200,
+    time_limit=1260,
 )
 def run_youtube_appium(
     self,
@@ -51,6 +51,7 @@ def run_youtube_appium(
     prob_like: int = 0,
     prob_comment: int = 0,
     prob_subscribe: int = 0,
+    prob_playlist: int = 0,
     comment_text: Optional[str] = None,
 ):
     """
@@ -68,6 +69,7 @@ def run_youtube_appium(
         prob_like: 좋아요 확률 (0-100)
         prob_comment: 댓글 확률 (0-100)
         prob_subscribe: 구독 확률 (0-100)
+        prob_playlist: 재생목록 담기 확률 (0-100)
         comment_text: 댓글 텍스트 (None이면 랜덤)
     """
     from youtube.bot_orchestrator import YouTubeBotOrchestrator, JobParams
@@ -97,6 +99,7 @@ def run_youtube_appium(
             prob_like=prob_like,
             prob_comment=prob_comment,
             prob_subscribe=prob_subscribe,
+            prob_playlist=prob_playlist,
             comment_text=comment_text,
         )
 
@@ -120,6 +123,7 @@ def run_youtube_appium(
             "did_like": result.did_like,
             "did_comment": result.did_comment,
             "did_subscribe": result.did_subscribe,
+            "did_playlist": result.did_playlist,
             "error_code": result.error_code,
             "error_message": result.error_message,
             "ad_stats": result.ad_stats,
@@ -195,6 +199,7 @@ def _report_to_supabase(assignment_id: str, result) -> None:
                     "did_like": result.did_like,
                     "did_comment": result.did_comment,
                     "did_subscribe": result.did_subscribe,
+                    "did_playlist": result.did_playlist,
                     "ad_stats": result.ad_stats,
                 },
             )

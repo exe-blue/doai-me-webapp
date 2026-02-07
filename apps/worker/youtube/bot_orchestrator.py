@@ -30,6 +30,7 @@ from youtube.constants import (
     AD_CHECK_INTERVAL_SEC,
     PROGRESS_REPORT_INTERVAL_SEC,
     TIMEOUT_VIDEO_LOAD,
+    DEVICE_TIMEOUT_SEC,
     ErrorCode,
 )
 
@@ -113,6 +114,7 @@ class YouTubeBotOrchestrator:
         """
         result = JobResult()
         start_time = time.time()
+        last_report_time = start_time  # 20분 타임아웃 추적용
 
         logger.info(
             "Starting YouTube job: assignment=%s, url=%s, keyword=%s",
@@ -124,42 +126,55 @@ class YouTubeBotOrchestrator:
         # 증거 수집 시작
         self.evidence.start_job(params.assignment_id)
 
+        # 진행률 콜백에 20분 타임아웃 체크를 래핑
+        def _progress_with_timeout(progress: float, message: str) -> None:
+            nonlocal last_report_time
+            last_report_time = time.time()
+            if on_progress:
+                on_progress(progress, message)
+
         try:
             # Step 1: YouTube 앱 실행
-            self._report_progress(on_progress, 5, "Launching YouTube")
+            self._report_progress(_progress_with_timeout, 5, "Launching YouTube")
             self._launch_youtube()
 
             # Step 2: 영상 이동 (URL 또는 검색)
-            self._report_progress(on_progress, 10, "Navigating to video")
+            self._report_progress(_progress_with_timeout, 10, "Navigating to video")
             nav_success = self._navigate_to_video(params)
             result.search_success = nav_success
 
             if not nav_success:
                 raise RuntimeError("Failed to navigate to video")
 
-            # Step 3: 영상 시청 (광고 스킵 포함)
-            self._report_progress(on_progress, 20, "Watching video")
+            # Step 3: 영상 시청 (광고 스킵 + 10%마다 앞으로 가기)
+            self._report_progress(_progress_with_timeout, 20, "Watching video")
             watch_duration = self._calculate_watch_duration(params)
             actual_duration = self._watch_video(
                 target_duration=watch_duration,
-                on_progress=on_progress,
+                on_progress=_progress_with_timeout,
             )
             result.duration_sec = actual_duration
 
-            # Step 4: 상호작용 (좋아요/댓글/구독)
-            self._report_progress(on_progress, 85, "Performing interactions")
+            # 20분 타임아웃 체크
+            if time.time() - last_report_time > DEVICE_TIMEOUT_SEC:
+                raise RuntimeError(f"Device timeout: no progress report for {DEVICE_TIMEOUT_SEC}s")
+
+            # Step 4: 상호작용 (좋아요→구독→담기→댓글 순서)
+            self._report_progress(_progress_with_timeout, 85, "Performing interactions")
             interaction_result = self.interactions.perform_interactions(
                 prob_like=params.prob_like,
                 prob_comment=params.prob_comment,
                 prob_subscribe=params.prob_subscribe,
+                prob_playlist=params.prob_playlist,
                 comment_text=params.comment_text,
             )
             result.did_like = interaction_result["did_like"]
             result.did_comment = interaction_result["did_comment"]
             result.did_subscribe = interaction_result["did_subscribe"]
+            result.did_playlist = interaction_result.get("did_playlist", False)
 
             # Step 5: 완료
-            self._report_progress(on_progress, 100, "Completed")
+            self._report_progress(_progress_with_timeout, 100, "Completed")
             result.success = True
             result.ad_stats = self.ad_skipper.get_stats()
 
@@ -249,14 +264,15 @@ class YouTubeBotOrchestrator:
     def _watch_video(
         self,
         target_duration: float,
+        watch_pct: int = 10,
         on_progress: Optional[Callable[[float, str], None]] = None,
     ) -> float:
         """
-        영상 시청 (광고 스킵 포함 인라인 폴링).
+        영상 시청 (광고 스킵 + 10%마다 앞으로 가기).
 
-        AutoX.js 아키텍처 변경:
-        - 기존: 백그라운드 스레드 + sleep(duration)
-        - 신규: AD_CHECK_INTERVAL_SEC 간격 인라인 루프
+        시청 구간이 watch_pct(기본 10%)일 때:
+        - 총 시청 시간의 N% 지점마다 영상 오른쪽 더블탭 (앞으로 건너뛰기)
+        - 예: 90%면 9번 앞으로 가기 (10%, 20%, ... 90% 지점에서)
 
         Returns:
             실제 시청 시간 (초)
@@ -275,8 +291,9 @@ class YouTubeBotOrchestrator:
         stall_monitor = self.error_recovery.create_stall_monitor()
         elapsed = 0.0
         last_progress_report = 0.0
+        next_skip_pct = watch_pct  # 다음 앞으로 가기 지점 (%)
 
-        logger.info("Watching video for %.0fs", target_duration)
+        logger.info("Watching video for %.0fs (skip every %d%%)", target_duration, watch_pct)
 
         while elapsed < target_duration:
             # 광고 체크 + 스킵
@@ -288,7 +305,14 @@ class YouTubeBotOrchestrator:
 
             # 진행률 업데이트
             progress_pct = min(elapsed / target_duration, 1.0)
+            current_pct_int = int(progress_pct * 100)
             stall_monitor.update(progress_pct)
+
+            # 10%마다 앞으로 가기 (영상 오른쪽 더블탭)
+            if current_pct_int >= next_skip_pct and next_skip_pct < 100:
+                self._skip_forward()
+                logger.info("Skip forward at %d%% (%.0fs)", next_skip_pct, elapsed)
+                next_skip_pct += watch_pct
 
             # 주기적 진행률 보고
             if elapsed - last_progress_report >= PROGRESS_REPORT_INTERVAL_SEC:
@@ -297,7 +321,7 @@ class YouTubeBotOrchestrator:
                 self._report_progress(
                     on_progress,
                     overall,
-                    f"Watching: {elapsed:.0f}/{target_duration:.0f}s ({progress_pct*100:.0f}%)",
+                    f"Watching: {elapsed:.0f}/{target_duration:.0f}s ({current_pct_int}%)",
                 )
 
             # YouTube 크래시 감지
@@ -312,6 +336,18 @@ class YouTubeBotOrchestrator:
 
         logger.info("Watch completed: %.1fs", elapsed)
         return elapsed
+
+    def _skip_forward(self) -> None:
+        """영상 오른쪽 더블탭으로 앞으로 가기 (10초 전진)."""
+        try:
+            # 화면 오른쪽 3/4 지점 더블탭 = YouTube 앞으로 10초
+            screen_size = self.driver.get_window_size()
+            x = int(screen_size["width"] * 0.75)
+            y = int(screen_size["height"] * 0.4)
+            self.actions.double_tap_at(x, y)
+            time.sleep(0.5)
+        except Exception as e:
+            logger.debug("Skip forward failed: %s", e)
 
     @staticmethod
     def _report_progress(
