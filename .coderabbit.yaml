@@ -1,0 +1,241 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+
+# ─── 일반 설정 ───────────────────────────────────────────────
+language: "ko-KR"
+early_access: false
+enable_free_tier: true
+tone_instructions: >-
+  Be direct and concise. Focus on actionable feedback.
+  This is a device farm orchestration platform with strict architecture rules
+  (Command & Control + State Machine). Flag any violations immediately.
+
+# ─── Knowledge Base ──────────────────────────────────────────
+knowledge_base:
+  opt_out: false
+  web_search:
+    enabled: true
+  learnings:
+    scope: auto
+  issues:
+    scope: auto
+  pull_requests:
+    scope: auto
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "CLAUDE.md"
+      - ".cursorrules"
+      - "docs/rules/RULE_ARCH.md"
+      - "docs/rules/RULE_UI.md"
+
+# ─── Chat 설정 ───────────────────────────────────────────────
+chat:
+  auto_reply: true
+
+# ─── Reviews 설정 ────────────────────────────────────────────
+reviews:
+  profile: "assertive"
+  request_changes_workflow: true
+  high_level_summary: true
+  high_level_summary_placeholder: "@coderabbitai summary"
+  poem: false
+  review_status: true
+  review_details: true
+  collapse_walkthrough: false
+  changed_files_summary: true
+  sequence_diagrams: true
+  assess_linked_issues: true
+  related_issues: true
+  related_prs: true
+  suggested_labels: true
+  suggested_reviewers: true
+  estimate_code_review_effort: true
+  enable_prompt_for_ai_agents: true
+  abort_on_close: true
+
+  # ─── 자동 리뷰 ──────────────────────────────────────────
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    drafts: false
+    ignore_title_keywords:
+      - "WIP"
+      - "DO NOT MERGE"
+      - "DRAFT"
+    base_branches:
+      - "main"
+      - "develop"
+
+  # ─── 경로 필터 (리뷰 제외 대상) ─────────────────────────
+  path_filters:
+    - "!_reference/**"
+    - "!_archive/**"
+    - "!**/node_modules/**"
+    - "!**/dist/**"
+    - "!**/.next/**"
+    - "!**/storybook-static/**"
+    - "!**/*.lock"
+    - "!**/package-lock.json"
+    - "!infra/database/supabase-schema.sql"
+
+  # ─── 경로별 리뷰 지침 ───────────────────────────────────
+  path_instructions:
+    - path: "apps/backend/**"
+      instructions: >-
+        This is the Express + Socket.IO backend server.
+        CRITICAL architecture rules to enforce:
+        1. Only the server can change device state via stateService.updateDeviceState()
+        2. Server-to-node commands must use "cmd:" prefix
+        3. Node-to-server events must use "evt:" prefix
+        4. All Redis access must go through redisService (no direct key manipulation)
+        5. BullMQ queues must be distributed per-node (no single global queue)
+        6. All state transitions must follow the defined state machine
+        7. No console.log in production code (use logger)
+
+    - path: "apps/dashboard/**"
+      instructions: >-
+        This is the Next.js 16 dashboard (App Router).
+        Review for:
+        1. Proper use of TanStack Query for server state
+        2. Socket.IO usage through hooks/use-socket.ts
+        3. Auth handled via contexts/auth-context.tsx
+        4. Tailwind CSS v4 with NeoBrutalist/RetroUI design system
+        5. No CSS-in-JS or inline styles
+        6. Import paths use @/* or @packages/* aliases (no deep relative paths)
+        7. No console.log in production code
+
+    - path: "apps/desktop-agent/**"
+      instructions: >-
+        This is the Electron desktop agent.
+        CRITICAL: Agents must NEVER decide device state.
+        They only report events (evt:*) and execute commands (cmd:*).
+        Check for:
+        1. No state decision logic (agent only reports, server decides)
+        2. Proper evt: prefix on all emitted events
+        3. No cmd: events being emitted (only server sends commands)
+        4. Proper error handling and recovery
+
+    - path: "apps/youtube-bot/**"
+      instructions: >-
+        YouTube automation worker bot.
+        Verify workflow steps follow YAML definitions.
+        Check for proper error handling and retry logic.
+
+    - path: "apps/install-bot/**"
+      instructions: >-
+        App installation worker bot.
+        Verify ADB commands are handled safely.
+        Check for proper error handling and retry logic.
+
+    - path: "apps/health-bot/**"
+      instructions: >-
+        Device health monitoring worker bot.
+        Verify health check logic and alerting thresholds.
+
+    - path: "packages/shared/**"
+      instructions: >-
+        Shared types, API contracts, and socket events.
+        Changes here affect ALL apps.
+        Verify:
+        1. No breaking changes to exported types
+        2. State machine transitions match the defined valid transitions
+        3. Socket event names follow cmd:/evt: prefix convention
+        4. Named exports only (no default exports)
+
+    - path: "packages/ui/**"
+      instructions: >-
+        Shared UI component library (Radix UI + RetroUI/NeoBrutalist).
+        Verify:
+        1. Components use cva() for variants
+        2. cn() from @packages/ui/lib/utils for className merging
+        3. React.forwardRef + displayName on all components
+        4. NeoBrutalist tokens: border-2 border-black, shadow-md, hover:translate-y-1
+        5. CSS variables (bg-primary, text-foreground), not hardcoded colors
+        6. kebab-case folder structure: {name}/{name}.tsx + {name}.stories.tsx
+        7. New components re-exported from packages/ui/src/index.ts
+        8. Named exports only (no default exports)
+
+    - path: "packages/workflow-engine/**"
+      instructions: >-
+        YAML workflow parser and runner.
+        Verify:
+        1. Workflows defined in YAML, not hardcoded
+        2. Each step has unique id, timeout, and retry config
+        3. Error policies (fail/skip/goto) properly handled
+
+    - path: "**/*.test.{ts,tsx}"
+      instructions: >-
+        Test files using Vitest.
+        Verify proper test coverage and meaningful assertions.
+        Dashboard tests should use jsdom environment.
+        Backend tests should use Node environment.
+
+  # ─── 도구 통합 ───────────────────────────────────────────
+  tools:
+    eslint:
+      enabled: true
+    biome:
+      enabled: true
+    markdownlint:
+      enabled: true
+    languagetool:
+      enabled: true
+      disabled_categories:
+        - "TYPOS"
+        - "TYPOGRAPHY"
+        - "CASING"
+      level: "default"
+    shellcheck:
+      enabled: true
+    hadolint:
+      enabled: true
+    yamllint:
+      enabled: true
+    gitleaks:
+      enabled: true
+    github-checks:
+      enabled: true
+      timeout_ms: 120000
+    actionlint:
+      enabled: true
+
+  # ─── 라벨링 지침 ─────────────────────────────────────────
+  labeling_instructions:
+    - label: "architecture"
+      instructions: "Changes to Command & Control pattern, state machine, or system architecture in apps/backend or packages/shared"
+    - label: "frontend"
+      instructions: "Changes to apps/dashboard or packages/ui"
+    - label: "backend"
+      instructions: "Changes to apps/backend"
+    - label: "agent"
+      instructions: "Changes to apps/desktop-agent"
+    - label: "worker"
+      instructions: "Changes to apps/youtube-bot, apps/install-bot, apps/health-bot, or packages/worker-core"
+    - label: "shared"
+      instructions: "Changes to packages/shared that affect multiple apps"
+    - label: "infra"
+      instructions: "Changes to infra/, Docker, nginx, or CI/CD configuration"
+    - label: "breaking-change"
+      instructions: "Changes that break backward compatibility in shared types, APIs, or socket events"
+
+# ─── Finishing Touches ───────────────────────────────────────
+finishing_touches:
+  docstrings:
+    enabled: true
+  unit_tests:
+    enabled: true
+
+# ─── Code Generation ────────────────────────────────────────
+code_generation:
+  docstrings:
+    language: "ko-KR"
+  unit_tests:
+    path_instructions:
+      - path: "apps/dashboard/**"
+        instructions: >-
+          Use Vitest with jsdom environment and React Testing Library.
+          Test files should be co-located in __tests__/ directories.
+      - path: "apps/backend/**"
+        instructions: >-
+          Use Vitest with Node environment.
+          Focus on integration tests for database repositories.
