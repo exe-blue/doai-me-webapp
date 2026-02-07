@@ -50,7 +50,7 @@
     "@vitest/coverage-v8": "^4.0.18",
     "cross-env": "^7.0.3",
     "electron": "40.1.0",
-    "electron-builder": "^24.13.2",
+    "electron-builder": "^26.7.0",
     "typescript": "^5.3.3",
     "vitest": "^4.0.18"
   },
