@@ -23,7 +23,10 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+  Label,
+  Slider,
+  Textarea,
+} from "@packages/ui";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -49,10 +52,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { StatsCard } from "@/components/ui/stats-card";
-import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Slider } from "@/components/ui/slider";
-import { Textarea } from "@/components/ui/textarea";
 
 interface Keyword {
   id: number;

@@ -29,7 +29,10 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+  Label,
+  Slider,
+  ScrollArea,
+} from "@packages/ui";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -54,10 +57,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Slider } from "@/components/ui/slider";
-import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface QueueItem {
   id: string;

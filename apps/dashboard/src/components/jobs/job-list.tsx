@@ -13,7 +13,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
+import { Progress } from '@packages/ui';
 import { cn } from '@/lib/utils';
 import { useSocketContext } from '@/contexts/socket-context';
 

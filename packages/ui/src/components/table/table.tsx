@@ -1,13 +1,8 @@
 "use client"
 
 import * as React from "react"
+import { cn } from "@packages/ui/lib/utils"
 
-import { cn } from "@/lib/utils"
-
-/**
- * Table - NeoBrutalist 스타일 테이블
- * 두꺼운 테두리, 강렬한 헤더
- */
 const Table = React.forwardRef<
   HTMLTableElement,
   React.HTMLAttributes<HTMLTableElement>
@@ -26,13 +21,13 @@ const TableHeader = React.forwardRef<
   HTMLTableSectionElement,
   React.HTMLAttributes<HTMLTableSectionElement>
 >(({ className, ...props }, ref) => (
-  <thead 
-    ref={ref} 
+  <thead
+    ref={ref}
     className={cn(
       "bg-muted border-b-2 border-foreground [&_tr]:border-0",
       className
-    )} 
-    {...props} 
+    )}
+    {...props}
   />
 ))
 TableHeader.displayName = "TableHeader"

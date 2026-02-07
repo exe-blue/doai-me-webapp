@@ -27,7 +27,10 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+  Label,
+  Slider,
+  Progress,
+} from "@packages/ui";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -52,10 +55,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
-import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
-import { Progress } from "@/components/ui/progress";
 import { VideoKpiStrip } from "@/components/video/video-kpi-strip";
 
 interface Video {

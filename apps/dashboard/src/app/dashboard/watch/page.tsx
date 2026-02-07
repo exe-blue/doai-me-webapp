@@ -16,7 +16,7 @@ import {
   PaginationLink,
   PaginationNext,
   PaginationPrevious,
-} from "@/components/ui/pagination";
+} from "@packages/ui";
 
 export default function WatchPage() {
   const [sessions, setSessions] = useState<WatchSession[]>([]);

@@ -9,7 +9,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@packages/ui";
 import { Monitor, Smartphone, AlertCircle, RefreshCw } from "lucide-react";
 
 interface WatchStatusData {

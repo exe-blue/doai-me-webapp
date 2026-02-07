@@ -16,7 +16,7 @@ import {
 import { WatchStatusModal } from "@/components/watch/watch-status-modal";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@packages/ui";
 import {
   Dialog,
   DialogContent,

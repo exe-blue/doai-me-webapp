@@ -30,7 +30,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+} from '@packages/ui';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import { useSocketContext } from '@/contexts/socket-context';

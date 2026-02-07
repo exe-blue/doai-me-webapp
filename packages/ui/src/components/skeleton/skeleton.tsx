@@ -3,7 +3,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@packages/ui/lib/utils";
 
 const skeletonVariants = cva(
-  "border-2 border-border",
+  "border-2 border-border rounded-md",
   {
     variants: {
       variant: {
@@ -27,6 +27,7 @@ export interface SkeletonProps
 function Skeleton({ className, variant, ...props }: SkeletonProps) {
   return (
     <div
+      data-slot="skeleton"
       className={cn(skeletonVariants({ variant }), className)}
       {...props}
     />

@@ -1,21 +1,19 @@
-"use client";
+"use client"
 
-import * as React from "react";
-import * as SheetPrimitive from "@radix-ui/react-dialog";
-import { X } from "lucide-react";
-import { type VariantProps, cva } from "class-variance-authority";
+import * as React from "react"
+import * as SheetPrimitive from "@radix-ui/react-dialog"
+import { X } from "lucide-react"
+import { type VariantProps, cva } from "class-variance-authority"
+import { cn } from "@packages/ui/lib/utils"
 
-import { cn } from "@/lib/utils";
+const Sheet = SheetPrimitive.Root
 
-const Sheet = SheetPrimitive.Root;
+const SheetTrigger = SheetPrimitive.Trigger
 
-const SheetTrigger = SheetPrimitive.Trigger;
+const SheetClose = SheetPrimitive.Close
 
-const SheetClose = SheetPrimitive.Close;
+const SheetPortal = SheetPrimitive.Portal
 
-const SheetPortal = SheetPrimitive.Portal;
-
-// 시트 오버레이 (배경)
 const SheetOverlay: React.FC<
   React.ComponentPropsWithRef<typeof SheetPrimitive.Overlay>
 > = ({ className, ...props }) => (
@@ -26,13 +24,9 @@ const SheetOverlay: React.FC<
     )}
     {...props}
   />
-);
-SheetOverlay.displayName = SheetPrimitive.Overlay.displayName;
+)
+SheetOverlay.displayName = SheetPrimitive.Overlay.displayName
 
-/**
- * Sheet Variants - NeoBrutalist 스타일
- * 두꺼운 테두리, 그림자
- */
 const sheetVariants = cva(
   "bg-background fixed z-50 gap-4 p-6 transition ease-in-out border-2 border-foreground shadow-[8px_8px_0px_0px] shadow-foreground data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:duration-500",
   {
@@ -50,15 +44,12 @@ const sheetVariants = cva(
       side: "right",
     },
   }
-);
+)
 
 interface SheetContentProps
   extends React.ComponentPropsWithoutRef<typeof SheetPrimitive.Content>,
     VariantProps<typeof sheetVariants> {}
 
-/**
- * SheetContent - NeoBrutalist 스타일 시트 콘텐츠
- */
 const SheetContent: React.FC<SheetContentProps> = ({
   side = "right",
   className,
@@ -73,15 +64,14 @@ const SheetContent: React.FC<SheetContentProps> = ({
     >
       <SheetPrimitive.Close className="absolute top-4 right-4 p-1 border-2 border-foreground hover:bg-primary hover:text-primary-foreground transition-colors disabled:pointer-events-none">
         <X className="h-4 w-4" />
-        <span className="sr-only">닫기</span>
+        <span className="sr-only">Close</span>
       </SheetPrimitive.Close>
       {children}
     </SheetPrimitive.Content>
   </SheetPortal>
-);
-SheetContent.displayName = SheetPrimitive.Content.displayName;
+)
+SheetContent.displayName = SheetPrimitive.Content.displayName
 
-// 시트 헤더
 const SheetHeader = ({
   className,
   ...props
@@ -90,10 +80,9 @@ const SheetHeader = ({
     className={cn("flex flex-col gap-y-3 text-center sm:text-left", className)}
     {...props}
   />
-);
-SheetHeader.displayName = "SheetHeader";
+)
+SheetHeader.displayName = "SheetHeader"
 
-// 시트 푸터
 const SheetFooter = ({
   className,
   ...props
@@ -105,10 +94,9 @@ const SheetFooter = ({
     )}
     {...props}
   />
-);
-SheetFooter.displayName = "SheetFooter";
+)
+SheetFooter.displayName = "SheetFooter"
 
-// 시트 제목
 const SheetTitle: React.FC<
   React.ComponentPropsWithoutRef<typeof SheetPrimitive.Title>
 > = ({ className, ...props }) => (
@@ -116,10 +104,9 @@ const SheetTitle: React.FC<
     className={cn("text-foreground text-lg font-semibold", className)}
     {...props}
   />
-);
-SheetTitle.displayName = SheetPrimitive.Title.displayName;
+)
+SheetTitle.displayName = SheetPrimitive.Title.displayName
 
-// 시트 설명
 const SheetDescription: React.FC<
   React.ComponentPropsWithoutRef<typeof SheetPrimitive.Description>
 > = ({ className, ...props }) => (
@@ -127,8 +114,8 @@ const SheetDescription: React.FC<
     className={cn("text-muted-foreground text-sm", className)}
     {...props}
   />
-);
-SheetDescription.displayName = SheetPrimitive.Description.displayName;
+)
+SheetDescription.displayName = SheetPrimitive.Description.displayName
 
 export {
   Sheet,
@@ -141,4 +128,4 @@ export {
   SheetFooter,
   SheetTitle,
   SheetDescription,
-};
+}

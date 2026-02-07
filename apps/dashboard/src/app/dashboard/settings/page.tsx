@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Slider } from '@/components/ui/slider';
+import { Slider } from '@packages/ui';
 import { Switch } from '@/components/ui/switch';
 import {
   Wifi,

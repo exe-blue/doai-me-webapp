@@ -22,6 +22,8 @@ export const buttonVariants = cva(
           "shadow-md hover:shadow active:shadow-none bg-destructive text-destructive-foreground border-2 border-border transition hover:translate-y-1 active:translate-y-2 active:translate-x-1",
         outline:
           "shadow-md hover:shadow active:shadow-none bg-transparent border-2 border-border transition hover:translate-y-1 active:translate-y-2 active:translate-x-1",
+        noShadow:
+          "bg-background text-foreground border-2 border-border hover:bg-accent",
         ghost:
           "bg-transparent hover:bg-accent border-2 border-transparent",
         link:

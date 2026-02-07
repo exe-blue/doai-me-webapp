@@ -36,7 +36,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+  Progress,
+} from "@packages/ui";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -60,7 +61,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import {
   Tooltip,
   TooltipContent,

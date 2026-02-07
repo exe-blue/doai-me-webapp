@@ -9,8 +9,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { Progress } from '@/components/ui/progress';
+  Progress,
+} from '@packages/ui';
 import {
   Tooltip,
   TooltipContent,
