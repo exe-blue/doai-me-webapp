@@ -1,5 +1,8 @@
 // ============================================
 // Socket.IO 이벤트 스펙
+//
+// @deprecated 새 코드는 `events.ts`의 JobAssignPayload / JobProgressPayload / JobCompletePayload 사용.
+// 이 파일은 하위 호환성을 위해 유지됨.
 // ============================================
 
 import type {

@@ -42,5 +42,11 @@ export * from "./error-codes";
 // 상수
 export * from "./constants";
 
-// 기존 호환성 유지
+// 봇 카탈로그
+export * from "./bot-catalog";
+
+// 정규 이벤트 맵 (Canonical Event Map)
+export * from "./events";
+
+// 기존 호환성 유지 (deprecated — 새 코드는 events.ts 사용)
 export * from "./socket-events";

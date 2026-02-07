@@ -1,7 +1,10 @@
 /**
  * Socket.IO 이벤트 타입 정의 (공유)
- * 
+ *
  * Backend ↔ Desktop Agent 간 통신 이벤트
+ *
+ * @deprecated 새 코드는 `events.ts`의 CANONICAL_WORKER_EVENTS / CANONICAL_DASHBOARD_EVENTS 사용.
+ * 이 파일은 하위 호환성을 위해 유지됨.
  */
 
 // ============================================
