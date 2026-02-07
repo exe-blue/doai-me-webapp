@@ -23,36 +23,14 @@ export async function GET(request: NextRequest) {
       sortOrder = "desc",
     } = getQueryParams(request);
 
-    let query = supabase.from("video_executions").select(
-      `*,
-      videos(title, thumbnail_url, channel_name)`,
-      { count: "exact" }
-    );
+    // Try FK join first, fallback to manual join if FK doesn't exist
+    let data: Record<string, unknown>[] | null = null;
+    let count: number | null = null;
+    let usedFallback = false;
 
-    // 완료된 실행만 조회 (기본)
-    if (status && status !== "all") {
-      query = query.eq("status", status);
-    } else {
-      query = query.in("status", ["completed", "failed", "cancelled"]);
-    }
-
-    if (nodeId && nodeId !== "all") {
-      query = query.eq("node_id", nodeId);
-    }
-    if (deviceId) {
-      query = query.eq("device_id", deviceId);
-    }
-    if (videoId) {
-      query = query.eq("video_id", videoId);
-    }
-    if (dateFrom) {
-      query = query.gte("started_at", dateFrom);
-    }
-    if (dateTo) {
-      query = query.lte("started_at", dateTo);
-    }
-
-    // 정렬 - Map API field names to DB column names
+    // Build base filters
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
     const sortFieldMap: Record<string, string> = {
       "started_at": "started_at",
       "duration": "actual_watch_seconds",
@@ -60,17 +38,64 @@ export async function GET(request: NextRequest) {
     const validApiSortFields = ["started_at", "duration"];
     const apiSortField = validApiSortFields.includes(sortBy) ? sortBy : "started_at";
     const dbSortField = sortFieldMap[apiSortField];
-    query = query.order(dbSortField, { ascending: sortOrder === "asc", nullsFirst: false });
 
-    // 페이지네이션
-    const from = (page - 1) * pageSize;
-    const to = from + pageSize - 1;
-    query = query.range(from, to);
+    // Attempt 1: FK join
+    {
+      let query = supabase.from("video_executions").select(
+        `*, videos(title, thumbnail_url, channel_name)`,
+        { count: "exact" }
+      );
+      if (status && status !== "all") query = query.eq("status", status);
+      else query = query.in("status", ["completed", "failed", "cancelled"]);
+      if (nodeId && nodeId !== "all") query = query.eq("node_id", nodeId);
+      if (deviceId) query = query.eq("device_id", deviceId);
+      if (videoId) query = query.eq("video_id", videoId);
+      if (dateFrom) query = query.gte("started_at", dateFrom);
+      if (dateTo) query = query.lte("started_at", dateTo);
+      query = query.order(dbSortField, { ascending: sortOrder === "asc", nullsFirst: false });
+      query = query.range(from, to);
 
-    const { data, error, count } = await query;
+      const result = await query;
+      if (!result.error) {
+        data = result.data;
+        count = result.count;
+      }
+    }
 
-    if (error) {
-      return errorResponse("DB_ERROR", error.message, 500);
+    // Attempt 2: Manual join (no FK)
+    if (data === null) {
+      usedFallback = true;
+      let query = supabase.from("video_executions").select("*", { count: "exact" });
+      if (status && status !== "all") query = query.eq("status", status);
+      else query = query.in("status", ["completed", "failed", "cancelled"]);
+      if (nodeId && nodeId !== "all") query = query.eq("node_id", nodeId);
+      if (deviceId) query = query.eq("device_id", deviceId);
+      if (videoId) query = query.eq("video_id", videoId);
+      if (dateFrom) query = query.gte("started_at", dateFrom);
+      if (dateTo) query = query.lte("started_at", dateTo);
+      query = query.order(dbSortField, { ascending: sortOrder === "asc", nullsFirst: false });
+      query = query.range(from, to);
+
+      const result = await query;
+      if (result.error) {
+        return errorResponse("DB_ERROR", result.error.message, 500);
+      }
+      data = result.data || [];
+      count = result.count;
+
+      // Fetch video info for matched executions
+      const videoIds = [...new Set((data || []).map((e) => e.video_id as string).filter(Boolean))];
+      if (videoIds.length > 0) {
+        const { data: videos } = await supabase
+          .from("videos")
+          .select("id, title, thumbnail_url, channel_name")
+          .in("id", videoIds);
+        const videoMap = new Map((videos || []).map((v) => [v.id, v]));
+        data = (data || []).map((exec) => ({
+          ...exec,
+          videos: videoMap.get(exec.video_id as string) || null,
+        }));
+      }
     }
 
     return paginatedResponse(data || [], count || 0, page, pageSize);

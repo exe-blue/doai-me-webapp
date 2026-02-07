@@ -23,46 +23,67 @@ export async function GET(request: NextRequest) {
       sortOrder = "desc",
     } = getQueryParams(request);
 
-    // Use left join to include orphaned device_issues (devices may be deleted)
-    let query = supabase.from("device_issues").select("*, devices(device_id, name)", {
-      count: "exact",
-    });
+    // Try FK join first, fallback to manual join if FK doesn't exist
+    let data: Record<string, unknown>[] | null = null;
+    let count: number | null = null;
 
-    // 필터링
-    if (status && status !== "all") {
-      query = query.eq("status", status);
-    }
-    if (severity && severity !== "all") {
-      query = query.eq("severity", severity);
-    }
-    if (type && type !== "all") {
-      query = query.eq("type", type);
-    }
-    if (nodeId && nodeId !== "all") {
-      query = query.eq("devices.node_id", nodeId);
-    }
-    if (deviceId) {
-      query = query.eq("device_id", deviceId);
-    }
-
-    // 정렬
     const validSortFields = ["created_at", "severity"];
     const sortField = validSortFields.includes(sortBy) ? sortBy : "created_at";
-    query = query.order(sortField, { ascending: sortOrder === "asc" });
-
-    // 페이지네이션
     const from = (page - 1) * pageSize;
     const to = from + pageSize - 1;
-    query = query.range(from, to);
 
-    const { data, error, count } = await query;
+    // Attempt 1: FK join
+    {
+      let query = supabase.from("device_issues").select("*, devices(id, serial_number, name)", {
+        count: "exact",
+      });
+      if (status && status !== "all") query = query.eq("status", status);
+      if (severity && severity !== "all") query = query.eq("severity", severity);
+      if (type && type !== "all") query = query.eq("type", type);
+      if (deviceId) query = query.eq("device_id", deviceId);
+      query = query.order(sortField, { ascending: sortOrder === "asc" });
+      query = query.range(from, to);
 
-    if (error) {
-      // 테이블이 없는 경우 빈 결과 반환
-      if (error.code === "42P01") {
-        return paginatedResponse([], 0, page, pageSize);
+      const result = await query;
+      if (!result.error) {
+        data = result.data;
+        count = result.count;
       }
-      return errorResponse("DB_ERROR", error.message, 500);
+    }
+
+    // Attempt 2: Manual join (no FK relationship)
+    if (data === null) {
+      let query = supabase.from("device_issues").select("*", { count: "exact" });
+      if (status && status !== "all") query = query.eq("status", status);
+      if (severity && severity !== "all") query = query.eq("severity", severity);
+      if (type && type !== "all") query = query.eq("type", type);
+      if (deviceId) query = query.eq("device_id", deviceId);
+      query = query.order(sortField, { ascending: sortOrder === "asc" });
+      query = query.range(from, to);
+
+      const result = await query;
+      if (result.error) {
+        if (result.error.code === "42P01") {
+          return paginatedResponse([], 0, page, pageSize);
+        }
+        return errorResponse("DB_ERROR", result.error.message, 500);
+      }
+      data = result.data || [];
+      count = result.count;
+
+      // Manual device lookup
+      const deviceIds = [...new Set((data || []).map((i) => i.device_id as string).filter(Boolean))];
+      if (deviceIds.length > 0) {
+        const { data: devices } = await supabase
+          .from("devices")
+          .select("id, serial_number, name")
+          .in("serial_number", deviceIds);
+        const deviceMap = new Map((devices || []).map((d) => [d.serial_number, d]));
+        data = (data || []).map((issue) => ({
+          ...issue,
+          devices: deviceMap.get(issue.device_id as string) || null,
+        }));
+      }
     }
 
     return paginatedResponse(data || [], count || 0, page, pageSize);
