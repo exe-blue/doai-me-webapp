@@ -3,7 +3,7 @@ import path from 'path';
 
 const authFile = path.join(__dirname, 'playwright', '.auth', 'user.json');
 
-setup('authenticate', async ({ page }) => {
+setup('authenticate @smoke', async ({ page }) => {
   const email = process.env.E2E_USER_EMAIL || 'e2e-test@doai.me';
   const password = process.env.E2E_USER_PASSWORD || 'test-password-123!';
 

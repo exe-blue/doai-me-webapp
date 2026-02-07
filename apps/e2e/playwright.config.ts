@@ -28,6 +28,7 @@ export default defineConfig({
   projects: [
     {
       name: 'auth-setup',
+      testDir: '.',
       testMatch: /auth\.setup\.ts/,
     },
     {
@@ -37,6 +38,12 @@ export default defineConfig({
         storageState: 'playwright/.auth/user.json',
       },
       dependencies: ['auth-setup'],
+      testIgnore: /tests\/(api|auth)\/.*/,
+    },
+    {
+      name: 'auth',
+      use: { ...devices['Desktop Chrome'] },
+      testMatch: /tests\/auth\/.*/,
     },
     {
       name: 'api',

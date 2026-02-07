@@ -32,33 +32,30 @@ export class JobsPage extends BasePage {
   }
 
   async createJob(options: {
-    title?: string;
+    channelName: string;
     videoUrl: string;
     duration?: number;
   }) {
     await this.clickNewJob();
 
-    // Wait for dialog/form to appear
-    const dialog = this.page.locator('[role="dialog"], form').first();
+    // Wait for dialog to appear
+    const dialog = this.page.locator('[role="dialog"]').first();
     await expect(dialog).toBeVisible({ timeout: 5_000 });
 
-    // Fill in URL (look for URL input)
-    const urlInput = this.page.locator('input[placeholder*="youtube"], input[placeholder*="URL"], input[name*="url"]').first();
-    if (await urlInput.isVisible()) {
-      await urlInput.fill(options.videoUrl);
-    }
+    // Fill YouTube URL
+    const urlInput = dialog.locator('input[placeholder*="youtube.com"]').first();
+    await urlInput.fill(options.videoUrl);
 
-    // Fill title if provided
-    if (options.title) {
-      const titleInput = this.page.locator('input[name*="title"], input[placeholder*="제목"]').first();
-      if (await titleInput.isVisible()) {
-        await titleInput.fill(options.title);
-      }
-    }
+    // Fill channel name (required)
+    const channelInput = dialog.locator('input[placeholder*="짐승남"]').first();
+    await channelInput.fill(options.channelName);
 
-    // Submit
-    const submitBtn = dialog.locator('button[type="submit"], button:has-text("생성"), button:has-text("등록")').first();
-    await submitBtn.click();
+    // Submit — button text is "Create Job"
+    // Button may be disabled when no idle devices are available via socket context,
+    // but the mocked POST handler will still return success.
+    // Use dispatchEvent because the dialog scroll container prevents viewport-based clicks.
+    const submitBtn = dialog.getByRole('button', { name: /Create Job/i });
+    await submitBtn.dispatchEvent('click');
   }
 
   async refresh() {

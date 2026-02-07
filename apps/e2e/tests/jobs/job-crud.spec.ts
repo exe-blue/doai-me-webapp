@@ -27,7 +27,7 @@ test.describe('Job CRUD', () => {
     if (await jobs.newJobButton.isVisible().catch(() => false)) {
       await jobs.createJob({
         videoUrl: TestData.job.valid.target_url,
-        title: TestData.job.valid.title,
+        channelName: 'E2E테스트',
       });
 
       // Expect success feedback (toast or list update)
@@ -79,15 +79,15 @@ test.describe('Job CRUD', () => {
     if (await jobs.newJobButton.isVisible().catch(() => false)) {
       await jobs.clickNewJob();
 
-      const dialog = page.locator('[role="dialog"], form').first();
+      const dialog = page.locator('[role="dialog"]').first();
       await expect(dialog).toBeVisible({ timeout: 5_000 }).catch(() => null);
 
       // Try to submit with invalid URL
-      const urlInput = page.locator('input[placeholder*="youtube"], input[placeholder*="URL"], input[name*="url"]').first();
+      const urlInput = dialog.locator('input[placeholder*="youtube.com"]').first();
       if (await urlInput.isVisible().catch(() => false)) {
         await urlInput.fill('https://example.com/not-youtube');
 
-        const submitBtn = dialog.locator('button[type="submit"], button:has-text("생성"), button:has-text("등록")').first();
+        const submitBtn = dialog.getByRole('button', { name: /Create Job/i });
         if (await submitBtn.isVisible().catch(() => false)) {
           await submitBtn.click();
           // Expect validation error
