@@ -255,7 +255,7 @@ CREATE TABLE IF NOT EXISTS monitored_channels (
 -- -----------------------------------------
 CREATE TABLE IF NOT EXISTS device_states (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    device_id UUID NOT NULL,
+    device_id UUID NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
     node_id TEXT,
     state TEXT DEFAULT 'DISCONNECTED'
         CHECK (state IN ('DISCONNECTED', 'IDLE', 'QUEUED', 'RUNNING', 'ERROR', 'QUARANTINE')),
@@ -1048,6 +1048,9 @@ DECLARE
     v_video_title TEXT;
     v_duration_sec INTEGER;
 BEGIN
+    -- Lock device row first to prevent concurrent claims for the same device
+    PERFORM 1 FROM devices WHERE id = p_device_id FOR UPDATE;
+
     UPDATE job_assignments ja
     SET status = 'running', started_at = NOW()
     FROM jobs j
@@ -1060,7 +1063,7 @@ BEGIN
         LIMIT 1
     )
     AND ja.job_id = j.id
-    RETURNING ja.id, ja.job_id, j.keyword, j.video_title, 60
+    RETURNING ja.id, ja.job_id, j.keyword, j.video_title, j.duration_sec
     INTO v_assignment_id, v_job_id, v_keyword, v_video_title, v_duration_sec;
 
     IF v_assignment_id IS NULL THEN
@@ -1081,7 +1084,7 @@ $$ LANGUAGE plpgsql;
 -- Salary rank 계산
 CREATE OR REPLACE FUNCTION compute_rank_in_group(p_job_id UUID, p_assignment_id UUID)
 RETURNS INTEGER
-LANGUAGE plpgsql SECURITY DEFINER AS $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
     v_rank INTEGER;
 BEGIN
@@ -1390,7 +1393,7 @@ BEGIN
     RETURNING * INTO result;
     RETURN result;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- Onboarding 요약
 CREATE OR REPLACE FUNCTION get_onboarding_summary(p_node_id TEXT DEFAULT NULL)
@@ -1452,9 +1455,17 @@ BEGIN
     IF parts[3] = '*' AND parts[4] = '*' AND parts[5] = '*' THEN
         IF minute_part = '*' THEN minute_part := '0'; END IF;
         IF hour_part = '*' THEN hour_part := '0'; END IF;
+        -- Guard against non-numeric or out-of-range cron parts
+        IF minute_part !~ '^\d+$' OR hour_part !~ '^\d+$' THEN
+            RETURN NULL;
+        END IF;
+        IF minute_part::INT < 0 OR minute_part::INT > 59
+           OR hour_part::INT < 0 OR hour_part::INT > 23 THEN
+            RETURN NULL;
+        END IF;
         next_time := DATE_TRUNC('day', from_time) +
-                     (hour_part::INT || ' hours')::INTERVAL +
-                     (minute_part::INT || ' minutes')::INTERVAL;
+                     make_interval(hours => hour_part::INT) +
+                     make_interval(mins => minute_part::INT);
         IF next_time <= from_time THEN
             next_time := next_time + INTERVAL '1 day';
         END IF;
