@@ -18,18 +18,21 @@
     "build:linux": "electron-builder --linux",
     "build:dir": "tsc && electron-builder --dir",
     "predist": "node scripts/verify-resources.js",
-    "dist": "tsc && electron-builder",
+    "dist": "npm run build && electron-builder",
     "predist:win": "node scripts/verify-resources.js",
-    "dist:win": "tsc && electron-builder --win",
+    "dist:win": "npm run build && electron-builder --win",
     "predist:mac": "node scripts/verify-resources.js",
-    "dist:mac": "tsc && electron-builder --mac",
+    "dist:mac": "npm run build && electron-builder --mac",
     "predist:linux": "node scripts/verify-resources.js",
-    "dist:linux": "tsc && electron-builder --linux",
-    "release": "tsc && electron-builder --publish always",
-    "release:win": "tsc && electron-builder --win --publish always",
-    "release:mac": "tsc && electron-builder --mac --publish always",
+    "dist:linux": "npm run build && electron-builder --linux",
+    "release": "npm run build && electron-builder --publish always",
+    "release:win": "npm run build && electron-builder --win --publish always",
+    "release:mac": "npm run build && electron-builder --mac --publish always",
     "clean": "rimraf dist build",
-    "lint": "eslint src --ext .ts"
+    "lint": "eslint src --ext .ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@doai/shared": "file:../../packages/shared",
@@ -44,10 +47,12 @@
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
+    "@vitest/coverage-v8": "^4.0.18",
     "cross-env": "^7.0.3",
     "electron": "40.1.0",
     "electron-builder": "^24.13.2",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^4.0.18"
   },
   "repository": {
     "type": "git",
