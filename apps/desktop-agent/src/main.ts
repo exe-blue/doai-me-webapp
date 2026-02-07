@@ -430,6 +430,40 @@ async function startAgent(): Promise<void> {
 
   deviceRecovery.start();
 
+  // ============================================
+  // 시작 시 WiFi/OTG ADB 자동 연결
+  // ============================================
+  try {
+    const connSettings = loadConnectionSettings();
+    const allTargets = [...(connSettings.otg || []), ...(connSettings.wifi || [])];
+    if (allTargets.length > 0) {
+      logger.info('[AutoConnect] Connecting ADB targets on startup', {
+        otg: connSettings.otg?.length || 0,
+        wifi: connSettings.wifi?.length || 0,
+      });
+      let connected = 0;
+      for (const target of allTargets) {
+        const match = target.match(/^(\d+\.\d+\.\d+\.\d+):(\d+)$/);
+        if (!match) continue;
+        try {
+          const ok = await adb.reconnectWifiAdb(match[1], Number(match[2]));
+          if (ok) connected++;
+        } catch (err) {
+          logger.warn('[AutoConnect] Failed to connect', { target, error: (err as Error).message });
+        }
+      }
+      logger.info('[AutoConnect] Startup ADB connect done', { connected, total: allTargets.length });
+      pushLog({ timestamp: Date.now(), level: 'info', message: `시작 시 ADB 연결: ${connected}/${allTargets.length}`, source: 'device' });
+
+      // 연결 후 DeviceManager가 스캔할 시간을 줌
+      if (connected > 0) {
+        await new Promise(resolve => setTimeout(resolve, 3000));
+      }
+    }
+  } catch (err) {
+    logger.error('[AutoConnect] Startup ADB connect error', { error: (err as Error).message });
+  }
+
   // 인프라 헬스체커 초기화
   infraHealthChecker = getInfraHealthChecker(SERVER_URL);
 

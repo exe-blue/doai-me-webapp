@@ -83,6 +83,10 @@ export class FrameProcessor extends EventEmitter {
    */
   start(codecWidth: number, codecHeight: number): void {
     if (this._running) return;
+    if (codecWidth <= 0 || codecHeight <= 0) {
+      logger.warn('[FrameProcessor] Invalid codec dimensions, skipping start', { deviceId: this.deviceId, codecWidth, codecHeight });
+      return;
+    }
 
     // 출력 높이를 종횡비에 맞게 계산
     const aspectRatio = codecHeight / codecWidth;
@@ -179,8 +183,19 @@ export class FrameProcessor extends EventEmitter {
    * MJPEG 출력 스트림에서 개별 JPEG 이미지 추출
    * JPEG: SOI (FF D8) → ... → EOI (FF D9)
    */
+  private static readonly MAX_BUFFER_SIZE = 5 * 1024 * 1024; // 5MB limit
+
   private processJpegOutput(chunk: Buffer, width: number, height: number): void {
     this.outputBuffer = Buffer.concat([this.outputBuffer, chunk]);
+
+    if (this.outputBuffer.length > FrameProcessor.MAX_BUFFER_SIZE) {
+      logger.warn('[FrameProcessor] Output buffer exceeded limit, clearing', {
+        deviceId: this.deviceId,
+        bufferSize: this.outputBuffer.length,
+      });
+      this.outputBuffer = Buffer.alloc(0);
+      return;
+    }
 
     while (true) {
       // SOI 마커 찾기

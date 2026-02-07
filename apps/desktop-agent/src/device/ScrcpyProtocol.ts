@@ -254,9 +254,11 @@ export class ScrcpyProtocol {
     offset += 2;
 
     // scroll amounts as float → i16 (scrcpy uses fixed-point: value * 8192)
-    buf.writeInt16BE(Math.round(event.horizontalScroll * 8192), offset);
+    const hScrollFixed = Math.max(-32768, Math.min(32767, Math.round(event.horizontalScroll * 8192)));
+    buf.writeInt16BE(hScrollFixed, offset);
     offset += 2;
-    buf.writeInt16BE(Math.round(event.verticalScroll * 8192), offset);
+    const vScrollFixed = Math.max(-32768, Math.min(32767, Math.round(event.verticalScroll * 8192)));
+    buf.writeInt16BE(vScrollFixed, offset);
     offset += 2;
 
     buf.writeInt32BE(event.buttons, offset);
@@ -265,7 +267,7 @@ export class ScrcpyProtocol {
   }
 
   /**
-   * Back or Screen On (1 byte)
+   * Back or Screen On (2 bytes)
    */
   static serializeBackOrScreenOn(): Buffer {
     const buf = Buffer.alloc(2);
@@ -413,6 +415,7 @@ export class ScrcpyProtocol {
       case DeviceMessageType.CLIPBOARD: {
         if (data.length < 5) return null;
         const textLength = data.readUInt32BE(1);
+        if (data.length < 5 + textLength) return null;
         const text = data.subarray(5, 5 + textLength).toString('utf-8');
         return { type, payload: { text } as DeviceClipboardMessage };
       }

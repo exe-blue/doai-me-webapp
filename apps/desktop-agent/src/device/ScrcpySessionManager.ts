@@ -74,7 +74,7 @@ export class ScrcpySessionManager extends EventEmitter {
 
   constructor(config: SessionManagerConfig) {
     super();
-    this.setMaxListeners(200); // 100 devices × 2 event types
+    this.setMaxListeners(400); // 100 devices × 4 event types
 
     this.config = {
       serverJarPath: config.serverJarPath,
@@ -292,7 +292,7 @@ export class ScrcpySessionManager extends EventEmitter {
     text: string
   ): Promise<Map<string, Error | null>> {
     return this.batchAction(deviceIds, async (session) => {
-      session.injectText(text);
+      await session.injectText(text);
     });
   }
 
@@ -314,7 +314,7 @@ export class ScrcpySessionManager extends EventEmitter {
    */
   async batchBack(deviceIds: string[]): Promise<Map<string, Error | null>> {
     return this.batchAction(deviceIds, async (session) => {
-      session.pressBack();
+      await session.pressBack();
     });
   }
 

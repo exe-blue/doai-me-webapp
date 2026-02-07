@@ -172,14 +172,14 @@ export class ScrcpySession extends EventEmitter {
       const abstractSocket = `scrcpy_${this.deviceId.replace(/[^a-zA-Z0-9]/g, '_')}`;
       await this.adb.execute(this.adbSerial, `reverse localabstract:${abstractSocket} tcp:${this.options.tunnelPort}`);
 
-      // 3. Start TCP server to accept connections
-      const sockets = await this.acceptConnections();
+      // 3. Start TCP server to accept connections (don't await yet)
+      const socketsPromise = this.acceptConnections();
 
       // 4. Launch scrcpy-server on device
       this.launchServer(abstractSocket);
 
       // 5. Wait for video + control sockets
-      const { videoSocket, controlSocket } = await sockets;
+      const { videoSocket, controlSocket } = await socketsPromise;
       this.videoSocket = videoSocket;
       this.controlSocket = controlSocket;
 

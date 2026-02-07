@@ -256,11 +256,11 @@ export class SocketClient extends EventEmitter {
         console.log('[SocketClient] Calling startStatusReporting()...');
         this.startStatusReporting();
         console.log('[SocketClient] startStatusReporting() done');
+        this.emit('connected');
       } catch (err) {
         console.error('[SocketClient] ERROR in connect handler:', err);
+        this.emit('error', err);
       }
-
-      this.emit('connected');
     });
 
     // 연결 해제
