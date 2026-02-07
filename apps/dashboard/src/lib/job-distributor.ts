@@ -73,8 +73,27 @@ export async function getIdleDevices(supabase?: SupabaseClient): Promise<Device[
   return devices || [];
 }
 
+/** PC당 최대 디바이스 수 */
+const MAX_DEVICES_PER_PC = 20;
+
 /**
- * 목표에 따라 할당 대상 기기 선택
+ * PC별로 디바이스를 그룹핑하고 PC당 최대 20대까지 선택
+ */
+function groupByPcWithLimit(devices: Device[], limit: number = MAX_DEVICES_PER_PC): Device[] {
+  const byPc = new Map<string, Device[]>();
+  for (const device of devices) {
+    const pcId = device.pc_id || 'unknown';
+    const group = byPc.get(pcId) || [];
+    if (group.length < limit) {
+      group.push(device);
+    }
+    byPc.set(pcId, group);
+  }
+  return Array.from(byPc.values()).flat();
+}
+
+/**
+ * 목표에 따라 할당 대상 기기 선택 (PC별 최대 20대)
  */
 export function selectTargetDevices(
   idleDevices: Device[],
@@ -85,17 +104,21 @@ export function selectTargetDevices(
     return [];
   }
 
+  // PC별 최대 20대 그룹핑 적용
+  const pcLimited = groupByPcWithLimit(idleDevices);
+
   switch (targetType) {
-    case 'percentage':
-      const count = Math.ceil((idleDevices.length * targetValue) / 100);
-      return idleDevices.slice(0, count);
+    case 'percentage': {
+      const count = Math.ceil((pcLimited.length * targetValue) / 100);
+      return pcLimited.slice(0, count);
+    }
 
     case 'device_count':
-      return idleDevices.slice(0, Math.min(targetValue, idleDevices.length));
+      return pcLimited.slice(0, Math.min(targetValue, pcLimited.length));
 
     case 'all_devices':
     default:
-      return [...idleDevices];
+      return [...pcLimited];
   }
 }
 

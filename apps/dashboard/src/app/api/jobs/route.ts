@@ -327,19 +327,32 @@ export async function POST(request: NextRequest) {
     // 연결된 기기가 없어도 작업은 생성 (나중에 기기 연결 시 할당)
     const hasIdleDevices = idleDevices && idleDevices.length > 0;
 
-    // 2. 목표에 따라 할당 대상 결정
+    // 2. 목표에 따라 할당 대상 결정 (PC별 최대 20대)
+    const MAX_DEVICES_PER_PC = 20;
     let targetDevices: typeof idleDevices = [];
-    
+
     if (hasIdleDevices) {
-      targetDevices = [...(idleDevices || [])];
+      // PC별 최대 20대 그룹핑 적용
+      const byPc = new Map<string, typeof idleDevices>();
+      for (const device of idleDevices!) {
+        const pcId = device.pc_id || 'unknown';
+        const group = byPc.get(pcId) || [];
+        if (group.length < MAX_DEVICES_PER_PC) {
+          group.push(device);
+        }
+        byPc.set(pcId, group);
+      }
+      const pcLimited = Array.from(byPc.values()).flat();
 
       if (target_type === 'percentage') {
-        const count = Math.ceil((idleDevices!.length * effectiveTargetValue) / 100);
-        targetDevices = idleDevices!.slice(0, count);
+        const count = Math.ceil((pcLimited.length * effectiveTargetValue) / 100);
+        targetDevices = pcLimited.slice(0, count);
       } else if (target_type === 'device_count') {
-        targetDevices = idleDevices!.slice(0, Math.min(effectiveTargetValue, idleDevices!.length));
+        targetDevices = pcLimited.slice(0, Math.min(effectiveTargetValue, pcLimited.length));
+      } else {
+        // target_type === 'all_devices'
+        targetDevices = pcLimited;
       }
-      // target_type === 'all_devices' 는 전체 사용
     }
 
     // 3. 채널 모드 처리 (CHANNEL_AUTO)
