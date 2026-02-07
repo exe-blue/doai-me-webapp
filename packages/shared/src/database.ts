@@ -725,6 +725,63 @@ export type ScriptDeviceResultUpdate = {
 };
 
 // ============================================
+// 명령 시스템 (Commands)
+// ============================================
+
+export type CommandStatus = 'PENDING' | 'CLAIMED' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'TIMEOUT';
+export type CommandType = 'reboot' | 'shell' | 'install' | 'screenshot' | 'ping';
+export type CommandEventType = 'CREATED' | 'CLAIMED' | 'STARTED' | 'STDOUT' | 'STDERR' | 'SUCCEEDED' | 'FAILED' | 'TIMEOUT';
+
+export type Command = {
+  id: string;
+  node_id: string;
+  device_id: string;
+  type: CommandType;
+  payload: Json;
+  status: CommandStatus;
+  result: Json | null;
+  error: string | null;
+  claimed_by: string | null;
+  timeout_ms: number;
+  created_at: string;
+  claimed_at: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+};
+
+export type CommandInsert = {
+  node_id: string;
+  device_id: string;
+  type: CommandType;
+  payload?: Json;
+  timeout_ms?: number;
+};
+
+export type CommandUpdate = {
+  status?: CommandStatus;
+  result?: Json | null;
+  error?: string | null;
+  claimed_by?: string | null;
+  claimed_at?: string | null;
+  started_at?: string | null;
+  completed_at?: string | null;
+};
+
+export type CommandEvent = {
+  id: number;
+  command_id: string;
+  type: CommandEventType;
+  payload: Json;
+  created_at: string;
+};
+
+export type CommandEventInsert = {
+  command_id: string;
+  type: CommandEventType;
+  payload?: Json;
+};
+
+// ============================================
 // 모니터링 채널 (Legacy)
 // ============================================
 
@@ -894,6 +951,18 @@ export type Database = {
         Update: ScriptDeviceResultUpdate;
         Relationships: [];
       };
+      commands: {
+        Row: Command;
+        Insert: CommandInsert;
+        Update: CommandUpdate;
+        Relationships: [];
+      };
+      command_events: {
+        Row: CommandEvent;
+        Insert: CommandEventInsert;
+        Update: never;
+        Relationships: [];
+      };
     };
     Views: {
       system_overview: {
@@ -941,6 +1010,10 @@ export type Database = {
       increment_script_exec_count: {
         Args: { p_execution_id: string; p_count_type: string };
         Returns: undefined;
+      };
+      claim_command: {
+        Args: { p_node_id: string; p_device_id: string };
+        Returns: { id: string; type: CommandType; payload: Json; timeout_ms: number }[];
       };
     };
     Enums: {

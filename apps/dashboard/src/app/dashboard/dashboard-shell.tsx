@@ -35,6 +35,8 @@ import {
   Globe,
   Bot,
   SlidersHorizontal,
+  Monitor,
+  Terminal,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -86,6 +88,20 @@ const navigation: NavigationGroup[] = [
           { label: '온보딩', href: '/dashboard/onboarding', icon: UserPlus },
           { label: 'Workers', href: '/dashboard/workers', icon: Cpu },
           { label: '노드 관리', href: '/dashboard/nodes', icon: LayoutGrid },
+          { label: '명령 패널', href: '/dashboard/commands', icon: Terminal },
+        ],
+      },
+    ],
+  },
+  {
+    items: [
+      {
+        label: '디바이스 팜',
+        href: '/dashboard/farm',
+        icon: Monitor,
+        children: [
+          { label: '디바이스 현황', href: '/dashboard/farm', icon: Monitor },
+          { label: '명령 로그', href: '/dashboard/farm/commands', icon: Terminal },
         ],
       },
     ],
