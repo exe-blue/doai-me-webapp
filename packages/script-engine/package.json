@@ -1,0 +1,30 @@
+{
+  "name": "@doai/script-engine",
+  "version": "1.0.0",
+  "description": "Sandboxed JS script execution engine - V8 isolate sandbox for user scripts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rimraf dist",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "isolated-vm": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "rimraf": "^5.0.0",
+    "typescript": "^5.3.0"
+  },
+  "files": ["dist", "src"],
+  "license": "MIT"
+}
