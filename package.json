@@ -66,9 +66,9 @@
   "optionalDependencies": {
     "@esbuild/linux-x64": "^0.27.2",
     "@esbuild/win32-x64": "^0.27.2",
-    "lightningcss-win32-x64-msvc": "^1.31.1",
-    "lightningcss-linux-x64-gnu": "^1.31.1",
+    "@tailwindcss/oxide-linux-x64-gnu": "^4.1.18",
     "@tailwindcss/oxide-win32-x64-msvc": "^4.1.18",
-    "@tailwindcss/oxide-linux-x64-gnu": "^4.1.18"
+    "lightningcss-linux-x64-gnu": "^1.31.1",
+    "lightningcss-win32-x64-msvc": "^1.31.1"
   }
 }

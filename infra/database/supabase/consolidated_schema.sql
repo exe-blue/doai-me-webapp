@@ -1455,8 +1455,9 @@ BEGIN
     IF parts[3] = '*' AND parts[4] = '*' AND parts[5] = '*' THEN
         IF minute_part = '*' THEN minute_part := '0'; END IF;
         IF hour_part = '*' THEN hour_part := '0'; END IF;
-        -- Guard against non-numeric or out-of-range cron parts
-        IF minute_part !~ '^\d+$' OR hour_part !~ '^\d+$' THEN
+        -- Guard against non-numeric, oversized, or out-of-range cron parts
+        IF minute_part !~ '^\d+$' OR hour_part !~ '^\d+$'
+           OR length(minute_part) > 2 OR length(hour_part) > 2 THEN
             RETURN NULL;
         END IF;
         IF minute_part::INT < 0 OR minute_part::INT > 59
