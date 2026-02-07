@@ -324,9 +324,24 @@ export default function KeywordsPage() {
     }
   }
 
-  async function collectKeyword(id: number, keyword: string) {
-    alert(`"${keyword}" 수집 기능은 백엔드 API가 필요합니다`);
-    // TODO: 백엔드 API 연동
+  const [collectingId, setCollectingId] = useState<number | null>(null);
+
+  async function collectKeyword(id: number, _keyword: string) {
+    setCollectingId(id);
+    try {
+      const res = await fetch(`/api/keywords/${id}/collect`, { method: "POST" });
+      const result = await res.json();
+      if (result.success) {
+        alert(result.data.message);
+        fetchKeywords();
+      } else {
+        alert(result.error?.message || "수집에 실패했습니다");
+      }
+    } catch {
+      alert("수집 중 오류가 발생했습니다");
+    } finally {
+      setCollectingId(null);
+    }
   }
 
   async function deleteKeyword(id: number) {
@@ -726,10 +741,11 @@ export default function KeywordsPage() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem
+                          disabled={collectingId === keyword.id}
                           onClick={() => collectKeyword(keyword.id, keyword.keyword)}
                         >
-                          <RefreshCw className="mr-2 h-4 w-4" />
-                          지금 수집
+                          <RefreshCw className={`mr-2 h-4 w-4 ${collectingId === keyword.id ? 'animate-spin' : ''}`} />
+                          {collectingId === keyword.id ? '수집중...' : '지금 수집'}
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => openEditDialog(keyword)}>
                           <Edit className="mr-2 h-4 w-4" />

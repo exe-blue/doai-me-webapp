@@ -261,10 +261,24 @@ export default function ChannelsPage() {
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async function collectChannelVideos(_channelId: string) {
-    alert("채널 영상 수집 기능은 백엔드 API가 필요합니다");
-    // TODO: 백엔드 API 연동
+  const [collecting, setCollecting] = useState<string | null>(null);
+
+  async function collectChannelVideos(channelId: string) {
+    setCollecting(channelId);
+    try {
+      const res = await fetch(`/api/channels/${channelId}/collect`, { method: "POST" });
+      const result = await res.json();
+      if (result.success) {
+        alert(result.data.message);
+        fetchChannels();
+      } else {
+        alert(result.error?.message || "수집에 실패했습니다");
+      }
+    } catch {
+      alert("수집 중 오류가 발생했습니다");
+    } finally {
+      setCollecting(null);
+    }
   }
 
   async function openChannelDetail(channel: Channel) {
@@ -549,10 +563,11 @@ export default function ChannelsPage() {
                           YouTube에서 보기
                         </DropdownMenuItem>
                         <DropdownMenuItem
+                          disabled={collecting === channel.id}
                           onClick={() => collectChannelVideos(channel.id)}
                         >
-                          <RefreshCw className="mr-2 h-4 w-4" />
-                          지금 수집
+                          <RefreshCw className={`mr-2 h-4 w-4 ${collecting === channel.id ? 'animate-spin' : ''}`} />
+                          {collecting === channel.id ? '수집중...' : '지금 수집'}
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         {channel.status === "active" ? (
@@ -727,10 +742,11 @@ export default function ChannelsPage() {
 
                     <Button
                       className="w-full"
+                      disabled={collecting === selectedChannel.id}
                       onClick={() => collectChannelVideos(selectedChannel.id)}
                     >
-                      <RefreshCw className="mr-2 h-4 w-4" />
-                      지금 영상 수집
+                      <RefreshCw className={`mr-2 h-4 w-4 ${collecting === selectedChannel.id ? 'animate-spin' : ''}`} />
+                      {collecting === selectedChannel.id ? '수집중...' : '지금 영상 수집'}
                     </Button>
                   </div>
                 </TabsContent>

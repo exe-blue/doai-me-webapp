@@ -26,6 +26,35 @@ interface CommandResult {
   error?: string;
 }
 
+export interface ScrcpyThumbnailData {
+  deviceId: string;
+  frame: string; // base64 JPEG
+  timestamp: number;
+  width?: number;
+  height?: number;
+}
+
+export interface ScrcpySessionState {
+  deviceId: string;
+  state: 'idle' | 'starting' | 'streaming' | 'stopping' | 'error';
+  error?: string;
+  videoMeta?: { width: number; height: number };
+}
+
+export type ScrcpyInputAction = 'tap' | 'swipe' | 'text' | 'key' | 'scroll' | 'back' | 'longPress';
+
+export interface JobProgress {
+  jobId?: string;
+  assignmentId?: string;
+  deviceId?: string;
+  progress: number;
+  currentStep: string;
+  status: string;
+  timestamp: number;
+}
+
+export type JobProgressMap = Map<string, JobProgress>;
+
 // Socket.io server URL: env var → same-origin (empty string = current host)
 const SOCKET_SERVER_URL = process.env.NEXT_PUBLIC_SOCKET_URL || '';
 
@@ -43,9 +72,16 @@ export function useSocket(options: UseSocketOptions = {}) {
   const [isConnected, setIsConnected] = useState(false);
   const [devices, setDevices] = useState<Device[]>([]);
 
+  // Job progress tracking
+  const [jobProgressMap, setJobProgressMap] = useState<JobProgressMap>(new Map());
+
   // Event listeners
   const frameListenersRef = useRef<Map<string, (frame: StreamFrame) => void>>(new Map());
   const commandResultListenersRef = useRef<((result: CommandResult) => void)[]>([]);
+
+  // Scrcpy listeners
+  const scrcpyThumbnailListenersRef = useRef<Map<string, (data: ScrcpyThumbnailData) => void>>(new Map());
+  const scrcpyStateListenersRef = useRef<Map<string, (state: ScrcpySessionState) => void>>(new Map());
 
   // Keep auth token ref in sync without triggering socket reconnection
   useEffect(() => {
@@ -177,6 +213,18 @@ export function useSocket(options: UseSocketOptions = {}) {
       }
     });
 
+    // Scrcpy thumbnails
+    socket.on(DASHBOARD_EVENTS.SCRCPY_THUMBNAIL, (data: ScrcpyThumbnailData) => {
+      const listener = scrcpyThumbnailListenersRef.current.get(data.deviceId);
+      if (listener) listener(data);
+    });
+
+    // Scrcpy session state changes
+    socket.on(DASHBOARD_EVENTS.SCRCPY_SESSION_STATE, (data: ScrcpySessionState) => {
+      const listener = scrcpyStateListenersRef.current.get(data.deviceId);
+      if (listener) listener(data);
+    });
+
     // Command results
     socket.on('command:result', (result: CommandResult) => {
       commandResultListenersRef.current.forEach(listener => listener(result));
@@ -184,6 +232,73 @@ export function useSocket(options: UseSocketOptions = {}) {
 
     socket.on('command:error', (error: { deviceId: string; error: string }) => {
       console.error('[Socket] Command error:', error);
+    });
+
+    // Job lifecycle events
+    socket.on('job:started', (data: { assignmentId?: string; deviceId?: string; jobId?: string }) => {
+      const key = data.deviceId || data.assignmentId || '';
+      if (!key) return;
+      setJobProgressMap(prev => {
+        const next = new Map(prev);
+        next.set(key, {
+          jobId: data.jobId,
+          assignmentId: data.assignmentId,
+          deviceId: data.deviceId,
+          progress: 0,
+          currentStep: 'initializing',
+          status: 'running',
+          timestamp: Date.now(),
+        });
+        return next;
+      });
+    });
+
+    socket.on('job:progress', (data: {
+      jobId?: string; assignmentId?: string; deviceId?: string;
+      progress?: number; currentStep?: string; status?: string;
+    }) => {
+      const key = data.deviceId || data.assignmentId || '';
+      if (!key) return;
+      setJobProgressMap(prev => {
+        const next = new Map(prev);
+        const existing = next.get(key);
+        next.set(key, {
+          ...existing,
+          jobId: data.jobId || existing?.jobId,
+          assignmentId: data.assignmentId || existing?.assignmentId,
+          deviceId: data.deviceId || existing?.deviceId,
+          progress: data.progress ?? existing?.progress ?? 0,
+          currentStep: data.currentStep || existing?.currentStep || 'running',
+          status: data.status || 'running',
+          timestamp: Date.now(),
+        });
+        return next;
+      });
+    });
+
+    socket.on('job:completed', (data: { assignmentId?: string; deviceId?: string; jobId?: string }) => {
+      const key = data.deviceId || data.assignmentId || '';
+      if (!key) return;
+      setJobProgressMap(prev => {
+        const next = new Map(prev);
+        next.delete(key);
+        return next;
+      });
+    });
+
+    socket.on('job:failed', (data: { assignmentId?: string; deviceId?: string; error?: string }) => {
+      const key = data.deviceId || data.assignmentId || '';
+      if (!key) return;
+      setJobProgressMap(prev => {
+        const next = new Map(prev);
+        next.delete(key);
+        return next;
+      });
+    });
+
+    socket.on('auth:token_expired', () => {
+      console.warn('[Socket] Auth token expired, redirecting to login');
+      window.location.href = '/auth/signin';
     });
 
     return () => {
@@ -243,14 +358,68 @@ export function useSocket(options: UseSocketOptions = {}) {
     };
   }, []);
 
+  // Start scrcpy session (registers thumbnail + state callbacks)
+  const startScrcpySession = useCallback((
+    deviceId: string,
+    onThumbnail: (data: ScrcpyThumbnailData) => void,
+    onStateChange?: (state: ScrcpySessionState) => void,
+  ) => {
+    if (!socketRef.current) return;
+
+    scrcpyThumbnailListenersRef.current.set(deviceId, onThumbnail);
+    if (onStateChange) {
+      scrcpyStateListenersRef.current.set(deviceId, onStateChange);
+    }
+    socketRef.current.emit(DASHBOARD_EVENTS.SCRCPY_START, { deviceId });
+    console.log('[Socket] Started scrcpy session for device:', deviceId);
+  }, []);
+
+  // Stop scrcpy session
+  const stopScrcpySession = useCallback((deviceId: string) => {
+    if (!socketRef.current) return;
+
+    scrcpyThumbnailListenersRef.current.delete(deviceId);
+    scrcpyStateListenersRef.current.delete(deviceId);
+    socketRef.current.emit(DASHBOARD_EVENTS.SCRCPY_STOP, { deviceId });
+    console.log('[Socket] Stopped scrcpy session for device:', deviceId);
+  }, []);
+
+  // Send scrcpy input (tap/swipe/key/text/scroll via binary protocol)
+  const sendScrcpyInput = useCallback((
+    deviceId: string,
+    action: ScrcpyInputAction,
+    params: Record<string, number | string>
+  ) => {
+    if (!socketRef.current) return;
+
+    socketRef.current.emit(DASHBOARD_EVENTS.SCRCPY_INPUT, { deviceId, action, params });
+  }, []);
+
+  // Batch scrcpy input to multiple devices
+  const batchScrcpyInput = useCallback((
+    deviceIds: string[],
+    action: ScrcpyInputAction,
+    params: Record<string, number | string>
+  ) => {
+    if (!socketRef.current) return;
+
+    socketRef.current.emit(DASHBOARD_EVENTS.SCRCPY_BATCH_INPUT, { deviceIds, action, params });
+    console.log('[Socket] Batch scrcpy input:', action, 'to', deviceIds.length, 'devices');
+  }, []);
+
   return {
     isConnected,
     devices,
+    jobProgressMap,
     startStream,
     stopStream,
     sendCommand,
     broadcastCommand,
     onCommandResult,
+    startScrcpySession,
+    stopScrcpySession,
+    sendScrcpyInput,
+    batchScrcpyInput,
     getSocket: () => socketRef.current
   };
 }

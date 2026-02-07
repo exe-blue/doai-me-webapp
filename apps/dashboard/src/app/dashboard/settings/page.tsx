@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
@@ -12,11 +12,13 @@ import {
   RotateCcw,
   CheckCircle2,
   ArrowRight,
+  Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSocketContext } from '@/contexts/socket-context';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
+import { supabase } from '@/lib/supabase';
 
 interface GlobalSettings {
   // Connection Settings
@@ -49,19 +51,43 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState<GlobalSettings>(DEFAULT_SETTINGS);
   const [hasChanges, setHasChanges] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  // Read localStorage in useEffect to avoid SSR hydration mismatch
-  useEffect(() => {
+  // Load settings: DB first, then localStorage fallback
+  const loadSettings = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('settings')
+        .select('key, value')
+        .eq('key', 'global_settings')
+        .single();
+
+      if (!error && data?.value) {
+        const dbSettings = typeof data.value === 'string' ? JSON.parse(data.value) : data.value;
+        setSettings({ ...DEFAULT_SETTINGS, ...dbSettings });
+        // Sync to localStorage
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...DEFAULT_SETTINGS, ...dbSettings }));
+        return;
+      }
+    } catch {
+      // DB not available, fall through to localStorage
+    }
+
+    // Fallback to localStorage
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(stored) });
       }
     } catch {
-      // localStorage not available or parsing failed, keep defaults
+      // keep defaults
     }
+    // done loading
   }, []);
+
+  useEffect(() => {
+    loadSettings();
+  }, [loadSettings]);
 
   const updateSetting = <K extends keyof GlobalSettings>(key: K, value: GlobalSettings[K]) => {
     setSettings(prev => ({ ...prev, [key]: value }));
@@ -69,8 +95,9 @@ export default function SettingsPage() {
     setSaved(false);
   };
 
-  const saveSettings = () => {
-    // Merge with existing stored data (watch settings etc.)
+  const saveSettings = async () => {
+    setSaving(true);
+    // Save to localStorage
     try {
       const existing = localStorage.getItem(STORAGE_KEY);
       const merged = existing ? { ...JSON.parse(existing), ...settings } : settings;
@@ -78,9 +105,31 @@ export default function SettingsPage() {
     } catch {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
     }
+
+    // Save to Supabase settings table
+    try {
+      const { error } = await supabase
+        .from('settings')
+        .upsert({
+          key: 'global_settings',
+          value: settings,
+          description: 'Dashboard global settings',
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'key' });
+
+      if (error) {
+        console.warn('DB settings save failed:', error.message);
+        toast.success('설정이 로컬에 저장되었습니다 (DB 동기화 실패)');
+      } else {
+        toast.success('설정이 저장되었습니다');
+      }
+    } catch {
+      toast.success('설정이 로컬에 저장되었습니다');
+    }
+
     setHasChanges(false);
     setSaved(true);
-    toast.success('설정이 저장되었습니다');
+    setSaving(false);
     setTimeout(() => setSaved(false), 2000);
   };
 
@@ -124,13 +173,18 @@ export default function SettingsPage() {
           <Button
             size="sm"
             onClick={saveSettings}
-            disabled={!hasChanges}
+            disabled={!hasChanges || saving}
             className={cn(
               'font-sans text-xs',
               saved ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'
             )}
           >
-            {saved ? (
+            {saving ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                SAVING...
+              </>
+            ) : saved ? (
               <>
                 <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
                 SAVED

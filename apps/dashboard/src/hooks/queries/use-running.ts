@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { fetchRunningTasks, fetchNodes, fetchTodayStats, type NodeRow } from '@/lib/api';
+import type { JobProgressMap } from '@/hooks/use-socket';
 
 export const runningKeys = {
   all: ['running'] as const,
@@ -63,7 +64,7 @@ export interface RealtimeStats {
 // Helpers
 // =============================================
 
-function getSimulatedStep(task: {
+function estimateStep(task: {
   started_at?: string;
   watch_duration_sec?: number;
 }): string {
@@ -110,6 +111,7 @@ function mapNode(n: NodeRow): NodeStatus {
 export function useRunningTasksQuery(
   nodeFilter?: string,
   refetchInterval?: number | false,
+  jobProgressMap?: JobProgressMap,
 ) {
   return useQuery({
     queryKey: runningKeys.tasks(nodeFilter),
@@ -120,31 +122,35 @@ export function useRunningTasksQuery(
           const video = Array.isArray(task.video)
             ? task.video[0]
             : task.video;
+          const deviceId = task.device_id as string;
+
+          // Use real-time Socket.IO data if available
+          const socketData = jobProgressMap?.get(deviceId);
+
+          const elapsedSec = Math.floor(
+            (Date.now() -
+              new Date(
+                (task.started_at as string) || Date.now(),
+              ).getTime()) /
+              1000,
+          );
+
+          const estimatedProgress = Math.min(
+            100,
+            Math.floor(
+              (elapsedSec / ((task.watch_duration_sec as number) || 60)) * 100,
+            ),
+          );
+
           return {
             ...task,
             video,
-            progress: Math.min(
-              100,
-              Math.floor(
-                ((Date.now() -
-                  new Date(
-                    (task.started_at as string) || Date.now(),
-                  ).getTime()) /
-                  1000 /
-                  ((task.watch_duration_sec as number) || 60)) *
-                  100,
+            progress: socketData?.progress ?? estimatedProgress,
+            current_step: socketData?.currentStep ??
+              estimateStep(
+                task as { started_at?: string; watch_duration_sec?: number },
               ),
-            ),
-            current_step: getSimulatedStep(
-              task as { started_at?: string; watch_duration_sec?: number },
-            ),
-            elapsed_sec: Math.floor(
-              (Date.now() -
-                new Date(
-                  (task.started_at as string) || Date.now(),
-                ).getTime()) /
-                1000,
-            ),
+            elapsed_sec: elapsedSec,
           } as RunningTask;
         },
       );
