@@ -17,6 +17,8 @@ import { logger } from '../utils/logger';
 export interface AppConfig {
   backendBaseUrl: string;
   nodeId?: string;
+  pcId?: string;
+  workerToken?: string;
   workerServerPort?: number;
   logLevel?: string;
 }
@@ -63,13 +65,19 @@ function loadEnvConfig(): Partial<AppConfig> {
 
   const port = process.env.WORKER_SERVER_PORT;
   if (port) {
-    const parsedPort = parseInt(port, 10);
+    const parsedPort = Number.parseInt(port, 10);
     if (Number.isFinite(parsedPort) && parsedPort > 0 && parsedPort <= 65535) {
       env.workerServerPort = parsedPort;
     } else {
       logger.warn('[AppConfig] Invalid WORKER_SERVER_PORT, ignoring', { value: port });
     }
   }
+
+  const pcId = process.env.PC_ID || process.env.DOAIME_PC_ID;
+  if (pcId) env.pcId = pcId;
+
+  const workerToken = process.env.WORKER_TOKEN || process.env.DOAIME_WORKER_TOKEN;
+  if (workerToken) env.workerToken = workerToken;
 
   const logLevel = process.env.LOG_LEVEL;
   if (logLevel) env.logLevel = logLevel;

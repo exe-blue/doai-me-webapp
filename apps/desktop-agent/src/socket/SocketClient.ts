@@ -22,6 +22,8 @@ export type { WorkflowStep };
 export interface SocketClientConfig {
   serverUrl: string;
   nodeId: string;
+  pcId?: string;
+  workerToken?: string;
   reconnectAttempts: number;
   reconnectDelay: number;
   statusReportInterval: number;
@@ -151,11 +153,18 @@ export class SocketClient extends EventEmitter {
 
     console.log(`[SocketClient] Connecting to ${this.config.serverUrl}...`);
 
-    this.socket = io(this.config.serverUrl, {
+    const connectUrl = this.config.serverUrl + '/worker';
+    console.log(`[SocketClient] Using namespace: /worker, pcId: ${this.config.pcId || this.config.nodeId}`);
+
+    this.socket = io(connectUrl, {
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionAttempts: this.config.reconnectAttempts,
       reconnectionDelay: this.config.reconnectDelay,
+      auth: {
+        pcId: this.config.pcId || this.config.nodeId,
+        token: this.config.workerToken || '',
+      },
     });
 
     this.setupEventHandlers();

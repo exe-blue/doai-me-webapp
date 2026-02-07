@@ -10,8 +10,8 @@
  */
 
 import { app, BrowserWindow, Tray, Menu, ipcMain, nativeImage } from 'electron';
-import path from 'path';
-import os from 'os';
+import path from 'node:path';
+import os from 'node:os';
 import { SocketClient } from './socket/SocketClient';
 import { DeviceManager, getDeviceManager } from './device/DeviceManager';
 import { getAdbController } from './device/AdbController';
@@ -24,7 +24,7 @@ import { DeviceRecovery } from './recovery/DeviceRecovery';
 import { NodeRecovery, getNodeRecovery, SavedState } from './recovery/NodeRecovery';
 import { logger } from './utils/logger';
 import { loadAppConfig, getAppConfig, getResourcePath } from './config/AppConfig';
-import fs from 'fs';
+import fs from 'node:fs';
 
 // Manager components for Worker orchestration
 import {
@@ -43,7 +43,7 @@ import {
 const gotTheLock = app.requestSingleInstanceLock();
 
 if (!gotTheLock) {
-  console.log('[App] Another instance is already running. Quitting.');
+  logger.info('Another instance is already running. Quitting.');
   app.quit();
 } else {
   app.on('second-instance', () => {
@@ -92,7 +92,7 @@ let isAppQuitting = false;
 let workerRegistry: WorkerRegistry | null = null;
 let taskDispatcher: TaskDispatcher | null = null;
 let workerServer: WorkerServer | null = null;
-let screenStreamProxy: ScreenStreamProxy | null = null;
+let screenStreamProxy: ScreenStreamProxy | null = null; // NOSONAR: kept alive for side-effect listeners
 
 // ============================================
 // 로그 링 버퍼 (v1.1.0)
@@ -151,7 +151,8 @@ function recordActivity(deviceId?: string, isError = false): void {
     if (!deviceActivity.has(deviceId)) {
       deviceActivity.set(deviceId, Array(24).fill(0));
     }
-    deviceActivity.get(deviceId)![hour]++;
+    const hours = deviceActivity.get(deviceId);
+    if (hours) hours[hour]++;
   }
 }
 
@@ -185,7 +186,6 @@ function createWindow(): void {
     const preloadPath = path.join(__dirname, 'preload.js');
     const htmlPath = path.join(__dirname, 'index.html');
 
-    console.log('[createWindow] Starting', { iconPath, preloadPath, htmlPath });
     logger.info('Creating window', { iconPath, preloadPath, htmlPath, isPackaged: app.isPackaged });
 
     mainWindow = new BrowserWindow({
@@ -209,13 +209,11 @@ function createWindow(): void {
     // 렌더러 크래시 감지
     mainWindow.webContents.on('render-process-gone', (_event, details) => {
       logger.error('Renderer process gone', { reason: details.reason, exitCode: details.exitCode });
-      console.error('[createWindow] Renderer process gone:', details.reason);
     });
 
     // 페이지 로드 실패 감지
     mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
       logger.error('Page failed to load', { errorCode, errorDescription, validatedURL });
-      console.error('[createWindow] did-fail-load:', errorCode, errorDescription);
       // 로드 실패 시에도 윈도우 표시 (에러가 보이도록)
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.show();
@@ -236,7 +234,6 @@ function createWindow(): void {
       })
       .catch((err) => {
         logger.error('loadFile failed', { error: (err as Error).message, htmlPath });
-        console.error('[createWindow] loadFile failed:', (err as Error).message);
         // 로드 실패 시에도 윈도우 표시
         if (mainWindow && !mainWindow.isDestroyed()) {
           mainWindow.show();
@@ -245,7 +242,6 @@ function createWindow(): void {
 
     mainWindow.once('ready-to-show', () => {
       logger.info('Window ready-to-show');
-      console.log('[createWindow] ready-to-show fired');
       mainWindow?.show();
     });
 
@@ -253,7 +249,6 @@ function createWindow(): void {
     setTimeout(() => {
       if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
         logger.warn('Window not visible after 3s, forcing show');
-        console.warn('[createWindow] Forcing show after 3s timeout');
         mainWindow.show();
       }
     }, 3000);
@@ -273,13 +268,12 @@ function createWindow(): void {
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     logger.error('createWindow CRASHED', { error: msg, stack: (error as Error).stack });
-    console.error('[createWindow] CRASHED:', msg);
     // 긴급 폴백: 최소한의 윈도우 생성
     try {
       mainWindow = new BrowserWindow({ width: 600, height: 400, show: true });
       mainWindow.loadURL(`data:text/html,<h1>Error: ${encodeURIComponent(msg)}</h1><p>Desktop Agent window failed to initialize.</p>`);
     } catch (fallbackErr) {
-      console.error('[createWindow] Even fallback failed:', (fallbackErr as Error).message);
+      logger.error('Fallback window creation also failed', { error: (fallbackErr as Error).message });
     }
   }
 }
@@ -438,10 +432,13 @@ async function startAgent(): Promise<void> {
   nodeRecovery = getNodeRecovery();
 
   // Socket.IO 클라이언트 초기화
+  const appConfig = getAppConfig();
   socketClient = new SocketClient(
     {
       serverUrl: SERVER_URL,
       nodeId: NODE_ID,
+      pcId: appConfig.pcId,
+      workerToken: appConfig.workerToken,
     },
     deviceManager,
     workflowRunner
@@ -462,7 +459,9 @@ async function startAgent(): Promise<void> {
 
     // 이전 상태 복구 시도
     if (nodeRecovery) {
-      await nodeRecovery.recover(socketClient!);
+      if (socketClient) {
+        await nodeRecovery.recover(socketClient);
+      }
     }
   });
 
@@ -531,8 +530,8 @@ async function startAgent(): Promise<void> {
 // 디바이스 상태 브로드캐스트 (v1.1.0)
 // ============================================
 
-function broadcastDeviceUpdate(): void {
-  const devices = (deviceManager?.getAllDevices() || []).map(d => ({
+function mapDevicesToDTO(devices: ReturnType<DeviceManager['getAllDevices']>) {
+  return devices.map(d => ({
     id: d.serial,
     serial: d.serial,
     name: d.model || d.serial,
@@ -542,6 +541,10 @@ function broadcastDeviceUpdate(): void {
     lastActivity: d.lastSeen || Date.now(),
     state: d.state,
   }));
+}
+
+function broadcastDeviceUpdate(): void {
+  const devices = mapDevicesToDTO(deviceManager?.getAllDevices() || []);
   sendToRenderer('device-update', devices);
 }
 
@@ -733,17 +736,7 @@ function setupIPC(): void {
 
   // 디바이스 목록 조회
   ipcMain.handle('get-devices', () => {
-    const devices = deviceManager?.getAllDevices() || [];
-    return devices.map(d => ({
-      id: d.serial,
-      serial: d.serial,
-      name: d.model || d.serial,
-      model: d.model || 'Unknown',
-      status: d.state?.toLowerCase() || 'offline',
-      battery: d.battery ?? 0,
-      lastActivity: d.lastSeen || Date.now(),
-      state: d.state,
-    }));
+    return mapDevicesToDTO(deviceManager?.getAllDevices() || []);
   });
 
   // 로그 조회
@@ -796,8 +789,8 @@ function setupIPC(): void {
     try {
       battery = await adb.getBatteryLevel(serial);
       screenOn = await adb.isScreenOn(serial);
-    } catch {
-      // 디바이스 응답 없을 수 있음
+    } catch (error) {
+      logger.debug('Failed to get device details', { serial, error: (error as Error).message });
     }
 
     return {
@@ -938,12 +931,12 @@ function setupIPC(): void {
   // 선택한 APK를 디바이스에 설치
   ipcMain.handle('install-apk', async (_event, serial: string, apkFileName: string) => {
     try {
-      // 파일 이름 검증 (경로 순회 방지)
-      if (apkFileName.includes('/') || apkFileName.includes('\\') || apkFileName.includes('..')) {
+      // 파일 이름 검증 (경로 순회 + 명령 인젝션 방지)
+      if (!/^[\w\-.]+\.apk$/i.test(apkFileName)) {
         return { success: false, message: '잘못된 파일 이름' };
       }
 
-      const apkPath = getResourcePath(`apks/${apkFileName}`);
+      const apkPath = getResourcePath(path.join('apks', apkFileName));
       if (!fs.existsSync(apkPath)) {
         return { success: false, message: `APK 파일 없음: ${apkFileName}` };
       }
@@ -1053,7 +1046,6 @@ function sendToRenderer(channel: string, data?: unknown): void {
 // ============================================
 
 app.on('ready', async () => {
-  console.log('[App] ready event fired', { isPackaged: app.isPackaged, version: app.getVersion() });
   logger.info('App ready', {
     isPackaged: app.isPackaged,
     version: app.getVersion(),
@@ -1074,13 +1066,9 @@ app.on('ready', async () => {
     logger.error('loadAppConfig failed', { error: (err as Error).message });
   }
 
-  console.log('[App] Creating window...');
   createWindow();
-  console.log('[App] Creating tray...');
   createTray();
-  console.log('[App] Setting up IPC...');
   setupIPC();
-  console.log('[App] Setup complete, scheduling agent start...');
 
   // 약간의 딜레이 후 에이전트 시작
   setTimeout(() => {
