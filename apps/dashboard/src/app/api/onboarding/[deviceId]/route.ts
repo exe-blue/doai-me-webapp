@@ -19,7 +19,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     // DB에서 온보딩 상태 조회
     const { data: dbData, error } = await supabase
-      .from("device_onboarding")
+      .from("device_onboarding_states")
       .select("*")
       .eq("device_id", deviceId)
       .maybeSingle();
@@ -72,7 +72,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     const supabase = getServerClient();
 
     const { error } = await supabase
-      .from("device_onboarding")
+      .from("device_onboarding_states")
       .delete()
       .eq("device_id", deviceId);
 
@@ -139,7 +139,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       
       // 현재 상태 조회
       const { data: current } = await supabase
-        .from("device_onboarding")
+        .from("device_onboarding_states")
         .select("completed_steps")
         .eq("device_id", deviceId)
         .maybeSingle();
@@ -150,7 +150,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       }
 
       await supabase
-        .from("device_onboarding")
+        .from("device_onboarding_states")
         .update({
           current_step: step,
           completed_steps: completedSteps,

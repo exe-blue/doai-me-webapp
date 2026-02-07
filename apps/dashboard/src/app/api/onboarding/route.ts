@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
 
     // 온보딩 상태 테이블 조회
     let query = supabase
-      .from("device_onboarding")
+      .from("device_onboarding_states")
       .select("*", { count: "exact" })
       .order("updated_at", { ascending: false });
 
@@ -166,7 +166,7 @@ export async function POST(request: NextRequest) {
     // DB에 온보딩 상태 기록
     const supabase = getServerClient();
     for (const deviceId of deviceIds) {
-      const { error } = await supabase.from("device_onboarding").upsert(
+      const { error } = await supabase.from("device_onboarding_states").upsert(
         {
           device_id: deviceId,
           node_id: nodeId,
@@ -249,7 +249,7 @@ export async function PATCH(request: NextRequest) {
       // DB 상태 업데이트
       const supabase = getServerClient();
       await supabase
-        .from("device_onboarding")
+        .from("device_onboarding_states")
         .update({
           status: "failed",
           error_message: "Cancelled by user",
@@ -280,7 +280,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const { data, error } = await supabase
-      .from("device_onboarding")
+      .from("device_onboarding_states")
       .update(updateData)
       .eq("device_id", deviceId)
       .select()
