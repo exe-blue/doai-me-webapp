@@ -77,3 +77,9 @@ _legacy/
 
 # Resources (binary/media assets)
 resources/
+
+# Playwright E2E test artifacts
+test-results/
+playwright-report/
+playwright/.cache/
+apps/e2e/playwright/.auth/

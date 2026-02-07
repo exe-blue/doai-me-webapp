@@ -40,7 +40,10 @@
     "typecheck:install-bot": "npm run typecheck --workspace=apps/install-bot",
     "typecheck:health-bot": "npm run typecheck --workspace=apps/health-bot",
     "typecheck:workers": "npm run typecheck:types && npm run typecheck:core && npm run typecheck:ui-automator && npm run typecheck:youtube-bot && npm run typecheck:install-bot && npm run typecheck:health-bot",
-    "download:minicap": "node scripts/download-minicap.js"
+    "download:minicap": "node scripts/download-minicap.js",
+    "e2e": "npm run test --workspace=apps/e2e",
+    "e2e:ui": "npm run test:ui --workspace=apps/e2e",
+    "e2e:smoke": "npm run test:smoke --workspace=apps/e2e"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",

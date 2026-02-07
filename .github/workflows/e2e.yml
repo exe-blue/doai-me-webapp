@@ -1,0 +1,51 @@
+name: E2E Tests
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/dashboard/**'
+      - 'apps/backend/**'
+      - 'apps/e2e/**'
+      - 'packages/**'
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - run: npm run build --workspace=apps/dashboard
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+        working-directory: apps/e2e
+
+      - name: Run E2E smoke tests
+        run: npm run test:smoke --workspace=apps/e2e
+        env:
+          CI: true
+          NEXT_PUBLIC_APP_URL: http://localhost:3000
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: apps/e2e/playwright-report/
+          retention-days: 7
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: test-results
+          path: apps/e2e/test-results/
+          retention-days: 7
