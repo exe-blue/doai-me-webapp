@@ -24,7 +24,7 @@ export interface AppConfig {
 }
 
 const DEFAULTS: AppConfig = {
-  backendBaseUrl: 'http://158.247.210.152:4000',
+  backendBaseUrl: 'https://api.doai.me',
 };
 
 let cached: AppConfig | null = null;

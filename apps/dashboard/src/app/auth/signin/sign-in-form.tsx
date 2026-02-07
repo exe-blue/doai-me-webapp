@@ -10,7 +10,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Label } from '@packages/ui';
 import { OAuthButtons } from '@/components/auth/oauth-buttons';
 import { createClient } from '@/lib/supabase/client';
 

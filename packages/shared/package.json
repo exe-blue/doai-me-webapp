@@ -39,6 +39,16 @@
       "types": "./dist/database.d.ts",
       "import": "./dist/database.js",
       "require": "./dist/database.js"
+    },
+    "./bot-catalog": {
+      "types": "./dist/bot-catalog.d.ts",
+      "import": "./dist/bot-catalog.js",
+      "require": "./dist/bot-catalog.js"
+    },
+    "./events": {
+      "types": "./dist/events.d.ts",
+      "import": "./dist/events.js",
+      "require": "./dist/events.js"
     }
   },
   "scripts": {
@@ -46,20 +56,41 @@
     "dev": "tsc --watch",
     "clean": "rimraf dist",
     "lint": "eslint src",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "devDependencies": {
     "rimraf": "^5.0.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "vitest": "^4.0.18"
   },
   "typesVersions": {
     "*": {
-      "database": ["dist/database.d.ts"],
-      "types": ["dist/types.d.ts"],
-      "api": ["dist/api.d.ts"],
-      "socket": ["dist/socket.d.ts"],
-      "queue": ["dist/queue.d.ts"],
-      "constants": ["dist/constants.d.ts"]
+      "database": [
+        "dist/database.d.ts"
+      ],
+      "types": [
+        "dist/types.d.ts"
+      ],
+      "api": [
+        "dist/api.d.ts"
+      ],
+      "socket": [
+        "dist/socket.d.ts"
+      ],
+      "queue": [
+        "dist/queue.d.ts"
+      ],
+      "constants": [
+        "dist/constants.d.ts"
+      ],
+      "bot-catalog": [
+        "dist/bot-catalog.d.ts"
+      ],
+      "events": [
+        "dist/events.d.ts"
+      ]
     }
   },
   "files": [

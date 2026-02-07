@@ -9,7 +9,7 @@ import Link from 'next/link';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Label } from '@packages/ui';
 import { createClient } from '@/lib/supabase/client';
 
 const forgotPasswordSchema = z.object({

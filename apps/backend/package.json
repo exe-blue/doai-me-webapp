@@ -11,10 +11,10 @@
     "test:latency": "ts-node latency_test.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "socketio": "node socketio-server.js",
-    "socketio:dev": "nodemon socketio-server.js",
-    "worker": "node workers/workflowWorker.js",
-    "worker:dev": "nodemon workers/workflowWorker.js"
+    "socketio": "node dist/server.js",
+    "socketio:dev": "ts-node src/server.ts",
+    "worker": "node dist/queue/WorkflowWorker.js",
+    "worker:dev": "ts-node src/queue/WorkflowWorker.ts"
   },
   "keywords": [
     "websocket",

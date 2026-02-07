@@ -119,6 +119,25 @@ export interface ScrcpyBatchInputEvent {
   params: Record<string, unknown>;
 }
 
+// job:assign 이벤트 (서버 → 에이전트, 프로덕션 작업 분배)
+export interface JobAssignEvent {
+  assignmentId: string;
+  deviceId: string;
+  deviceSerial: string;
+  job: {
+    id: string;
+    title: string;
+    target_url: string;
+    duration_sec: number;
+    duration_min_pct: number;
+    duration_max_pct: number;
+    prob_like: number;
+    prob_comment: number;
+    prob_playlist: number;
+    script_type: string;
+  };
+}
+
 // ============================================
 // 상수
 // ============================================
@@ -134,11 +153,11 @@ const SOCKET_EVENTS = {
   EXECUTE_WORKFLOW: 'EXECUTE_WORKFLOW',
   CANCEL_WORKFLOW: 'CANCEL_WORKFLOW',
   PING: 'PING',
-  // scrcpy 제어 (서버 → 에이전트)
-  SCRCPY_START: 'SCRCPY_START',
-  SCRCPY_STOP: 'SCRCPY_STOP',
-  SCRCPY_INPUT: 'SCRCPY_INPUT',
-  SCRCPY_BATCH_INPUT: 'SCRCPY_BATCH_INPUT',
+  // scrcpy 제어 (서버 → 에이전트) — canonical lowercase names
+  SCRCPY_START: 'scrcpy:start',
+  SCRCPY_STOP: 'scrcpy:stop',
+  SCRCPY_INPUT: 'scrcpy:input',
+  SCRCPY_BATCH_INPUT: 'scrcpy:batch:input',
   // 에이전트 → 서버
   REGISTER: 'REGISTER',
   DEVICE_STATUS: 'DEVICE_STATUS',
@@ -146,10 +165,20 @@ const SOCKET_EVENTS = {
   WORKFLOW_COMPLETE: 'WORKFLOW_COMPLETE',
   WORKFLOW_ERROR: 'WORKFLOW_ERROR',
   PONG: 'PONG',
-  // scrcpy 스트림 (에이전트 → 서버)
-  SCRCPY_THUMBNAIL: 'SCRCPY_THUMBNAIL',
-  SCRCPY_SESSION_STATE: 'SCRCPY_SESSION_STATE',
-  SCRCPY_VIDEO_META: 'SCRCPY_VIDEO_META',
+  // scrcpy 스트림 (에이전트 → 서버) — canonical lowercase names
+  SCRCPY_THUMBNAIL: 'scrcpy:thumbnail',
+  SCRCPY_SESSION_STATE: 'scrcpy:session:state',
+  SCRCPY_VIDEO_META: 'scrcpy:video:meta',
+  // job 이벤트 (프로덕션 작업 분배)
+  JOB_ASSIGN: 'job:assign',           // 서버 → 에이전트
+  JOB_STARTED: 'job:started',         // 에이전트 → 서버
+  JOB_PROGRESS: 'job:progress',       // 에이전트 → 서버
+  JOB_COMPLETED: 'job:completed',     // 에이전트 → 서버
+  JOB_FAILED: 'job:failed',           // 에이전트 → 서버
+  JOB_REQUEST: 'job:request',         // 에이전트 → 서버 (작업 요청)
+  JOB_REQUEST_RESPONSE: 'job:request:response', // 서버 → 에이전트
+  COMMENT_REQUEST: 'comment:request', // 에이전트 → 서버
+  COMMENT_RESPONSE: 'comment:response', // 서버 → 에이전트
 } as const;
 
 // ============================================
@@ -301,6 +330,15 @@ export class SocketClient extends EventEmitter {
       ack?.({ received: true });
       this.emit('scrcpy:batchInput', data);
     });
+
+    // ============================================
+    // job:assign 이벤트 (프로덕션 작업 분배)
+    // ============================================
+
+    this.socket.on(SOCKET_EVENTS.JOB_ASSIGN, async (data: JobAssignEvent) => {
+      console.log(`[SocketClient] Received job:assign: ${data.assignmentId} for device ${data.deviceSerial}`);
+      await this.handleJobAssign(data);
+    });
   }
 
   /**
@@ -392,6 +430,115 @@ export class SocketClient extends EventEmitter {
     // TODO: 실제 취소 로직 구현
     this.activeWorkflows.delete(jobId);
     return true;
+  }
+
+  /**
+   * job:assign 핸들러 (프로덕션 작업 분배)
+   * Backend에서 job:assign → WorkflowDefinition 변환 → WorkflowRunner 실행
+   */
+  private async handleJobAssign(data: JobAssignEvent): Promise<void> {
+    const { assignmentId, deviceId, deviceSerial, job } = data;
+
+    // 1. job:started 보고
+    this.socket?.emit(SOCKET_EVENTS.JOB_STARTED, {
+      assignmentId,
+      jobId: job.id,
+      deviceId,
+      deviceSerial,
+      timestamp: Date.now(),
+    });
+
+    // 2. job:assign → WorkflowDefinition 변환
+    const workflow: WorkflowDefinition = {
+      id: `job-${job.id}`,
+      name: job.title || 'YouTube Watch',
+      version: 1,
+      timeout: (job.duration_sec || 60) * 1000 * 2,
+      steps: [
+        { id: 'launch', action: 'adb', command: 'shell am start -n com.google.android.youtube/.HomeActivity' },
+        { id: 'wait_launch', action: 'wait', params: { ms: 3000 } },
+        { id: 'open_video', action: 'adb', command: `shell am start -a android.intent.action.VIEW -d "${job.target_url}"` },
+        { id: 'wait_video', action: 'wait', params: { ms: 5000 } },
+        { id: 'watch', action: 'wait', params: { ms: (job.duration_sec || 60) * 1000 } },
+        { id: 'report', action: 'system', command: 'report_complete' },
+      ],
+    };
+
+    const startTime = Date.now();
+
+    // 3. activeWorkflows에 등록
+    this.activeWorkflows.set(job.id, {
+      deviceIds: [deviceSerial],
+      startTime,
+    });
+
+    try {
+      // 4. WorkflowRunner 실행
+      await this.workflowRunner.executeWorkflow(
+        workflow.id,
+        deviceSerial,
+        { assignmentId, jobId: job.id, ...job },
+        {
+          onProgress: async (progress, stepId) => {
+            this.socket?.emit(SOCKET_EVENTS.JOB_PROGRESS, {
+              jobId: job.id,
+              assignmentId,
+              deviceId,
+              deviceSerial,
+              progressPct: progress,
+              currentStep: stepId,
+              totalSteps: workflow.steps.length,
+              status: 'running',
+              timestamp: Date.now(),
+            });
+          },
+        },
+        workflow
+      );
+
+      // 5. 성공 보고
+      const finalDurationSec = Math.round((Date.now() - startTime) / 1000);
+      this.socket?.emit(SOCKET_EVENTS.JOB_COMPLETED, {
+        assignmentId,
+        jobId: job.id,
+        deviceId,
+        deviceSerial,
+        finalDurationSec,
+        success: true,
+        timestamp: Date.now(),
+      });
+
+    } catch (error) {
+      // 6. 실패 보고
+      this.socket?.emit(SOCKET_EVENTS.JOB_FAILED, {
+        assignmentId,
+        jobId: job.id,
+        deviceId,
+        deviceSerial,
+        error: (error as Error).message,
+        timestamp: Date.now(),
+      });
+    } finally {
+      // 7. activeWorkflows에서 제거
+      this.activeWorkflows.delete(job.id);
+    }
+  }
+
+  /**
+   * 댓글 요청 (Backend comment pool에서 가져오기)
+   */
+  async requestComment(jobId: string, deviceId: string): Promise<string | null> {
+    return new Promise((resolve) => {
+      if (!this.socket?.connected) { resolve(null); return; }
+
+      this.socket.emit(SOCKET_EVENTS.COMMENT_REQUEST, { jobId, deviceId });
+
+      const timeout = setTimeout(() => resolve(null), 10000);
+      this.socket.once(SOCKET_EVENTS.COMMENT_RESPONSE, (data: { jobId: string; deviceId: string; comment: string | null }) => {
+        clearTimeout(timeout);
+        resolve(data.comment || null);
+      });
+    });
   }
 
   /**

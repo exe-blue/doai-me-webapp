@@ -64,7 +64,7 @@ if (!gotTheLock) {
 // ============================================
 
 const NODE_ID = process.env.NODE_ID || process.env.DOAIME_NODE_ID || `node_${os.hostname()}`;
-let SERVER_URL = process.env.SERVER_URL || process.env.DOAIME_SERVER_URL || 'http://158.247.210.152:4000';
+let SERVER_URL = process.env.SERVER_URL || process.env.DOAIME_SERVER_URL || 'https://api.doai.me';
 const IS_DEV = process.env.NODE_ENV === 'development';
 const WORKER_SERVER_PORT = parseInt(process.env.WORKER_SERVER_PORT || '3001', 10);
 
