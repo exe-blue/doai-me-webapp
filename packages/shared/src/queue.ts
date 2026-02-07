@@ -16,6 +16,7 @@ export const QUEUE_NAMES = {
   CLEANUP: "cleanup",
   SCRIPT_EXECUTION: "script-execution",
   DEVICE_REGISTRATION: "device-registration",
+  COMMENT_GENERATION: "comment-generation",
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];
@@ -34,6 +35,18 @@ export interface VideoExecutionJobData {
   maxRetries: number;
   preferredNodeId?: string;
   preferredDeviceId?: string;
+  // YouTube 봇 파라미터
+  keyword?: string;
+  durationMinPct?: number;
+  durationMaxPct?: number;
+  actionProbabilities?: {
+    like: number;
+    comment: number;
+    subscribe: number;
+    playlist: number;
+  };
+  commentText?: string;
+  botTemplateId?: string;         // 'youtube-watch-v1'
   metadata?: {
     scheduleId?: UUID;
     batchId?: string;
@@ -206,6 +219,27 @@ export interface DeviceRegistrationJobResult {
 }
 
 // ============================================
+// Comment Generation Job
+// ============================================
+
+export interface CommentGenerationJobData {
+  jobId: UUID;
+  videoTitle: string;
+  videoUrl: string;
+  channelName?: string;
+  count: number;           // 생성할 댓글 수
+  language: string;        // 'ko' | 'en'
+  style?: 'positive' | 'neutral' | 'question';
+}
+
+export interface CommentGenerationJobResult {
+  jobId: UUID;
+  comments: string[];
+  success: boolean;
+  errorMessage?: string;
+}
+
+// ============================================
 // Job Options 기본값
 // ============================================
 
@@ -261,6 +295,15 @@ export const DEFAULT_JOB_OPTIONS = {
     backoff: {
       type: "exponential" as const,
       delay: 2000,
+    },
+    removeOnComplete: { count: 200 },
+    removeOnFail: { count: 500 },
+  },
+  [QUEUE_NAMES.COMMENT_GENERATION]: {
+    attempts: 2,
+    backoff: {
+      type: "exponential" as const,
+      delay: 3000,
     },
     removeOnComplete: { count: 200 },
     removeOnFail: { count: 500 },

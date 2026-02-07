@@ -44,3 +44,21 @@ client-pc/Output/*.exe
 # Platform tools (user must download)
 client-pc/platform-tools/*.exe
 client-pc/platform-tools/*.dll
+
+# Desktop Agent build & binaries
+apps/desktop-agent/release/
+apps/desktop-agent/resources/apks/
+apps/desktop-agent/resources/platform-tools/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Turborepo cache
+.turbo/
+
+# Sisyphus plans (local agent state)
+.sisyphus/
+
+# Resources (binary/media assets)
+resources/
