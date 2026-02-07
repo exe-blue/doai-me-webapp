@@ -24,15 +24,34 @@ export class ResourceAllocator {
 
   async getHostResources(): Promise<{ totalCpuCores: number; totalMemoryMb: number; availableMemoryMb: number }> {
     const info = await this.docker.info();
+    const totalMemoryMb = Math.floor((info.MemTotal ?? 0) / (1024 * 1024));
+
+    let usedMemoryMb = 0;
+    try {
+      const containers = await this.docker.listContainers();
+      for (const c of containers) {
+        const container = this.docker.getContainer(c.Id);
+        const inspectData = await container.inspect();
+        const memLimit = inspectData.HostConfig?.Memory ?? 0;
+        if (memLimit > 0) {
+          usedMemoryMb += Math.floor(memLimit / (1024 * 1024));
+        }
+      }
+    } catch {
+      usedMemoryMb = Math.floor(totalMemoryMb * 0.2);
+    }
+
     return {
       totalCpuCores: info.NCPU ?? 0,
-      totalMemoryMb: Math.floor((info.MemTotal ?? 0) / (1024 * 1024)),
-      availableMemoryMb: Math.floor((info.MemTotal ?? 0) / (1024 * 1024)),
+      totalMemoryMb,
+      availableMemoryMb: Math.max(0, totalMemoryMb - usedMemoryMb),
     };
   }
 
-  calculateMaxEmulators(resources: ResourceAllocation): number {
-    // This is a simplified estimate
-    return Math.floor(64 * 1024 / resources.memoryMb); // Assume 64GB total
+  async calculateMaxEmulators(resources: ResourceAllocation): Promise<number> {
+    if (!resources.memoryMb || resources.memoryMb <= 0) return 0;
+    const hostResources = await this.getHostResources();
+    if (hostResources.availableMemoryMb <= 0) return 0;
+    return Math.floor(hostResources.availableMemoryMb / resources.memoryMb);
   }
 }

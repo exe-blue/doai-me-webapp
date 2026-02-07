@@ -60,7 +60,7 @@ export interface StreamHubStats {
   activeSessions: number;
   totalSubscribers: number;
   totalBytesPerSecond: number;
-  sessionsPerDevice: Map<string, number>;
+  sessionsPerDevice: Record<string, number>;
 }
 
 export interface AdaptiveQualityConfig {

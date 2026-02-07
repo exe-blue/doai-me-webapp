@@ -21,7 +21,9 @@ export class ThumbnailGenerator {
       data: new Uint8Array(thumbnailData),
       timestamp: frame.timestamp,
       width: this.width,
-      height: Math.round((frame.height / frame.width) * this.width),
+      height: frame.width > 0
+        ? Math.round((frame.height / frame.width) * this.width)
+        : this.width,
     };
   }
 

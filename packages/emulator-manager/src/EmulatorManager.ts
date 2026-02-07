@@ -49,10 +49,10 @@ export class EmulatorManager {
 
   async destroy(emulatorId: string): Promise<void> {
     const info = await this.provider.getInfo(emulatorId);
+    await this.provider.destroy(emulatorId);
     if (info) {
       this.usedPorts.delete(info.config.adbPort);
     }
-    await this.provider.destroy(emulatorId);
   }
 
   async getInfo(emulatorId: string): Promise<EmulatorInfo | null> {

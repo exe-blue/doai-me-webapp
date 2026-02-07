@@ -1,9 +1,12 @@
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 import type { EmulatorHealthStatus } from '../types';
 import type { EmulatorProvider } from '../providers/EmulatorProvider';
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
+
+// Only allow host:port or device serial patterns to prevent injection
+const ADB_SERIAL_PATTERN = /^[a-zA-Z0-9._:\-]+$/;
 
 export class EmulatorHealthChecker {
   private provider: EmulatorProvider;
@@ -30,8 +33,14 @@ export class EmulatorHealthChecker {
 
     if (containerRunning) {
       try {
-        await execAsync(`adb -s ${info.adbSerial} shell getprop sys.boot_completed`, { timeout: 5000 });
-        adbResponsive = true;
+        if (!ADB_SERIAL_PATTERN.test(info.adbSerial)) {
+          throw new Error(`Invalid adb serial: ${info.adbSerial}`);
+        }
+        const { stdout } = await execFileAsync(
+          'adb', ['-s', info.adbSerial, 'shell', 'getprop', 'sys.boot_completed'],
+          { timeout: 5000 },
+        );
+        adbResponsive = stdout.trim() === '1';
       } catch {
         adbResponsive = false;
       }

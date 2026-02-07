@@ -23,15 +23,31 @@ export class WebSocketTransport implements StreamTransport {
     for (const subId of subs) {
       const sub = this.subscribers.get(subId);
       if (sub) {
-        sub.send(frame.data);
+        try {
+          sub.send(frame.data);
+        } catch {
+          // Isolate per-subscriber errors so one failure doesn't stop broadcast
+        }
       }
     }
   }
 
   addSubscriber(subscriberId: string, deviceId: string): void {
+    // Clean up old device mapping if subscriber is switching devices
+    const existing = this.subscribers.get(subscriberId);
+    if (existing && existing.deviceId !== deviceId) {
+      const oldSubs = this.deviceSubscribers.get(existing.deviceId);
+      if (oldSubs) {
+        oldSubs.delete(subscriberId);
+        if (oldSubs.size === 0) {
+          this.deviceSubscribers.delete(existing.deviceId);
+        }
+      }
+    }
+
     this.subscribers.set(subscriberId, {
       deviceId,
-      send: () => {}, // Will be set by the caller
+      send: existing?.send ?? (() => {}),
     });
 
     let deviceSubs = this.deviceSubscribers.get(deviceId);

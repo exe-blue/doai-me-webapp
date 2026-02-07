@@ -18,7 +18,12 @@ export class EmulatorPool {
         androidVersion: this.config.androidVersion,
         resources: this.config.defaultResources,
       });
-      await this.manager.start(emu.id);
+      try {
+        await this.manager.start(emu.id);
+      } catch (err) {
+        await this.manager.destroy(emu.id).catch(() => {});
+        throw err;
+      }
       this.available.push(emu.id);
     }
   }
@@ -27,8 +32,19 @@ export class EmulatorPool {
     const emulatorId = this.available.shift();
     if (!emulatorId) return null;
 
+    let info: EmulatorInfo | null;
+    try {
+      info = await this.manager.getInfo(emulatorId);
+    } catch {
+      this.available.unshift(emulatorId);
+      return null;
+    }
+
+    if (!info) {
+      return null;
+    }
+
     this.allocated.set(allocationId, emulatorId);
-    const info = await this.manager.getInfo(emulatorId);
 
     // Replenish pool in background
     this.replenish().catch(() => {});
@@ -53,7 +69,12 @@ export class EmulatorPool {
         androidVersion: this.config.androidVersion,
         resources: this.config.defaultResources,
       });
-      await this.manager.start(emu.id);
+      try {
+        await this.manager.start(emu.id);
+      } catch (err) {
+        await this.manager.destroy(emu.id).catch(() => {});
+        throw err;
+      }
       this.available.push(emu.id);
     }
   }

@@ -61,7 +61,7 @@ export class RedroidProvider implements EmulatorProvider {
     const inspectData = await container.inspect();
     const ipAddress = inspectData.NetworkSettings?.IPAddress ?? '';
 
-    info.state = 'booting';
+    info.state = inspectData.State?.Running ? 'running' : 'booting';
     info.ipAddress = ipAddress;
     this.emulators.set(emulatorId, info);
   }
@@ -121,10 +121,13 @@ export class RedroidProvider implements EmulatorProvider {
     const info = this.emulators.get(emulatorId);
     if (!info) throw new Error(`Emulator ${emulatorId} not found`);
 
+    const sanitizedName = name.replace(/[^a-zA-Z0-9_.\-]/g, '_');
+    if (!sanitizedName) throw new Error('Invalid snapshot name after sanitization');
+
     const container = this.docker.getContainer(info.containerId);
     const commitResult = await container.commit({
       repo: `redroid-snapshot-${emulatorId}`,
-      tag: name,
+      tag: sanitizedName,
     });
 
     return {

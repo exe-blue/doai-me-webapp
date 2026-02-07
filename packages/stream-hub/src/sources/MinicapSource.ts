@@ -73,7 +73,7 @@ export class MinicapSource extends FrameSource {
       height: this.height,
       timestamp: Date.now(),
       format: 'jpeg',
-      quality: 'high',
+      quality: this.quality >= 80 ? 'high' : this.quality >= 50 ? 'medium' : 'low',
     };
 
     this.emit('frame', frame);
