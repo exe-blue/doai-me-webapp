@@ -163,14 +163,48 @@ contextBridge.exposeInMainWorld('api', {
   // v1.2.0: scrcpy 화면 제어
   // ========================================================================
 
-  // scrcpy 시작 (디바이스 화면 미러링 + 제어)
+  // scrcpy 시작 (디바이스 화면 미러링 + 제어) — 레거시
   startScrcpy: (serial) => ipcRenderer.invoke('start-scrcpy', serial),
 
-  // scrcpy 중지
+  // scrcpy 중지 — 레거시
   stopScrcpy: (serial) => ipcRenderer.invoke('stop-scrcpy', serial),
 
-  // scrcpy 활성 상태 조회
+  // scrcpy 활성 상태 조회 — 레거시
   isScrcpyActive: (serial) => ipcRenderer.invoke('is-scrcpy-active', serial),
+
+  // ========================================================================
+  // v1.3.0: ScrcpySession 관리 (ScrcpySessionManager 기반)
+  // ========================================================================
+
+  // scrcpy 세션 시작 (옵션: maxSize, bitrate, fps 등)
+  scrcpySessionStart: (deviceId, options) =>
+    ipcRenderer.invoke('scrcpy-session:start', deviceId, options),
+
+  // scrcpy 세션 종료
+  scrcpySessionStop: (deviceId) =>
+    ipcRenderer.invoke('scrcpy-session:stop', deviceId),
+
+  // 활성 scrcpy 세션 목록 조회
+  scrcpySessionList: () =>
+    ipcRenderer.invoke('scrcpy-session:list'),
+
+  // scrcpy 세션 입력 전송 (tap/swipe/key/text/scroll)
+  scrcpySessionInput: (deviceId, action, params) =>
+    ipcRenderer.invoke('scrcpy-session:input', deviceId, action, params),
+
+  // scrcpy 썸네일 수신 리스너
+  onScrcpyThumbnail: (callback) => {
+    const handler = (event, data) => callback(data);
+    ipcRenderer.on('scrcpy-thumbnail', handler);
+    return () => ipcRenderer.removeListener('scrcpy-thumbnail', handler);
+  },
+
+  // scrcpy 세션 상태 변경 리스너
+  onScrcpyStateChanged: (callback) => {
+    const handler = (event, data) => callback(data);
+    ipcRenderer.on('scrcpy-state-changed', handler);
+    return () => ipcRenderer.removeListener('scrcpy-state-changed', handler);
+  },
 
   // ========================================================================
   // v1.2.0: APK 관리
@@ -191,4 +225,23 @@ contextBridge.exposeInMainWorld('api', {
 
   // 인프라 점검 실행 (강제 갱신)
   runInfraCheck: () => ipcRenderer.invoke('run-infra-check'),
+
+  // ========================================================================
+  // v1.2.3: 접속설정 (USB/WiFi/OTG 연결 관리)
+  // ========================================================================
+
+  // USB 디바이스 스캔
+  scanUsbDevices: () => ipcRenderer.invoke('scan-usb-devices'),
+
+  // WiFi/OTG 대상 일괄 연결
+  connectAdbTargets: (type) => ipcRenderer.invoke('connect-adb-targets', type),
+
+  // 단일 IP로 ADB 연결
+  connectAdbIp: (ip) => ipcRenderer.invoke('connect-adb-ip', ip),
+
+  // 접속설정 조회
+  getConnectionSettings: () => ipcRenderer.invoke('get-connection-settings'),
+
+  // 접속설정 저장
+  saveConnectionSettings: (settings) => ipcRenderer.invoke('save-connection-settings', settings),
 });

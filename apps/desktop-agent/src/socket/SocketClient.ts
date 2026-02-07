@@ -92,6 +92,33 @@ export interface DeviceStatusEvent {
   };
 }
 
+// scrcpy 이벤트 타입
+export interface ScrcpyStartEvent {
+  device_id: string;
+  adb_serial: string;
+  options?: {
+    maxSize?: number;
+    maxFps?: number;
+    videoBitRate?: number;
+  };
+}
+
+export interface ScrcpyStopEvent {
+  device_id: string;
+}
+
+export interface ScrcpyInputEvent {
+  device_id: string;
+  type: 'tap' | 'swipe' | 'text' | 'key' | 'scroll' | 'back' | 'longPress';
+  params: Record<string, unknown>;
+}
+
+export interface ScrcpyBatchInputEvent {
+  device_ids: string[];
+  type: 'tap' | 'swipe' | 'text' | 'key' | 'back';
+  params: Record<string, unknown>;
+}
+
 // ============================================
 // 상수
 // ============================================
@@ -107,6 +134,11 @@ const SOCKET_EVENTS = {
   EXECUTE_WORKFLOW: 'EXECUTE_WORKFLOW',
   CANCEL_WORKFLOW: 'CANCEL_WORKFLOW',
   PING: 'PING',
+  // scrcpy 제어 (서버 → 에이전트)
+  SCRCPY_START: 'SCRCPY_START',
+  SCRCPY_STOP: 'SCRCPY_STOP',
+  SCRCPY_INPUT: 'SCRCPY_INPUT',
+  SCRCPY_BATCH_INPUT: 'SCRCPY_BATCH_INPUT',
   // 에이전트 → 서버
   REGISTER: 'REGISTER',
   DEVICE_STATUS: 'DEVICE_STATUS',
@@ -114,6 +146,10 @@ const SOCKET_EVENTS = {
   WORKFLOW_COMPLETE: 'WORKFLOW_COMPLETE',
   WORKFLOW_ERROR: 'WORKFLOW_ERROR',
   PONG: 'PONG',
+  // scrcpy 스트림 (에이전트 → 서버)
+  SCRCPY_THUMBNAIL: 'SCRCPY_THUMBNAIL',
+  SCRCPY_SESSION_STATE: 'SCRCPY_SESSION_STATE',
+  SCRCPY_VIDEO_META: 'SCRCPY_VIDEO_META',
 } as const;
 
 // ============================================
@@ -235,6 +271,36 @@ export class SocketClient extends EventEmitter {
     this.socket.on(SOCKET_EVENTS.PING, () => {
       this.socket?.emit(SOCKET_EVENTS.PONG);
     });
+
+    // ============================================
+    // scrcpy 제어 이벤트
+    // ============================================
+
+    // scrcpy 세션 시작 요청
+    this.socket.on(SOCKET_EVENTS.SCRCPY_START, (data: ScrcpyStartEvent, ack) => {
+      console.log(`[SocketClient] Received SCRCPY_START: ${data.device_id}`);
+      ack?.({ received: true });
+      this.emit('scrcpy:start', data);
+    });
+
+    // scrcpy 세션 종료 요청
+    this.socket.on(SOCKET_EVENTS.SCRCPY_STOP, (data: ScrcpyStopEvent, ack) => {
+      console.log(`[SocketClient] Received SCRCPY_STOP: ${data.device_id}`);
+      ack?.({ received: true });
+      this.emit('scrcpy:stop', data);
+    });
+
+    // scrcpy 입력 명령 (단일 디바이스)
+    this.socket.on(SOCKET_EVENTS.SCRCPY_INPUT, (data: ScrcpyInputEvent, ack) => {
+      ack?.({ received: true });
+      this.emit('scrcpy:input', data);
+    });
+
+    // scrcpy 배치 입력 명령 (여러 디바이스)
+    this.socket.on(SOCKET_EVENTS.SCRCPY_BATCH_INPUT, (data: ScrcpyBatchInputEvent, ack) => {
+      ack?.({ received: true });
+      this.emit('scrcpy:batchInput', data);
+    });
   }
 
   /**
@@ -243,19 +309,9 @@ export class SocketClient extends EventEmitter {
   private register(): void {
     if (!this.socket?.connected) return;
 
-    const devices = this.deviceManager.getConnectedDevices();
-    
-    this.socket.emit(SOCKET_EVENTS.REGISTER, {
-      node_id: this.config.nodeId,
-      version: process.env.npm_package_version || '1.0.0',
-      device_count: devices.length,
-    }, (response: { success: boolean }) => {
-      if (response?.success) {
-        console.log('[SocketClient] Node registered successfully');
-      } else {
-        console.error('[SocketClient] Node registration failed');
-      }
-    });
+    // 초기 heartbeat로 등록 (백엔드는 worker:heartbeat으로 디바이스를 관리)
+    this.sendHeartbeat();
+    console.log('[SocketClient] Node registered via heartbeat');
   }
 
   /**
@@ -445,27 +501,30 @@ export class SocketClient extends EventEmitter {
   }
 
   /**
-   * 디바이스 상태 전송
+   * 디바이스 상태 전송 (worker:heartbeat 프로토콜)
    */
   private async sendDeviceStatus(): Promise<void> {
     if (!this.socket?.connected) return;
+    await this.sendHeartbeat();
+  }
+
+  /**
+   * worker:heartbeat 전송 (백엔드 프로토콜)
+   */
+  private async sendHeartbeat(): Promise<void> {
+    if (!this.socket?.connected) return;
 
     const devices = this.deviceManager.getAllDevices();
-    
-    const event: DeviceStatusEvent = {
-      node_id: this.config.nodeId,
+
+    this.socket.emit('worker:heartbeat', {
       devices: devices.map(d => ({
-        id: d.serial,
-        state: this.getDeviceState(d),
+        deviceId: `${this.config.pcId || this.config.nodeId}-${d.serial}`,
+        serial: d.serial,
+        status: this.getDeviceState(d),
+        adbConnected: d.state !== 'DISCONNECTED',
         battery: d.battery,
       })),
-      system: {
-        cpu: await this.getSystemCpu(),
-        memory: await this.getSystemMemory(),
-      },
-    };
-
-    this.socket.emit(SOCKET_EVENTS.DEVICE_STATUS, event);
+    });
   }
 
   /**
@@ -514,6 +573,58 @@ export class SocketClient extends EventEmitter {
     } catch {
       return 0;
     }
+  }
+
+  // ============================================
+  // scrcpy 스트림 전송 (에이전트 → 서버)
+  // ============================================
+
+  /**
+   * scrcpy 썸네일 프레임 전송 (바이너리)
+   */
+  sendScrcpyThumbnail(
+    deviceId: string,
+    jpegData: Buffer,
+    width: number,
+    height: number
+  ): void {
+    if (!this.socket?.connected) return;
+
+    this.socket.emit(SOCKET_EVENTS.SCRCPY_THUMBNAIL, {
+      device_id: deviceId,
+      data: jpegData,
+      width,
+      height,
+      timestamp: Date.now(),
+    });
+  }
+
+  /**
+   * scrcpy 세션 상태 변경 전송
+   */
+  sendScrcpySessionState(deviceId: string, state: string): void {
+    if (!this.socket?.connected) return;
+
+    this.socket.emit(SOCKET_EVENTS.SCRCPY_SESSION_STATE, {
+      device_id: deviceId,
+      state,
+      timestamp: Date.now(),
+    });
+  }
+
+  /**
+   * scrcpy 비디오 메타 정보 전송
+   */
+  sendScrcpyVideoMeta(
+    deviceId: string,
+    meta: { codecId: number; width: number; height: number }
+  ): void {
+    if (!this.socket?.connected) return;
+
+    this.socket.emit(SOCKET_EVENTS.SCRCPY_VIDEO_META, {
+      device_id: deviceId,
+      ...meta,
+    });
   }
 
   /**

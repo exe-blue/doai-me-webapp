@@ -40,7 +40,12 @@ export const WORKER_EVENTS = {
   STREAM_STOP: 'stream:stop',
   STREAM_FRAME: 'stream:frame',
   STREAM_ERROR: 'stream:error',
-  
+
+  // Scrcpy (Worker → Server)
+  SCRCPY_THUMBNAIL: 'scrcpy:thumbnail',
+  SCRCPY_SESSION_STATE: 'scrcpy:session:state',
+  SCRCPY_VIDEO_META: 'scrcpy:video:meta',
+
   // Connection
   DISCONNECT: 'disconnect',
 } as const;
@@ -74,7 +79,15 @@ export const DASHBOARD_EVENTS = {
   STREAM_START: 'stream:start',
   STREAM_STOP: 'stream:stop',
   STREAM_DATA: 'stream:data',
-  
+
+  // Scrcpy Control (Dashboard ↔ Server)
+  SCRCPY_START: 'scrcpy:start',
+  SCRCPY_STOP: 'scrcpy:stop',
+  SCRCPY_INPUT: 'scrcpy:input',
+  SCRCPY_BATCH_INPUT: 'scrcpy:batch:input',
+  SCRCPY_THUMBNAIL: 'scrcpy:thumbnail',
+  SCRCPY_SESSION_STATE: 'scrcpy:session:state',
+
   // Log Room
   JOIN_LOG_ROOM: 'join:log_room',
   LEAVE_LOG_ROOM: 'leave:log_room',

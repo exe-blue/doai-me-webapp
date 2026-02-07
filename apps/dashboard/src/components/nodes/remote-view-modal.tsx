@@ -68,42 +68,55 @@ export function RemoteViewModal({
   const [isLoading, setIsLoading] = useState(false);
   const [clickPos, setClickPos] = useState<{ x: number; y: number } | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [scrcpyState, setScrcpyState] = useState<string>('idle');
   const imageRef = useRef<HTMLDivElement>(null);
 
-  // Socket.io integration
-  const { isConnected, startStream, stopStream, sendCommand, broadcastCommand } = useSocketContext();
+  // Socket.io integration — scrcpy protocol for low-latency input
+  const {
+    isConnected,
+    sendCommand,
+    startScrcpySession, stopScrcpySession,
+    sendScrcpyInput, batchScrcpyInput,
+  } = useSocketContext();
 
-  // Auto-start streaming when modal opens
+  // Auto-start streaming when modal opens (scrcpy session)
   useEffect(() => {
     if (open && autoStream && device && isConnected && !isStreaming) {
       // Small delay to ensure modal is fully rendered
       const timer = setTimeout(() => {
-        startStream(device.id, (frameData) => {
-          setScreenshot(`data:image/jpeg;base64,${frameData.frame}`);
-        });
+        startScrcpySession(
+          device.id,
+          (thumbData) => {
+            setScreenshot(`data:image/jpeg;base64,${thumbData.frame}`);
+          },
+          (state) => {
+            setScrcpyState(state.state);
+          },
+        );
         setIsStreaming(true);
       }, 100);
       return () => clearTimeout(timer);
     }
-  }, [open, autoStream, device, isConnected, isStreaming, startStream]);
+  }, [open, autoStream, device, isConnected, isStreaming, startScrcpySession]);
 
   // Stop streaming when modal closes
   useEffect(() => {
     if (!open && isStreaming && device) {
-      stopStream(device.id);
+      stopScrcpySession(device.id);
       setIsStreaming(false);
+      setScrcpyState('idle');
       setScreenshot(null); // Clear screenshot on close
     }
-  }, [open, isStreaming, device, stopStream]);
+  }, [open, isStreaming, device, stopScrcpySession]);
 
   // Cleanup stream on unmount
   useEffect(() => {
     return () => {
       if (device && isStreaming) {
-        stopStream(device.id);
+        stopScrcpySession(device.id);
       }
     };
-  }, [device, isStreaming, stopStream]);
+  }, [device, isStreaming, stopScrcpySession]);
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const _fetchScreenshot = useCallback(async () => {
@@ -128,21 +141,28 @@ export function RemoteViewModal({
       return;
     }
 
-    startStream(device.id, (frameData) => {
-      setScreenshot(`data:image/jpeg;base64,${frameData.frame}`);
-    });
+    startScrcpySession(
+      device.id,
+      (thumbData) => {
+        setScreenshot(`data:image/jpeg;base64,${thumbData.frame}`);
+      },
+      (state) => {
+        setScrcpyState(state.state);
+      },
+    );
 
     setIsStreaming(true);
-    toast.success('스트리밍 시작됨');
-  }, [device, isConnected, startStream]);
+    toast.success('Scrcpy 스트리밍 시작됨');
+  }, [device, isConnected, startScrcpySession]);
 
   const stopStreaming = useCallback(() => {
     if (device) {
-      stopStream(device.id);
+      stopScrcpySession(device.id);
     }
     setIsStreaming(false);
-    toast.info('스트리밍 중지됨');
-  }, [device, stopStream]);
+    setScrcpyState('idle');
+    toast.info('Scrcpy 스트리밍 중지됨');
+  }, [device, stopScrcpySession]);
 
   const handleImageClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (!device || !imageRef.current) return;
@@ -154,16 +174,16 @@ export function RemoteViewModal({
     setClickPos({ x, y });
 
     if (broadcastEnabled && broadcastDeviceIds.length > 0) {
-      // Broadcast to all devices in the group via Socket.io
+      // Broadcast tap to all devices via scrcpy binary protocol
       const allDeviceIds = [device.id, ...broadcastDeviceIds.filter(id => id !== device.id)];
-      broadcastCommand(allDeviceIds, 'tap', { x, y });
+      batchScrcpyInput(allDeviceIds, 'tap', { x, y });
       toast.success(`${allDeviceIds.length}대 기기에 탭 전송됨`);
     } else {
-      // Single device tap via Socket.io
-      sendCommand(device.id, 'tap', { x, y });
+      // Single device tap via scrcpy binary protocol
+      sendScrcpyInput(device.id, 'tap', { x, y });
       toast.success('탭 전송됨');
     }
-  }, [device, sendCommand, broadcastCommand, broadcastEnabled, broadcastDeviceIds, deviceResolution]);
+  }, [device, sendScrcpyInput, batchScrcpyInput, broadcastEnabled, broadcastDeviceIds, deviceResolution]);
 
   const handleSwipe = useCallback((direction: 'up' | 'down' | 'left' | 'right') => {
     if (!device) return;
@@ -191,26 +211,26 @@ export function RemoteViewModal({
 
     if (broadcastEnabled && broadcastDeviceIds.length > 0) {
       const allDeviceIds = [device.id, ...broadcastDeviceIds.filter(id => id !== device.id)];
-      broadcastCommand(allDeviceIds, 'swipe', params);
+      batchScrcpyInput(allDeviceIds, 'swipe', params);
       toast.success(`${allDeviceIds.length}대 기기에 스와이프 전송됨`);
     } else {
-      sendCommand(device.id, 'swipe', params);
+      sendScrcpyInput(device.id, 'swipe', params);
       toast.success('스와이프 전송됨');
     }
-  }, [device, sendCommand, broadcastCommand, broadcastEnabled, broadcastDeviceIds, deviceResolution]);
+  }, [device, sendScrcpyInput, batchScrcpyInput, broadcastEnabled, broadcastDeviceIds, deviceResolution]);
 
   const handleKeyCommand = useCallback((keycode: number) => {
     if (!device) return;
 
     if (broadcastEnabled && broadcastDeviceIds.length > 0) {
       const allDeviceIds = [device.id, ...broadcastDeviceIds.filter(id => id !== device.id)];
-      broadcastCommand(allDeviceIds, 'keyevent', { keycode });
+      batchScrcpyInput(allDeviceIds, 'key', { keycode });
       toast.success(`${allDeviceIds.length}대 기기에 키 전송됨`);
     } else {
-      sendCommand(device.id, 'keyevent', { keycode });
+      sendScrcpyInput(device.id, 'key', { keycode });
       toast.success('키 전송됨');
     }
-  }, [device, sendCommand, broadcastCommand, broadcastEnabled, broadcastDeviceIds]);
+  }, [device, sendScrcpyInput, batchScrcpyInput, broadcastEnabled, broadcastDeviceIds]);
 
   if (!device) return null;
 
@@ -230,6 +250,17 @@ export function RemoteViewModal({
               <Badge variant="default" className="bg-red-500 animate-pulse">
                 <Radio className="h-3 w-3 mr-1" />
                 LIVE
+              </Badge>
+            )}
+            {scrcpyState === 'starting' && (
+              <Badge variant="outline" className="text-yellow-600 border-yellow-600">
+                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                SCRCPY
+              </Badge>
+            )}
+            {scrcpyState === 'error' && (
+              <Badge variant="outline" className="text-red-600 border-red-600">
+                SCRCPY ERROR
               </Badge>
             )}
             {isConnected ? (

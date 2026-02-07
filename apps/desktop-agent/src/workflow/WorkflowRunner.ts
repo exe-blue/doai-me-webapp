@@ -16,6 +16,7 @@
 import { AdbController, getAdbController } from '../device/AdbController';
 import { logger } from '../utils/logger';
 import type { WorkflowStep } from '@doai/shared/database';
+import type { ScrcpySessionManager } from '../device/ScrcpySessionManager';
 
 // ============================================
 // 타입 정의
@@ -74,11 +75,19 @@ interface RunningWorkflow {
 export class WorkflowRunner {
   private nodeId: string;
   private adbController: AdbController;
+  private scrcpyManager: ScrcpySessionManager | null = null;
   private runningWorkflows: Map<string, RunningWorkflow> = new Map();
 
   constructor(nodeId: string) {
     this.nodeId = nodeId;
     this.adbController = getAdbController();
+  }
+
+  /**
+   * ScrcpySessionManager 설정 (main.ts에서 초기화 후 주입)
+   */
+  setScrcpyManager(manager: ScrcpySessionManager): void {
+    this.scrcpyManager = manager;
   }
 
   /**
@@ -294,9 +303,89 @@ export class WorkflowRunner {
         break;
       }
 
+      case 'scrcpy_control' as WorkflowStep['action']: {
+        await this.executeScrcpyControl(deviceId, script, command);
+        break;
+      }
+
       default:
         throw new Error(`Unknown action: ${action}`);
     }
+  }
+
+  /**
+   * scrcpy 제어 액션 실행
+   *
+   * command 형식:
+   *   tap:x,y
+   *   swipe:x1,y1,x2,y2[,durationMs]
+   *   longPress:x,y[,durationMs]
+   *   text:문자열
+   *   key:keycode
+   *   back
+   *   scroll:x,y,dx,dy
+   */
+  private async executeScrcpyControl(
+    deviceId: string,
+    script: string,
+    command: string
+  ): Promise<void> {
+    if (!this.scrcpyManager) {
+      throw new Error('ScrcpySessionManager not initialized');
+    }
+
+    const session = this.scrcpyManager.getSession(deviceId);
+    if (!session || (session.state !== 'streaming' && session.state !== 'connected')) {
+      throw new Error(`No active scrcpy session for device: ${deviceId}`);
+    }
+
+    const cmd = (command || script).trim();
+    const [action, ...rest] = cmd.split(':');
+    const params = rest.join(':');
+
+    switch (action) {
+      case 'tap': {
+        const [x, y] = params.split(',').map(Number);
+        await session.tap(x, y);
+        break;
+      }
+      case 'swipe': {
+        const parts = params.split(',').map(Number);
+        const [x1, y1, x2, y2] = parts;
+        const duration = parts[4] ?? 300;
+        await session.swipe(x1, y1, x2, y2, duration);
+        break;
+      }
+      case 'longPress': {
+        const lparts = params.split(',').map(Number);
+        const [lx, ly] = lparts;
+        const dur = lparts[2] ?? 1000;
+        await session.longPress(lx, ly, dur);
+        break;
+      }
+      case 'text': {
+        session.injectText(params);
+        break;
+      }
+      case 'key': {
+        const keycode = parseInt(params, 10);
+        await session.injectKey(keycode);
+        break;
+      }
+      case 'back': {
+        session.pressBack();
+        break;
+      }
+      case 'scroll': {
+        const [sx, sy, sdx, sdy] = params.split(',').map(Number);
+        session.injectScroll(sx, sy, sdx, sdy);
+        break;
+      }
+      default:
+        throw new Error(`Unknown scrcpy_control action: ${action}`);
+    }
+
+    logger.debug('scrcpy_control executed', { deviceId, action, params });
   }
 
   /**

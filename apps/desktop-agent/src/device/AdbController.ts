@@ -228,17 +228,27 @@ export class AdbController {
 
   /**
    * 디바이스 재연결
+   * IP:port 형식이면 WiFi ADB (adb connect), 아니면 USB (adb reconnect)
    */
   async reconnect(deviceId: string): Promise<void> {
     logger.info('Reconnecting device', { deviceId });
-    
+
     try {
-      // USB 재연결
-      await this.execute(deviceId, 'reconnect');
-      
+      const ipMatch = deviceId.match(/^(\d+\.\d+\.\d+\.\d+):(\d+)$/);
+      if (ipMatch) {
+        // WiFi ADB 재연결
+        const success = await this.reconnectWifiAdb(ipMatch[1], Number(ipMatch[2]));
+        if (!success) {
+          throw new Error('WiFi ADB reconnect failed');
+        }
+      } else {
+        // USB 재연결
+        await this.execute(deviceId, 'reconnect');
+      }
+
       // 잠시 대기
       await new Promise(resolve => setTimeout(resolve, 2000));
-      
+
       // 연결 확인
       const devices = await this.getConnectedDevices();
       if (!devices.includes(deviceId)) {

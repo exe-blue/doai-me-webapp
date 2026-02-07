@@ -89,6 +89,21 @@ app.prepare().then(() => {
       }
     });
 
+    // Scrcpy thumbnail from worker → forward to dashboard viewers
+    socket.on('scrcpy:thumbnail', (data) => {
+      const session = streamingSessions.get(data.deviceId);
+      if (session && session.dashboardSockets.size > 0) {
+        session.dashboardSockets.forEach(dashSocket => {
+          dashSocket.emit('scrcpy:thumbnail', data);
+        });
+      }
+    });
+
+    // Scrcpy session state from worker → broadcast to all dashboard clients
+    socket.on('scrcpy:session:state', (data) => {
+      dashboardNsp.emit('scrcpy:session:state', data);
+    });
+
     // Command result from worker
     socket.on('command:result', (data) => {
       const { deviceId, commandId, success, error } = data;
@@ -193,6 +208,52 @@ app.prepare().then(() => {
       } else {
         socket.emit('command:error', { deviceId, error: 'Worker not connected' });
       }
+    });
+
+    // Dashboard → Worker: scrcpy session start
+    socket.on('scrcpy:start', (data) => {
+      const { deviceId } = data;
+      console.log(`[Dashboard] Scrcpy start request for device: ${deviceId}`);
+      const session = streamingSessions.get(deviceId) || { workerSocket: null, dashboardSockets: new Set() };
+      session.dashboardSockets.add(socket);
+      streamingSessions.set(deviceId, session);
+      watchingDevices.add(deviceId);
+      if (session.workerSocket) {
+        session.workerSocket.emit('scrcpy:start', data);
+      }
+    });
+
+    // Dashboard → Worker: scrcpy session stop
+    socket.on('scrcpy:stop', (data) => {
+      const { deviceId } = data;
+      console.log(`[Dashboard] Scrcpy stop request for device: ${deviceId}`);
+      const session = streamingSessions.get(deviceId);
+      if (session) {
+        session.dashboardSockets.delete(socket);
+        watchingDevices.delete(deviceId);
+        if (session.dashboardSockets.size === 0 && session.workerSocket) {
+          session.workerSocket.emit('scrcpy:stop', data);
+        }
+      }
+    });
+
+    // Dashboard → Worker: scrcpy input (tap/swipe/key/text/scroll)
+    socket.on('scrcpy:input', (data) => {
+      const session = streamingSessions.get(data.deviceId);
+      if (session && session.workerSocket) {
+        session.workerSocket.emit('scrcpy:input', data);
+      }
+    });
+
+    // Dashboard → Worker: batch scrcpy input to multiple devices
+    socket.on('scrcpy:batch:input', (data) => {
+      const { deviceIds, action, params } = data;
+      deviceIds.forEach(deviceId => {
+        const session = streamingSessions.get(deviceId);
+        if (session && session.workerSocket) {
+          session.workerSocket.emit('scrcpy:input', { deviceId, action, params });
+        }
+      });
     });
 
     // Broadcast command to multiple devices

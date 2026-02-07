@@ -897,6 +897,49 @@
       box-shadow: none;
     }
 
+    /* Scrcpy Session State Badge */
+    .scrcpy-state-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-size: 10px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .scrcpy-state-badge.idle { background: rgba(148, 163, 184, 0.15); color: var(--text-secondary); }
+    .scrcpy-state-badge.starting { background: rgba(245, 158, 11, 0.15); color: var(--warning); }
+    .scrcpy-state-badge.streaming { background: rgba(34, 197, 94, 0.15); color: var(--success); }
+    .scrcpy-state-badge.error { background: rgba(239, 68, 68, 0.15); color: var(--error); }
+
+    /* Scrcpy Thumbnail Preview */
+    .scrcpy-thumbnail-container {
+      width: 100%;
+      aspect-ratio: 9 / 16;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .scrcpy-thumbnail-container img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    .scrcpy-thumbnail-placeholder {
+      text-align: center;
+      color: var(--text-secondary);
+      font-size: 12px;
+    }
+
     .device-action-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -1055,6 +1098,145 @@
     ::-webkit-scrollbar-thumb:hover {
       background: #475569;
     }
+
+    /* Connect Dropdown */
+    .connect-btn-wrapper {
+      position: relative;
+    }
+
+    .connect-dropdown {
+      display: none;
+      position: absolute;
+      top: 100%;
+      right: 0;
+      margin-top: 4px;
+      min-width: 180px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+      z-index: 200;
+      overflow: hidden;
+    }
+
+    .connect-dropdown.open {
+      display: block;
+    }
+
+    .connect-dropdown-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      font-size: 13px;
+      color: var(--text-primary);
+      cursor: pointer;
+      transition: background 0.15s;
+      border: none;
+      background: none;
+      width: 100%;
+      text-align: left;
+      font-family: inherit;
+    }
+
+    .connect-dropdown-item:hover {
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .connect-dropdown-item:not(:last-child) {
+      border-bottom: 1px solid var(--border);
+    }
+
+    .connect-dropdown-item .dd-icon {
+      font-size: 15px;
+      flex-shrink: 0;
+    }
+
+    /* Connections Tab */
+    .conn-section {
+      margin-bottom: 24px;
+    }
+
+    .conn-section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .conn-section-title {
+      font-size: 15px;
+      font-weight: 600;
+    }
+
+    .conn-section-desc {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-bottom: 12px;
+      line-height: 1.5;
+    }
+
+    .conn-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      margin-bottom: 12px;
+    }
+
+    .conn-table thead {
+      background: var(--bg-secondary);
+    }
+
+    .conn-table th {
+      padding: 8px 12px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 12px;
+      color: var(--text-secondary);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .conn-table td {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      font-family: 'SF Mono', Monaco, monospace;
+    }
+
+    .conn-table tbody tr:hover {
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .btn-sm {
+      padding: 4px 10px;
+      font-size: 11px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text-secondary);
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s;
+      -webkit-app-region: no-drag;
+    }
+
+    .btn-sm:hover {
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+    }
+
+    .btn-sm.btn-danger:hover {
+      border-color: var(--error);
+      color: var(--error);
+    }
+
+    .btn-sm.btn-add {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .btn-sm.btn-add:hover {
+      background: rgba(59, 130, 246, 0.15);
+    }
   </style>
 </head>
 <body>
@@ -1067,6 +1249,20 @@
         <span class="node-id" id="nodeId">NODE-1</span>
       </div>
       <div class="header-right">
+        <div class="connect-btn-wrapper">
+          <button class="header-action-btn" id="connectBtn" onclick="toggleConnectDropdown(event)" title="ADB 연결">&#x1F517; 연결</button>
+          <div class="connect-dropdown" id="connectDropdown">
+            <button class="connect-dropdown-item" onclick="handleConnectAction('usb')">
+              <span class="dd-icon">&#x1F50C;</span> USB 스캔
+            </button>
+            <button class="connect-dropdown-item" onclick="handleConnectAction('wifi')">
+              <span class="dd-icon">&#x1F4F6;</span> WiFi 연결
+            </button>
+            <button class="connect-dropdown-item" onclick="handleConnectAction('otg')">
+              <span class="dd-icon">&#x1F500;</span> OTG 연결
+            </button>
+          </div>
+        </div>
         <button class="header-action-btn" onclick="handleRefresh()" title="서버 재연결">&#x21bb; 새로고침</button>
         <button class="header-action-btn btn-restart" onclick="handleRestart()" title="앱 재시작">&#x23fb; 재시작</button>
         <div class="status-badge connecting" id="serverStatus">
@@ -1112,6 +1308,10 @@
           <div class="nav-item" data-tab="infra" onclick="switchTab('infra')">
             <span class="nav-item-icon">🔧</span>
             <span>인프라</span>
+          </div>
+          <div class="nav-item" data-tab="connections" onclick="switchTab('connections')">
+            <span class="nav-item-icon">🔗</span>
+            <span>접속설정</span>
           </div>
         </div>
       </nav>
@@ -1361,6 +1561,56 @@
             </div>
           </div>
         </div>
+
+        <!-- Tab 6: 접속설정 -->
+        <div id="tab-connections" class="tab-content">
+          <div class="section-title">🔗 접속설정</div>
+
+          <!-- WiFi ADB -->
+          <div class="conn-section">
+            <div class="card">
+              <div class="conn-section-header">
+                <div class="conn-section-title">📶 WiFi ADB</div>
+                <button class="btn btn-primary" onclick="connectAllTargets('wifi')">전체 연결</button>
+              </div>
+              <div class="conn-section-desc">WiFi 네트워크를 통해 ADB로 연결합니다. 디바이스에서 <code>adb tcpip 5555</code>가 활성화되어 있어야 합니다.</div>
+              <table class="conn-table">
+                <thead><tr><th>IP:Port</th><th style="width:80px">동작</th></tr></thead>
+                <tbody id="connWifiBody">
+                  <tr><td colspan="2" style="text-align:center;color:var(--text-secondary)">설정된 대상이 없습니다</td></tr>
+                </tbody>
+              </table>
+              <div style="display:flex;gap:8px;">
+                <input type="text" id="connWifiInput" placeholder="192.168.35.100:5555" style="flex:1;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text-primary);font-size:13px;font-family:'SF Mono',Monaco,monospace;outline:none;">
+                <button class="btn btn-secondary" onclick="addConnTarget('wifi')">추가</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- OTG -->
+          <div class="conn-section">
+            <div class="card">
+              <div class="conn-section-header">
+                <div class="conn-section-title">🔌 OTG (USB 이더넷)</div>
+                <button class="btn btn-primary" onclick="connectAllTargets('otg')">전체 연결</button>
+              </div>
+              <div class="conn-section-desc">OTG 허브의 LAN 포트를 통해 내부 네트워크에 연결된 디바이스입니다. 허브가 게이트웨이/DHCP 역할을 하여 같은 서브넷(예: 192.168.35.x)에서 IP를 할당합니다.</div>
+              <table class="conn-table">
+                <thead><tr><th>IP:Port</th><th style="width:80px">동작</th></tr></thead>
+                <tbody id="connOtgBody">
+                  <tr><td colspan="2" style="text-align:center;color:var(--text-secondary)">설정된 대상이 없습니다</td></tr>
+                </tbody>
+              </table>
+              <div style="display:flex;gap:8px;">
+                <input type="text" id="connOtgInput" placeholder="192.168.45.100:5555" style="flex:1;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text-primary);font-size:13px;font-family:'SF Mono',Monaco,monospace;outline:none;">
+                <button class="btn btn-secondary" onclick="addConnTarget('otg')">추가</button>
+              </div>
+              <div class="conn-section-desc" style="margin-top:12px;">
+                <strong>참고:</strong> PC-01은 192.168.35.x, PC-03은 192.168.45.x 서브넷을 사용합니다. 디바이스의 USB 디버깅이 활성화되어 있어야 합니다.
+              </div>
+            </div>
+          </div>
+        </div>
       </main>
     </div>
 
@@ -1397,6 +1647,10 @@
         </div>
 
         <div class="section-subtitle" style="margin-top: 0;">화면 제어</div>
+        <div id="panelScrcpyState" class="scrcpy-state-badge idle">IDLE</div>
+        <div class="scrcpy-thumbnail-container" id="panelScrcpyThumbnail">
+          <div class="scrcpy-thumbnail-placeholder">세션을 시작하면 화면이 표시됩니다</div>
+        </div>
         <button class="btn-scrcpy" id="panelScrcpyBtn" onclick="toggleScrcpy()">
           <span id="panelScrcpyIcon">📺</span>
           <span id="panelScrcpyText">화면 보기 / 제어</span>
@@ -1449,7 +1703,9 @@
       managerStatus: null,
       botFleetStatus: [],
       scrcpyActive: {},
-      selectedDeviceSerial: null
+      scrcpySessionStates: {},  // deviceId -> 'idle'|'starting'|'streaming'|'error'
+      selectedDeviceSerial: null,
+      connectionSettings: { wifi: [], otg: [] }
     };
 
     // ============================================
@@ -1516,6 +1772,9 @@
             break;
           case 'infra':
             await loadInfraHealth();
+            break;
+          case 'connections':
+            await loadConnectionSettings();
             break;
         }
       } catch (err) {
@@ -1740,14 +1999,26 @@
       const btn = document.getElementById('panelScrcpyBtn');
       const icon = document.getElementById('panelScrcpyIcon');
       const text = document.getElementById('panelScrcpyText');
+      const stateEl = document.getElementById('panelScrcpyState');
       const isActive = state.scrcpyActive[state.selectedDeviceSerial];
+      const sessionState = state.scrcpySessionStates[state.selectedDeviceSerial] || 'idle';
 
-      if (isActive) {
+      // Update session state badge
+      stateEl.className = 'scrcpy-state-badge ' + sessionState;
+      const stateLabels = { idle: 'IDLE', starting: 'STARTING...', streaming: 'STREAMING', stopping: 'STOPPING...', error: 'ERROR' };
+      stateEl.textContent = stateLabels[sessionState] || sessionState.toUpperCase();
+
+      if (isActive || sessionState === 'streaming') {
         btn.classList.add('active');
         icon.textContent = '🟢';
         text.textContent = '화면 보기 중 (클릭하여 중지)';
+      } else if (sessionState === 'starting') {
+        btn.disabled = true;
+        icon.textContent = '⏳';
+        text.textContent = 'scrcpy 세션 시작 중...';
       } else {
         btn.classList.remove('active');
+        btn.disabled = false;
         icon.textContent = '📺';
         text.textContent = '화면 보기 / 제어';
       }
@@ -1760,16 +2031,39 @@
       btn.disabled = true;
 
       try {
-        if (state.scrcpyActive[state.selectedDeviceSerial]) {
-          await api.stopScrcpy(state.selectedDeviceSerial);
+        const isActive = state.scrcpyActive[state.selectedDeviceSerial] ||
+                          state.scrcpySessionStates[state.selectedDeviceSerial] === 'streaming';
+
+        if (isActive) {
+          // Try new ScrcpySessionManager API first, fallback to legacy
+          if (api.scrcpySessionStop) {
+            await api.scrcpySessionStop(state.selectedDeviceSerial);
+          } else {
+            await api.stopScrcpy(state.selectedDeviceSerial);
+          }
           state.scrcpyActive[state.selectedDeviceSerial] = false;
-          addLog({ level: 'INFO', category: 'DEVICE', message: 'scrcpy 종료: ' + state.selectedDeviceSerial });
+          state.scrcpySessionStates[state.selectedDeviceSerial] = 'idle';
+          // Clear thumbnail
+          const thumbContainer = document.getElementById('panelScrcpyThumbnail');
+          if (thumbContainer) {
+            thumbContainer.innerHTML = '<div class="scrcpy-thumbnail-placeholder">세션을 시작하면 화면이 표시됩니다</div>';
+          }
+          addLog({ level: 'INFO', category: 'DEVICE', message: 'scrcpy 세션 종료: ' + state.selectedDeviceSerial });
         } else {
-          await api.startScrcpy(state.selectedDeviceSerial);
+          state.scrcpySessionStates[state.selectedDeviceSerial] = 'starting';
+          updateScrcpyButton();
+
+          // Try new ScrcpySessionManager API first, fallback to legacy
+          if (api.scrcpySessionStart) {
+            await api.scrcpySessionStart(state.selectedDeviceSerial, {});
+          } else {
+            await api.startScrcpy(state.selectedDeviceSerial);
+          }
           state.scrcpyActive[state.selectedDeviceSerial] = true;
-          addLog({ level: 'INFO', category: 'DEVICE', message: 'scrcpy 시작: ' + state.selectedDeviceSerial });
+          addLog({ level: 'INFO', category: 'DEVICE', message: 'scrcpy 세션 시작: ' + state.selectedDeviceSerial });
         }
       } catch (err) {
+        state.scrcpySessionStates[state.selectedDeviceSerial] = 'error';
         addLog({ level: 'ERROR', category: 'DEVICE', message: 'scrcpy 오류: ' + err.message });
       } finally {
         btn.disabled = false;
@@ -2135,6 +2429,39 @@
           });
         }
 
+        // Scrcpy thumbnail listener (from ScrcpySessionManager via IPC)
+        if (api.onScrcpyThumbnail) {
+          api.onScrcpyThumbnail((data) => {
+            // Update thumbnail if this device's panel is open
+            if (data.deviceId === state.selectedDeviceSerial) {
+              const thumbContainer = document.getElementById('panelScrcpyThumbnail');
+              if (thumbContainer) {
+                thumbContainer.innerHTML = '<img src="data:image/jpeg;base64,' + data.frame + '" alt="Screen" />';
+              }
+            }
+          });
+        }
+
+        // Scrcpy session state listener
+        if (api.onScrcpyStateChanged) {
+          api.onScrcpyStateChanged((data) => {
+            state.scrcpySessionStates[data.deviceId] = data.state;
+            if (data.state === 'streaming') {
+              state.scrcpyActive[data.deviceId] = true;
+            } else if (data.state === 'idle' || data.state === 'error') {
+              state.scrcpyActive[data.deviceId] = false;
+            }
+            // Update UI if this device's panel is open
+            if (data.deviceId === state.selectedDeviceSerial) {
+              updateScrcpyButton();
+            }
+            // Update device table indicator
+            if (state.currentTab === 'devices') {
+              renderDeviceTable();
+            }
+          });
+        }
+
         // Load initial data
         const devices = await api.getDevices();
         state.devices = devices || [];
@@ -2166,6 +2493,163 @@
       }
     }
 
+    // ============================================
+    // Connections Tab (접속설정)
+    // ============================================
+
+    function toggleConnectDropdown(event) {
+      event.stopPropagation();
+      const dropdown = document.getElementById('connectDropdown');
+      dropdown.classList.toggle('open');
+
+      // 바깥 클릭 시 닫기
+      function closeDropdown(e) {
+        if (!e.target.closest('.connect-btn-wrapper')) {
+          dropdown.classList.remove('open');
+          document.removeEventListener('click', closeDropdown);
+        }
+      }
+      if (dropdown.classList.contains('open')) {
+        setTimeout(() => document.addEventListener('click', closeDropdown), 0);
+      }
+    }
+
+    async function handleConnectAction(type) {
+      document.getElementById('connectDropdown').classList.remove('open');
+
+      try {
+        if (type === 'usb') {
+          addLog({ level: 'INFO', category: 'DEVICE', message: 'USB 디바이스 스캔 중...' });
+          const result = await api.scanUsbDevices();
+          addLog({ level: 'INFO', category: 'DEVICE', message: 'USB 스캔 완료: ' + (result.devices || []).length + '대 발견' });
+        } else if (type === 'wifi' || type === 'otg') {
+          const label = type === 'wifi' ? 'WiFi' : 'OTG';
+          addLog({ level: 'INFO', category: 'DEVICE', message: label + ' ADB 연결 시도 중...' });
+          const result = await api.connectAdbTargets(type);
+          const success = result.results ? result.results.filter(r => r.success).length : 0;
+          const total = result.results ? result.results.length : 0;
+          addLog({ level: 'INFO', category: 'DEVICE', message: label + ' 연결 완료: ' + success + '/' + total + '대 성공' });
+        }
+        // 디바이스 목록 갱신
+        const devices = await api.getDevices();
+        state.devices = devices || [];
+        if (state.currentTab === 'devices') renderDeviceTable();
+        updateNodeStatusBanner();
+      } catch (err) {
+        addLog({ level: 'ERROR', category: 'DEVICE', message: '연결 오류: ' + err.message });
+      }
+    }
+
+    async function loadConnectionSettings() {
+      try {
+        const settings = await api.getConnectionSettings();
+        state.connectionSettings = settings || { wifi: [], otg: [] };
+      } catch (err) {
+        console.error('Failed to load connection settings:', err);
+        state.connectionSettings = { wifi: [], otg: [] };
+      }
+      renderConnTargets('wifi');
+      renderConnTargets('otg');
+    }
+
+    function renderConnTargets(type) {
+      const bodyId = type === 'wifi' ? 'connWifiBody' : 'connOtgBody';
+      const tbody = document.getElementById(bodyId);
+      const targets = state.connectionSettings[type] || [];
+
+      if (targets.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="2" style="text-align:center;color:var(--text-secondary)">설정된 대상이 없습니다</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = targets.map((ip, idx) => `
+        <tr>
+          <td>${escapeHtml(ip)}</td>
+          <td>
+            <button class="btn-sm btn-danger" onclick="removeConnTarget('${type}', ${idx})">삭제</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    async function addConnTarget(type) {
+      const inputId = type === 'wifi' ? 'connWifiInput' : 'connOtgInput';
+      const input = document.getElementById(inputId);
+      const value = input.value.trim();
+
+      if (!value) return;
+
+      // IP:port 형식 검증
+      if (!/^\d+\.\d+\.\d+\.\d+(:\d+)?$/.test(value)) {
+        addLog({ level: 'WARN', category: 'SYSTEM', message: '잘못된 IP 형식: ' + value });
+        return;
+      }
+
+      // 포트 없으면 :5555 자동 추가
+      const target = value.includes(':') ? value : value + ':5555';
+
+      if (!state.connectionSettings[type]) {
+        state.connectionSettings[type] = [];
+      }
+
+      if (state.connectionSettings[type].includes(target)) {
+        addLog({ level: 'WARN', category: 'SYSTEM', message: '이미 등록된 대상: ' + target });
+        return;
+      }
+
+      state.connectionSettings[type].push(target);
+      input.value = '';
+
+      try {
+        await api.saveConnectionSettings(state.connectionSettings);
+        addLog({ level: 'INFO', category: 'SYSTEM', message: (type === 'wifi' ? 'WiFi' : 'OTG') + ' 대상 추가: ' + target });
+      } catch (err) {
+        addLog({ level: 'ERROR', category: 'SYSTEM', message: '설정 저장 실패: ' + err.message });
+      }
+
+      renderConnTargets(type);
+    }
+
+    async function removeConnTarget(type, index) {
+      if (!state.connectionSettings[type]) return;
+
+      const removed = state.connectionSettings[type].splice(index, 1)[0];
+
+      try {
+        await api.saveConnectionSettings(state.connectionSettings);
+        addLog({ level: 'INFO', category: 'SYSTEM', message: (type === 'wifi' ? 'WiFi' : 'OTG') + ' 대상 삭제: ' + removed });
+      } catch (err) {
+        addLog({ level: 'ERROR', category: 'SYSTEM', message: '설정 저장 실패: ' + err.message });
+      }
+
+      renderConnTargets(type);
+    }
+
+    async function connectAllTargets(type) {
+      const targets = state.connectionSettings[type] || [];
+      if (targets.length === 0) {
+        addLog({ level: 'WARN', category: 'DEVICE', message: '연결할 대상이 없습니다. 먼저 IP를 추가해주세요.' });
+        return;
+      }
+
+      const label = type === 'wifi' ? 'WiFi' : 'OTG';
+      addLog({ level: 'INFO', category: 'DEVICE', message: label + ' 전체 연결 시도: ' + targets.length + '대...' });
+
+      try {
+        const result = await api.connectAdbTargets(type);
+        const success = result.results ? result.results.filter(r => r.success).length : 0;
+        addLog({ level: 'INFO', category: 'DEVICE', message: label + ' 연결 완료: ' + success + '/' + targets.length + '대 성공' });
+
+        // 디바이스 목록 갱신
+        const devices = await api.getDevices();
+        state.devices = devices || [];
+        if (state.currentTab === 'devices') renderDeviceTable();
+        updateNodeStatusBanner();
+      } catch (err) {
+        addLog({ level: 'ERROR', category: 'DEVICE', message: label + ' 연결 오류: ' + err.message });
+      }
+    }
+
     // Expose functions used by inline onclick handlers
     window.switchTab = switchTab;
     window.setLogFilter = setLogFilter;
@@ -2176,6 +2660,11 @@
     window.openDevicePanel = openDevicePanel;
     window.refreshDevice = refreshDevice;
     window.installApk = installApk;
+    window.toggleConnectDropdown = toggleConnectDropdown;
+    window.handleConnectAction = handleConnectAction;
+    window.addConnTarget = addConnTarget;
+    window.removeConnTarget = removeConnTarget;
+    window.connectAllTargets = connectAllTargets;
 
     // 새로고침 (서버 재연결)
     function handleRefresh() {

@@ -17,6 +17,9 @@ import { DeviceManager, getDeviceManager } from './device/DeviceManager';
 import { getAdbController } from './device/AdbController';
 import { getAppiumController } from './device/AppiumController';
 import { getScrcpyController } from './device/ScrcpyController';
+import { ScrcpySessionManager, getScrcpySessionManager } from './device/ScrcpySessionManager';
+import { FrameProcessor, type ThumbnailFrame } from './device/FrameProcessor';
+import type { ScrcpyInputEvent, ScrcpyBatchInputEvent, ScrcpyStartEvent, ScrcpyStopEvent } from './socket/SocketClient';
 import { getInfraHealthChecker, InfraHealthChecker } from './infra/InfraHealthChecker';
 import { WorkflowRunner } from './workflow/WorkflowRunner';
 import { AutoUpdater, getAutoUpdater } from './updater/AutoUpdater';
@@ -61,7 +64,7 @@ if (!gotTheLock) {
 // ============================================
 
 const NODE_ID = process.env.NODE_ID || process.env.DOAIME_NODE_ID || `node_${os.hostname()}`;
-let SERVER_URL = process.env.SERVER_URL || process.env.DOAIME_SERVER_URL || 'https://api.doai.me';
+let SERVER_URL = process.env.SERVER_URL || process.env.DOAIME_SERVER_URL || 'http://158.247.210.152:4000';
 const IS_DEV = process.env.NODE_ENV === 'development';
 const WORKER_SERVER_PORT = parseInt(process.env.WORKER_SERVER_PORT || '3001', 10);
 
@@ -86,6 +89,8 @@ let autoUpdater: AutoUpdater | null = null;
 let deviceRecovery: DeviceRecovery | null = null;
 let nodeRecovery: NodeRecovery | null = null;
 let infraHealthChecker: InfraHealthChecker | null = null;
+let scrcpySessionManager: ScrcpySessionManager | null = null;
+let frameProcessors: Map<string, FrameProcessor> = new Map();
 let isAppQuitting = false;
 
 // Manager components for Worker orchestration
@@ -493,6 +498,124 @@ async function startAgent(): Promise<void> {
   }));
 
   // ============================================
+  // ScrcpySessionManager 초기화
+  // ============================================
+
+  try {
+    const serverJarPath = getResourcePath('scrcpy-server.jar');
+    scrcpySessionManager = getScrcpySessionManager({
+      serverJarPath,
+      portStart: 27183,
+      portEnd: 27283,
+      defaultMaxSize: 720,
+      defaultMaxFps: 30,
+      defaultBitRate: 2_000_000,
+      maxSessions: 100,
+    });
+
+    // WorkflowRunner에 scrcpy manager 주입
+    workflowRunner.setScrcpyManager(scrcpySessionManager);
+
+    // scrcpy 세션 이벤트 → SocketClient 전달
+    scrcpySessionManager.on('sessionStateChanged', (deviceId: string, state: string) => {
+      socketClient?.sendScrcpySessionState(deviceId, state);
+      sendToRenderer('scrcpy:stateChanged', { deviceId, state });
+    });
+
+    scrcpySessionManager.on('videoMeta', (deviceId: string, meta: { codecId: number; width: number; height: number }) => {
+      socketClient?.sendScrcpyVideoMeta(deviceId, meta);
+
+      // 비디오 메타 수신 시 FrameProcessor 자동 생성
+      if (!frameProcessors.has(deviceId)) {
+        const fp = new FrameProcessor(deviceId, { thumbnailWidth: 160, jpegQuality: 60, maxFps: 1 });
+        fp.on('thumbnail', (thumb: ThumbnailFrame) => {
+          socketClient?.sendScrcpyThumbnail(thumb.deviceId, thumb.data, thumb.width, thumb.height);
+          sendToRenderer('scrcpy:thumbnail', { deviceId: thumb.deviceId, data: thumb.data.toString('base64'), width: thumb.width, height: thumb.height });
+        });
+        fp.start(meta.width, meta.height);
+        frameProcessors.set(deviceId, fp);
+      }
+    });
+
+    scrcpySessionManager.on('frame', (deviceId: string, data: Buffer, header: { isConfig: boolean; isKeyFrame: boolean; pts: bigint; packetSize: number }) => {
+      const fp = frameProcessors.get(deviceId);
+      if (fp?.running) {
+        fp.feedFrame(data, header);
+      }
+    });
+
+    scrcpySessionManager.on('sessionError', (deviceId: string, error: Error) => {
+      pushLog({ timestamp: Date.now(), level: 'error', message: `scrcpy 세션 오류 (${deviceId}): ${error.message}`, source: 'device' });
+    });
+
+    // SocketClient → ScrcpySessionManager 이벤트 바인딩
+    socketClient.on('scrcpy:start', async (data: ScrcpyStartEvent) => {
+      try {
+        await scrcpySessionManager!.startSession(data.device_id, data.adb_serial, data.options);
+        pushLog({ timestamp: Date.now(), level: 'info', message: `scrcpy 세션 시작: ${data.device_id}`, source: 'device' });
+      } catch (err) {
+        logger.error('scrcpy:start failed', { deviceId: data.device_id, error: (err as Error).message });
+        pushLog({ timestamp: Date.now(), level: 'error', message: `scrcpy 세션 시작 실패 (${data.device_id}): ${(err as Error).message}`, source: 'device' });
+      }
+    });
+
+    socketClient.on('scrcpy:stop', async (data: ScrcpyStopEvent) => {
+      try {
+        // FrameProcessor 정리
+        const fp = frameProcessors.get(data.device_id);
+        if (fp) {
+          fp.stop();
+          frameProcessors.delete(data.device_id);
+        }
+        await scrcpySessionManager!.stopSession(data.device_id);
+        pushLog({ timestamp: Date.now(), level: 'info', message: `scrcpy 세션 종료: ${data.device_id}`, source: 'device' });
+      } catch (err) {
+        logger.error('scrcpy:stop failed', { deviceId: data.device_id, error: (err as Error).message });
+      }
+    });
+
+    socketClient.on('scrcpy:input', async (data: ScrcpyInputEvent) => {
+      const session = scrcpySessionManager!.getSession(data.device_id);
+      if (!session) return;
+      try {
+        const p = data.params;
+        switch (data.type) {
+          case 'tap': await session.tap(p.x as number, p.y as number); break;
+          case 'swipe': await session.swipe(p.x1 as number, p.y1 as number, p.x2 as number, p.y2 as number, (p.duration as number) ?? 300); break;
+          case 'text': session.injectText(p.text as string); break;
+          case 'key': await session.injectKey(p.keycode as number); break;
+          case 'scroll': session.injectScroll(p.x as number, p.y as number, p.dx as number, p.dy as number); break;
+          case 'back': session.pressBack(); break;
+          case 'longPress': await session.longPress(p.x as number, p.y as number, (p.duration as number) ?? 1000); break;
+        }
+      } catch (err) {
+        logger.error('scrcpy:input failed', { deviceId: data.device_id, type: data.type, error: (err as Error).message });
+      }
+    });
+
+    socketClient.on('scrcpy:batchInput', async (data: ScrcpyBatchInputEvent) => {
+      try {
+        const p = data.params;
+        switch (data.type) {
+          case 'tap': await scrcpySessionManager!.batchTap(data.device_ids, p.x as number, p.y as number); break;
+          case 'swipe': await scrcpySessionManager!.batchSwipe(data.device_ids, p.x1 as number, p.y1 as number, p.x2 as number, p.y2 as number, (p.duration as number) ?? 300); break;
+          case 'text': await scrcpySessionManager!.batchText(data.device_ids, p.text as string); break;
+          case 'key': await scrcpySessionManager!.batchKey(data.device_ids, p.keycode as number); break;
+          case 'back': await scrcpySessionManager!.batchBack(data.device_ids); break;
+        }
+      } catch (err) {
+        logger.error('scrcpy:batchInput failed', { type: data.type, error: (err as Error).message });
+      }
+    });
+
+    logger.info('[ScrcpySessionManager] Initialized', { serverJarPath });
+    pushLog({ timestamp: Date.now(), level: 'info', message: 'scrcpy 세션 매니저 초기화 완료', source: 'system' });
+  } catch (err) {
+    logger.error('ScrcpySessionManager init failed (non-fatal)', { error: (err as Error).message });
+    pushLog({ timestamp: Date.now(), level: 'error', message: `scrcpy 초기화 실패: ${(err as Error).message}`, source: 'system' });
+  }
+
+  // ============================================
   // Manager Components 초기화 (Worker 오케스트레이션)
   // ============================================
 
@@ -674,6 +797,45 @@ async function initializeManagerComponents(): Promise<void> {
     logger.error('[Manager] Failed to initialize Manager components (non-fatal)', { error: msg });
     // EADDRINUSE 등 — 다른 인스턴스가 실행 중일 수 있음. throw 하지 않고 계속 진행
     // Worker 오케스트레이션 없이 기본 기능은 사용 가능
+  }
+}
+
+// ============================================
+// 접속설정 헬퍼 (config.json의 connectionTargets)
+// ============================================
+
+interface ConnectionSettings {
+  wifi: string[];
+  otg: string[];
+}
+
+function getConfigPath(): string {
+  return path.join(app.getPath('userData'), 'config.json');
+}
+
+function loadConnectionSettings(): ConnectionSettings {
+  try {
+    const configPath = getConfigPath();
+    if (!fs.existsSync(configPath)) return { wifi: [], otg: [] };
+    const raw = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    return raw.connectionTargets || { wifi: [], otg: [] };
+  } catch {
+    return { wifi: [], otg: [] };
+  }
+}
+
+function saveConnectionSettings(settings: ConnectionSettings): void {
+  try {
+    const configPath = getConfigPath();
+    let raw: Record<string, unknown> = {};
+    if (fs.existsSync(configPath)) {
+      raw = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    }
+    raw.connectionTargets = settings;
+    fs.writeFileSync(configPath, JSON.stringify(raw, null, 2), 'utf-8');
+    logger.info('[ConnectionSettings] Saved', { wifi: settings.wifi.length, otg: settings.otg.length });
+  } catch (error) {
+    logger.error('[ConnectionSettings] Save failed', { error: (error as Error).message });
   }
 }
 
@@ -907,6 +1069,62 @@ function setupIPC(): void {
   });
 
   // ============================================
+  // scrcpy 세션 IPC 핸들러 (ScrcpySessionManager)
+  // ============================================
+
+  // scrcpy 세션 시작 (프로토콜 기반)
+  ipcMain.handle('scrcpy-session:start', async (_event, deviceId: string, adbSerial: string) => {
+    if (!scrcpySessionManager) return { success: false, message: 'ScrcpySessionManager not initialized' };
+    try {
+      await scrcpySessionManager.startSession(deviceId, adbSerial);
+      return { success: true };
+    } catch (error) {
+      return { success: false, message: (error as Error).message };
+    }
+  });
+
+  // scrcpy 세션 종료
+  ipcMain.handle('scrcpy-session:stop', async (_event, deviceId: string) => {
+    if (!scrcpySessionManager) return { success: false, message: 'ScrcpySessionManager not initialized' };
+    try {
+      const fp = frameProcessors.get(deviceId);
+      if (fp) { fp.stop(); frameProcessors.delete(deviceId); }
+      await scrcpySessionManager.stopSession(deviceId);
+      return { success: true };
+    } catch (error) {
+      return { success: false, message: (error as Error).message };
+    }
+  });
+
+  // scrcpy 세션 목록 조회
+  ipcMain.handle('scrcpy-session:list', () => {
+    if (!scrcpySessionManager) return [];
+    return scrcpySessionManager.getAllSessionInfo();
+  });
+
+  // scrcpy 입력 (단일 디바이스)
+  ipcMain.handle('scrcpy-session:input', async (_event, deviceId: string, type: string, params: Record<string, unknown>) => {
+    if (!scrcpySessionManager) return { success: false, message: 'ScrcpySessionManager not initialized' };
+    const session = scrcpySessionManager.getSession(deviceId);
+    if (!session) return { success: false, message: 'No active session' };
+    try {
+      switch (type) {
+        case 'tap': await session.tap(params.x as number, params.y as number); break;
+        case 'swipe': await session.swipe(params.x1 as number, params.y1 as number, params.x2 as number, params.y2 as number, (params.duration as number) ?? 300); break;
+        case 'text': session.injectText(params.text as string); break;
+        case 'key': await session.injectKey(params.keycode as number); break;
+        case 'back': session.pressBack(); break;
+        case 'scroll': session.injectScroll(params.x as number, params.y as number, params.dx as number, params.dy as number); break;
+        case 'longPress': await session.longPress(params.x as number, params.y as number, (params.duration as number) ?? 1000); break;
+        default: return { success: false, message: `Unknown input type: ${type}` };
+      }
+      return { success: true };
+    } catch (error) {
+      return { success: false, message: (error as Error).message };
+    }
+  });
+
+  // ============================================
   // APK 관리 IPC 핸들러
   // ============================================
 
@@ -956,6 +1174,96 @@ function setupIPC(): void {
     } catch (error) {
       const msg = (error as Error).message;
       pushLog({ timestamp: Date.now(), level: 'error', message: `APK 설치 오류: ${msg}`, source: 'device' });
+      return { success: false, message: msg };
+    }
+  });
+
+  // ============================================
+  // 접속설정 IPC 핸들러 (v1.2.3)
+  // ============================================
+
+  // 접속설정 조회
+  ipcMain.handle('get-connection-settings', () => {
+    return loadConnectionSettings();
+  });
+
+  // 접속설정 저장
+  ipcMain.handle('save-connection-settings', (_event, settings: { wifi: string[]; otg: string[] }) => {
+    saveConnectionSettings(settings);
+    return { success: true };
+  });
+
+  // USB 디바이스 스캔 (adb devices)
+  ipcMain.handle('scan-usb-devices', async () => {
+    try {
+      const adb = getAdbController();
+      const devices = await adb.getConnectedDevices();
+      pushLog({ timestamp: Date.now(), level: 'info', message: `USB 스캔 완료: ${devices.length}대`, source: 'device' });
+      broadcastDeviceUpdate();
+      return { success: true, devices };
+    } catch (error) {
+      const msg = (error as Error).message;
+      pushLog({ timestamp: Date.now(), level: 'error', message: `USB 스캔 실패: ${msg}`, source: 'device' });
+      return { success: false, devices: [], message: msg };
+    }
+  });
+
+  // WiFi/OTG 대상 일괄 ADB 연결
+  ipcMain.handle('connect-adb-targets', async (_event, type: 'wifi' | 'otg') => {
+    const settings = loadConnectionSettings();
+    const targets = settings[type] || [];
+
+    if (targets.length === 0) {
+      return { success: false, results: [], message: '연결 대상이 없습니다' };
+    }
+
+    const adb = getAdbController();
+    const results: Array<{ ip: string; success: boolean; message: string }> = [];
+
+    for (const target of targets) {
+      try {
+        const match = target.match(/^(\d+\.\d+\.\d+\.\d+):(\d+)$/);
+        if (!match) {
+          results.push({ ip: target, success: false, message: '잘못된 형식' });
+          continue;
+        }
+        const success = await adb.reconnectWifiAdb(match[1], Number(match[2]));
+        results.push({ ip: target, success, message: success ? '연결됨' : '연결 실패' });
+        pushLog({
+          timestamp: Date.now(),
+          level: success ? 'info' : 'warn',
+          message: `ADB ${type} 연결 ${success ? '성공' : '실패'}: ${target}`,
+          source: 'device',
+        });
+      } catch (error) {
+        const msg = (error as Error).message;
+        results.push({ ip: target, success: false, message: msg });
+        pushLog({ timestamp: Date.now(), level: 'error', message: `ADB 연결 오류 (${target}): ${msg}`, source: 'device' });
+      }
+    }
+
+    // 연결 후 디바이스 목록 갱신
+    setTimeout(() => broadcastDeviceUpdate(), 2000);
+
+    return { success: true, results };
+  });
+
+  // 단일 IP로 ADB 연결
+  ipcMain.handle('connect-adb-ip', async (_event, ip: string) => {
+    try {
+      const adb = getAdbController();
+      const match = ip.match(/^(\d+\.\d+\.\d+\.\d+):(\d+)$/);
+      if (!match) {
+        return { success: false, message: '잘못된 IP:Port 형식' };
+      }
+      const success = await adb.reconnectWifiAdb(match[1], Number(match[2]));
+      if (success) {
+        pushLog({ timestamp: Date.now(), level: 'info', message: `ADB 연결 성공: ${ip}`, source: 'device' });
+        setTimeout(() => broadcastDeviceUpdate(), 2000);
+      }
+      return { success, message: success ? '연결됨' : '연결 실패' };
+    } catch (error) {
+      const msg = (error as Error).message;
       return { success: false, message: msg };
     }
   });
@@ -1042,6 +1350,104 @@ function sendToRenderer(channel: string, data?: unknown): void {
 }
 
 // ============================================
+// App 종료 시 정리 헬퍼 함수들
+// ============================================
+
+/**
+ * 노드 상태 저장
+ */
+async function saveNodeState(): Promise<void> {
+  if (!nodeRecovery) return;
+  
+  const state: Omit<SavedState, 'timestamp' | 'version'> = {
+    nodeId: NODE_ID,
+    runningWorkflows: workflowRunner?.getRunningWorkflows?.() || [],
+    deviceStates: deviceManager?.getAllStates() || {},
+  };
+  await nodeRecovery.saveBeforeQuit(state);
+}
+
+/**
+ * Manager 컴포넌트 정리
+ */
+async function cleanupManagerComponents(): Promise<void> {
+  if (workerServer) {
+    logger.info('[Manager] Stopping worker server...');
+    await workerServer.stop();
+  }
+
+  if (workerRegistry) {
+    logger.info('[Manager] Stopping worker registry...');
+    workerRegistry.stop();
+  }
+  // Note: ScreenStreamProxy doesn't have cleanup method - streams are terminated when workers disconnect
+}
+
+/**
+ * ScrcpySessionManager 및 FrameProcessors 정리
+ */
+async function cleanupScrcpySessions(): Promise<void> {
+  if (!scrcpySessionManager) return;
+  
+  logger.info('Stopping all scrcpy sessions...');
+  for (const fp of frameProcessors.values()) {
+    fp.stop();
+  }
+  frameProcessors.clear();
+  await scrcpySessionManager.stopAll();
+}
+
+/**
+ * Appium 서버 및 scrcpy 스트림 정리
+ */
+function cleanupAppiumAndScrcpy(): void {
+  const appiumCtrl = getAppiumController();
+  if (appiumCtrl.isServerRunning()) {
+    logger.info('Stopping Appium server...');
+    appiumCtrl.stopServer();
+  }
+  const scrcpyCtrl = getScrcpyController();
+  scrcpyCtrl.stopAllStreams();
+}
+
+/**
+ * 나머지 컴포넌트 정리 (동기)
+ */
+function cleanupRemainingComponents(): void {
+  deviceRecovery?.stop();
+  autoUpdater?.stop();
+  nodeRecovery?.stopAutoBackup();
+  socketClient?.disconnect();
+  deviceManager?.stop();
+}
+
+/**
+ * App 종료 시 전체 정리 수행
+ */
+async function performCleanup(): Promise<void> {
+  await saveNodeState();
+  await cleanupManagerComponents();
+
+  try {
+    await cleanupScrcpySessions();
+  } catch (cleanupErr) {
+    logger.error('Error cleaning up ScrcpySessionManager', { error: (cleanupErr as Error).message });
+  }
+
+  try {
+    cleanupAppiumAndScrcpy();
+  } catch (cleanupErr) {
+    logger.error('Error cleaning up Appium/scrcpy', { error: (cleanupErr as Error).message });
+  }
+
+  cleanupRemainingComponents();
+
+  if (workflowRunner) {
+    await workflowRunner.cleanup();
+  }
+}
+
+// ============================================
 // App 라이프사이클
 // ============================================
 
@@ -1101,72 +1507,7 @@ app.on('before-quit', async (event) => {
   logger.info('App quitting, saving state...');
 
   try {
-    // 상태 저장
-    if (nodeRecovery) {
-      const state: Omit<SavedState, 'timestamp' | 'version'> = {
-        nodeId: NODE_ID,
-        runningWorkflows: workflowRunner?.getRunningWorkflows?.() || [],
-        deviceStates: deviceManager?.getAllStates() || {},
-      };
-      await nodeRecovery.saveBeforeQuit(state);
-    }
-
-    // Manager 컴포넌트 정리
-    if (workerServer) {
-      logger.info('[Manager] Stopping worker server...');
-      await workerServer.stop();
-    }
-
-    if (workerRegistry) {
-      logger.info('[Manager] Stopping worker registry...');
-      workerRegistry.stop();
-    }
-
-    // Note: ScreenStreamProxy doesn't have cleanup method - streams are terminated when workers disconnect
-
-    // Appium 서버 종료 + scrcpy 스트림 정리
-    try {
-      const appiumCtrl = getAppiumController();
-      if (appiumCtrl.isServerRunning()) {
-        logger.info('Stopping Appium server...');
-        appiumCtrl.stopServer();
-      }
-      const scrcpyCtrl = getScrcpyController();
-      scrcpyCtrl.stopAllStreams();
-    } catch (cleanupErr) {
-      logger.error('Error cleaning up Appium/scrcpy', { error: (cleanupErr as Error).message });
-    }
-
-    // 복구 모니터 중지
-    if (deviceRecovery) {
-      deviceRecovery.stop();
-    }
-
-    // 자동 업데이트 중지
-    if (autoUpdater) {
-      autoUpdater.stop();
-    }
-
-    // 자동 백업 중지
-    if (nodeRecovery) {
-      nodeRecovery.stopAutoBackup();
-    }
-
-    // Socket 연결 해제
-    if (socketClient) {
-      socketClient.disconnect();
-    }
-
-    // 디바이스 모니터링 중지
-    if (deviceManager) {
-      deviceManager.stop();
-    }
-
-    // 워크플로우 정리
-    if (workflowRunner) {
-      await workflowRunner.cleanup();
-    }
-
+    await performCleanup();
     logger.info('Cleanup completed, exiting');
   } catch (error) {
     logger.error('Error during cleanup', { error: (error as Error).message });
