@@ -57,8 +57,23 @@ __pycache__/
 # Turborepo cache
 .turbo/
 
+# Storybook build output
+storybook-static/
+
+# Root test scripts
+test_*.js
+test-*.mjs
+
+# .NET solution files
+*.sln
+
 # Sisyphus plans (local agent state)
 .sisyphus/
+
+# Legacy/archive directories
+_reference/
+_archive/
+_legacy/
 
 # Resources (binary/media assets)
 resources/
