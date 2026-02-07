@@ -18,7 +18,7 @@ interface BulkDevice {
   ip_address?: string;
   model?: string;
   android_version?: string;
-  connection_type?: 'usb' | 'wifi' | 'both';
+  connection_type?: 'usb' | 'wifi' | 'otg';
 }
 
 /**

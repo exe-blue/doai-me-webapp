@@ -245,13 +245,21 @@ export class SocketClient extends EventEmitter {
     this.socket.on('connect', () => {
       console.log('[SocketClient] Connected to server');
       this.isConnected = true;
-      
-      // 노드 등록
-      this.register();
-      
-      // 상태 보고 시작
-      this.startStatusReporting();
-      
+
+      try {
+        // 노드 등록
+        console.log('[SocketClient] Calling register()...');
+        this.register();
+        console.log('[SocketClient] register() done');
+
+        // 상태 보고 시작
+        console.log('[SocketClient] Calling startStatusReporting()...');
+        this.startStatusReporting();
+        console.log('[SocketClient] startStatusReporting() done');
+      } catch (err) {
+        console.error('[SocketClient] ERROR in connect handler:', err);
+      }
+
       this.emit('connected');
     });
 
@@ -659,19 +667,27 @@ export class SocketClient extends EventEmitter {
    * worker:heartbeat 전송 (백엔드 프로토콜)
    */
   private async sendHeartbeat(): Promise<void> {
-    if (!this.socket?.connected) return;
+    if (!this.socket?.connected) {
+      console.log('[SocketClient] sendHeartbeat skipped: socket not connected');
+      return;
+    }
 
-    const devices = this.deviceManager.getAllDevices();
+    try {
+      const devices = this.deviceManager.getAllDevices();
+      console.log(`[SocketClient] sendHeartbeat: ${devices.length} devices`);
 
-    this.socket.emit('worker:heartbeat', {
-      devices: devices.map(d => ({
-        deviceId: `${this.config.pcId || this.config.nodeId}-${d.serial}`,
-        serial: d.serial,
-        status: this.getDeviceState(d),
-        adbConnected: d.state !== 'DISCONNECTED',
-        battery: d.battery,
-      })),
-    });
+      this.socket.emit('worker:heartbeat', {
+        devices: devices.map(d => ({
+          deviceId: `${this.config.pcId || this.config.nodeId}-${d.serial}`,
+          serial: d.serial,
+          status: this.getDeviceState(d),
+          adbConnected: d.state !== 'DISCONNECTED',
+          battery: d.battery,
+        })),
+      });
+    } catch (err) {
+      console.error('[SocketClient] sendHeartbeat ERROR:', err);
+    }
   }
 
   /**

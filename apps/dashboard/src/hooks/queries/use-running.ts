@@ -152,6 +152,10 @@ export function useRunningTasksQuery(
                 task as { started_at?: string; watch_duration_sec?: number },
               ),
             elapsed_sec: elapsedSec,
+            // DB uses did_* (result) — map to will_* (intent) for running tasks
+            will_like: (task.did_like as boolean) || (task.will_like as boolean) || false,
+            will_comment: (task.did_comment as boolean) || (task.will_comment as boolean) || false,
+            will_subscribe: (task.did_subscribe as boolean) || (task.will_subscribe as boolean) || false,
           } as RunningTask;
         },
       );
@@ -193,7 +197,7 @@ export function useTodayStatsQuery(opts?: {
           completed.length > 0
             ? Math.round(
                 completed.reduce(
-                  (sum, c) => sum + (c.watch_duration_sec || 0),
+                  (sum, c) => sum + (c.actual_watch_duration_sec || 0),
                   0,
                 ) / completed.length,
               )
@@ -202,9 +206,9 @@ export function useTodayStatsQuery(opts?: {
           (sum, n) => sum + n.tasks_per_minute,
           0,
         ),
-        likes_today: completed.filter((c) => c.liked).length,
-        comments_today: completed.filter((c) => c.commented).length,
-        subscribes_today: completed.filter((c) => c.subscribed).length,
+        likes_today: completed.filter((c) => c.did_like).length,
+        comments_today: completed.filter((c) => c.did_comment).length,
+        subscribes_today: completed.filter((c) => c.did_subscribe).length,
       } satisfies RealtimeStats;
     },
     refetchInterval: 5000,

@@ -36,7 +36,7 @@ export interface PC {
 // ============================================
 
 export type DeviceStatus = 'online' | 'offline' | 'busy' | 'error';
-export type ConnectionType = 'usb' | 'wifi' | 'both';
+export type ConnectionType = 'usb' | 'wifi' | 'otg';
 
 export interface Device {
   id: string;

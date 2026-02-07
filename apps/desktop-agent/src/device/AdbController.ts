@@ -65,10 +65,10 @@ export class AdbController {
    * Validate and sanitize input to prevent command injection
    */
   private sanitizeInput(input: string): string {
-    // Allow only alphanumeric, dashes, underscores, colons, dots, spaces, and slashes
-    // This covers device serials (e.g., "192.168.1.1:5555", "emulator-5554", "R58M12345")
-    // and common ADB commands
-    if (!/^[\w\s\-.:/']+$/i.test(input)) {
+    // Allow alphanumeric, dashes, underscores, colons, dots, spaces, slashes,
+    // plus URL-safe chars (?=#%@+",~) for am start -d <url> commands.
+    // Safe because execute() uses execFile (not shell exec).
+    if (!/^[\w\s\-.:/'?=#%@+",~]+$/i.test(input)) {
       throw new Error(`Invalid input contains disallowed characters: ${input}`);
     }
     // Block shell injection patterns

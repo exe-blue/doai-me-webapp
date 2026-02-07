@@ -12,6 +12,9 @@ import {
   BatteryWarning,
   BatteryCharging,
   WifiOff,
+  Wifi,
+  Usb,
+  Cable,
   Power,
   RotateCcw,
   AlertTriangle,
@@ -70,7 +73,8 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { StatsCard } from "@/components/ui/stats-card";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { useDevicesQuery, type Device } from "@/hooks/queries";
+import { useDevicesQuery, deviceKeys, type Device } from "@/hooks/queries";
+import { useQueryClient } from "@tanstack/react-query";
 import { PageLoading } from "@/components/shared/page-loading";
 import { ErrorState } from "@/components/shared/error-state";
 
@@ -80,6 +84,14 @@ const statusConfig: Record<string, { label: string; color: string; icon: React.C
   offline: { label: "오프라인", color: "bg-gray-400 text-gray-900 border-gray-900", icon: WifiOff },
   error: { label: "오류", color: "bg-red-400 text-red-900 border-red-900", icon: AlertTriangle },
 };
+
+const connectionConfig: Record<string, { label: string; color: string; icon: React.ComponentType<{ className?: string }> }> = {
+  usb: { label: "USB", color: "bg-orange-200 text-orange-900 border-orange-900", icon: Usb },
+  wifi: { label: "WiFi", color: "bg-sky-200 text-sky-900 border-sky-900", icon: Wifi },
+  otg: { label: "OTG", color: "bg-violet-200 text-violet-900 border-violet-900", icon: Cable },
+};
+
+const CONNECTION_TYPES: Device["connection_type"][] = ["usb", "wifi", "otg"];
 
 function formatTimeAgo(dateString: string): string {
   const date = new Date(dateString);
@@ -126,6 +138,8 @@ export default function DevicesPage() {
   const [isAutoRefresh, setIsAutoRefresh] = useState(true);
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+
+  const queryClient = useQueryClient();
 
   const {
     data,
@@ -179,18 +193,37 @@ export default function DevicesPage() {
     await sendCommand([deviceId], "clear_cache");
   }
 
-  const filteredDevices = useMemo(() =>
-    devices.filter((device) => {
-      const matchesSearch =
-        device.device_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        device.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (device.management_code?.toLowerCase() || "").includes(searchQuery.toLowerCase());
+  async function changeConnectionType(deviceId: string, type: Device["connection_type"]) {
+    try {
+      const response = await fetch(`/api/devices/${deviceId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ connection_type: type }),
+      });
+      if (!response.ok) throw new Error("접속 방식 변경 실패");
+      queryClient.invalidateQueries({ queryKey: deviceKeys.all });
+      if (selectedDevice?.id === deviceId) {
+        setSelectedDevice({ ...selectedDevice, connection_type: type });
+      }
+    } catch (err) {
+      console.error("changeConnectionType error:", err);
+    }
+  }
+
+  const filteredDevices = useMemo(() => {
+    const q = searchQuery.toLowerCase();
+    return devices.filter((device) => {
+      const matchesSearch = !q ||
+        device.device_id.toLowerCase().includes(q) ||
+        device.name.toLowerCase().includes(q) ||
+        (device.management_code?.toLowerCase() || "").includes(q) ||
+        (device.serial_number?.toLowerCase() || "").includes(q) ||
+        (device.ip_address?.toLowerCase() || "").includes(q);
       const matchesPC = pcFilter === "all" || device.pc_id === pcFilter;
       const matchesStatus = statusFilter === "all" || device.status === statusFilter;
       return matchesSearch && matchesPC && matchesStatus;
-    }),
-    [devices, searchQuery, pcFilter, statusFilter],
-  );
+    });
+  }, [devices, searchQuery, pcFilter, statusFilter]);
 
   const stats = useMemo(() => ({
     total: devices.length,
@@ -423,7 +456,7 @@ export default function DevicesPage() {
                     setIsDetailOpen(true);
                   }}
                 >
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2">
                       <Checkbox
                         checked={selectedDevices.includes(device.id)}
@@ -436,13 +469,46 @@ export default function DevicesPage() {
                         }}
                         onClick={(e) => e.stopPropagation()}
                       />
-                      <span className="text-sm font-bold text-foreground">{device.device_id}</span>
+                      <span className="text-sm font-bold text-foreground">{device.management_code || device.device_id}</span>
                     </div>
                     <Badge
                       className={`${statusConfig[device.status]?.color || "bg-gray-400 text-gray-900 border-gray-900"} text-xs border-2 font-bold`}
                     >
                       {statusConfig[device.status]?.label || device.status}
                     </Badge>
+                  </div>
+
+                  {/* Connection type toggle */}
+                  <div className="flex gap-0.5 mb-1" onClick={(e) => e.stopPropagation()}>
+                    {CONNECTION_TYPES.map((ct) => {
+                      const cfg = connectionConfig[ct];
+                      const ConnIcon = cfg.icon;
+                      const isActive = device.connection_type === ct;
+                      return (
+                        <button
+                          key={ct}
+                          className={`flex-1 flex items-center justify-center gap-0.5 py-0.5 text-[10px] font-bold border-2 transition-all ${
+                            isActive
+                              ? `${cfg.color}`
+                              : "border-muted-foreground/30 text-muted-foreground/50 hover:border-muted-foreground"
+                          }`}
+                          onClick={() => changeConnectionType(device.id, ct)}
+                        >
+                          <ConnIcon className="h-2.5 w-2.5" />
+                          {cfg.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* IP / Serial */}
+                  <div className="text-[10px] text-muted-foreground mb-1 space-y-0.5">
+                    {device.ip_address && (
+                      <div className="truncate" title={device.ip_address}>IP: {device.ip_address}</div>
+                    )}
+                    {device.serial_number && (
+                      <div className="truncate" title={device.serial_number}>S/N: {device.serial_number}</div>
+                    )}
                   </div>
 
                   <div className="space-y-1">
@@ -492,12 +558,13 @@ export default function DevicesPage() {
                   </TableHead>
                   <TableHead>디바이스</TableHead>
                   <TableHead>PC / 관리번호</TableHead>
+                  <TableHead>접속</TableHead>
+                  <TableHead>IP / 시리얼</TableHead>
                   <TableHead>상태</TableHead>
                   <TableHead>배터리</TableHead>
                   <TableHead>CPU</TableHead>
                   <TableHead>메모리</TableHead>
                   <TableHead>온도</TableHead>
-                  <TableHead>Uptime</TableHead>
                   <TableHead>마지막 접속</TableHead>
                   <TableHead className="w-10"></TableHead>
                 </TableRow>
@@ -537,6 +604,50 @@ export default function DevicesPage() {
 
                       <TableCell className="text-muted-foreground">
                         {device.management_code || (device.pc_id ? `${device.pc_id}` : "-")}
+                      </TableCell>
+
+                      {/* Connection type toggle */}
+                      <TableCell>
+                        <div className="flex gap-0.5">
+                          {CONNECTION_TYPES.map((ct) => {
+                            const cfg = connectionConfig[ct];
+                            const ConnIcon = cfg.icon;
+                            const isActive = device.connection_type === ct;
+                            return (
+                              <button
+                                key={ct}
+                                className={`flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-bold border-2 transition-all ${
+                                  isActive
+                                    ? `${cfg.color}`
+                                    : "border-muted-foreground/30 text-muted-foreground/50 hover:border-muted-foreground"
+                                }`}
+                                onClick={() => changeConnectionType(device.id, ct)}
+                              >
+                                <ConnIcon className="h-3 w-3" />
+                                {cfg.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </TableCell>
+
+                      {/* IP / Serial */}
+                      <TableCell>
+                        <div className="text-xs space-y-0.5">
+                          {device.ip_address && (
+                            <div className="text-muted-foreground truncate max-w-[160px]" title={device.ip_address}>
+                              {device.ip_address}
+                            </div>
+                          )}
+                          {device.serial_number && (
+                            <div className="text-muted-foreground/70 truncate max-w-[160px] font-mono text-[10px]" title={device.serial_number}>
+                              {device.serial_number}
+                            </div>
+                          )}
+                          {!device.ip_address && !device.serial_number && (
+                            <span className="text-muted-foreground/40">-</span>
+                          )}
+                        </div>
                       </TableCell>
 
                       <TableCell>
@@ -579,8 +690,6 @@ export default function DevicesPage() {
                           {device.temperature}°C
                         </span>
                       </TableCell>
-
-                      <TableCell className="text-muted-foreground">{formatUptime(device.uptime_seconds)}</TableCell>
 
                       <TableCell className="text-muted-foreground">
                         {formatTimeAgo(device.last_heartbeat)}
@@ -655,6 +764,43 @@ export default function DevicesPage() {
                   {selectedDevice.status === "error" && (
                     <span className="text-sm text-red-600 font-medium">{selectedDevice.error_message}</span>
                   )}
+                </div>
+
+                {/* Connection type toggle */}
+                <div className="p-4 bg-muted border-2 border-foreground space-y-3">
+                  <p className="text-xs text-muted-foreground font-medium">접속 방식</p>
+                  <div className="flex gap-1">
+                    {CONNECTION_TYPES.map((ct) => {
+                      const cfg = connectionConfig[ct];
+                      const ConnIcon = cfg.icon;
+                      const isActive = selectedDevice.connection_type === ct;
+                      return (
+                        <button
+                          key={ct}
+                          className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-bold border-2 transition-all ${
+                            isActive
+                              ? `${cfg.color}`
+                              : "border-muted-foreground/30 text-muted-foreground/50 hover:border-muted-foreground hover:text-muted-foreground"
+                          }`}
+                          onClick={() => changeConnectionType(selectedDevice.id, ct)}
+                        >
+                          <ConnIcon className="h-4 w-4" />
+                          {cfg.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <p className="text-[10px] text-muted-foreground font-medium">IP 주소</p>
+                      <p className="text-sm font-bold text-foreground">{selectedDevice.ip_address || "-"}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-muted-foreground font-medium">시리얼</p>
+                      <p className="text-sm font-bold text-foreground font-mono">{selectedDevice.serial_number || "-"}</p>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 p-4 bg-muted border-2 border-foreground">

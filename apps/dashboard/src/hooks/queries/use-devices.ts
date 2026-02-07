@@ -35,8 +35,10 @@ interface Device {
   total_tasks_failed: number;
   error_message: string | null;
   created_at: string;
-  connection_type?: 'usb' | 'wifi' | 'adb_wifi';
-  usb_port?: number;
+  serial_number: string | null;
+  ip_address: string | null;
+  connection_type: 'usb' | 'wifi' | 'otg';
+  usb_port: number | null;
 }
 
 interface PCSummary {
@@ -79,8 +81,10 @@ function mapDevice(d: DeviceRaw): Device {
     total_tasks_failed: d.total_tasks_failed ?? d.failed_jobs ?? 0,
     error_message: d.error_message || null,
     created_at: d.created_at || new Date().toISOString(),
-    connection_type: d.connection_type,
-    usb_port: d.usb_port,
+    serial_number: d.serial_number || null,
+    ip_address: d.ip_address || null,
+    connection_type: (d.connection_type as Device['connection_type']) || 'usb',
+    usb_port: d.usb_port ?? null,
   };
 }
 

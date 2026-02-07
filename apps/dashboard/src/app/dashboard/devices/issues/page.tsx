@@ -321,69 +321,96 @@ export default function DeviceIssuesPage() {
   }
 
   async function resolveIssue(issueId: string, note: string) {
-    setIssues(
-      issues.map((issue) =>
-        issue.id === issueId
-          ? {
-              ...issue,
-              status: "resolved" as const,
-              resolved_at: new Date().toISOString(),
-              resolved_by: "user",
-              resolution_note: note,
-            }
-          : issue
-      )
-    );
+    try {
+      const response = await fetch(`/api/issues/${issueId}/resolve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resolution_note: note, resolved_by: "manual" }),
+      });
+      if (!response.ok) throw new Error("이슈 해결 실패");
+      setIssues(
+        issues.map((issue) =>
+          issue.id === issueId
+            ? {
+                ...issue,
+                status: "resolved" as const,
+                resolved_at: new Date().toISOString(),
+                resolved_by: "user",
+                resolution_note: note,
+              }
+            : issue
+        )
+      );
+    } catch (err) {
+      console.error("resolveIssue error:", err);
+    }
     setIsResolveOpen(false);
     setResolutionNote("");
   }
 
   async function bulkResolve(issueIds: string[]) {
-    setIssues(
-      issues.map((issue) =>
-        issueIds.includes(issue.id)
-          ? {
-              ...issue,
-              status: "resolved" as const,
-              resolved_at: new Date().toISOString(),
-              resolved_by: "user",
-              resolution_note: "일괄 해결 처리",
-            }
-          : issue
-      )
-    );
+    try {
+      const response = await fetch("/api/issues/batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ issue_ids: issueIds, action: "resolve" }),
+      });
+      if (!response.ok) throw new Error("일괄 해결 실패");
+      setIssues(
+        issues.map((issue) =>
+          issueIds.includes(issue.id)
+            ? {
+                ...issue,
+                status: "resolved" as const,
+                resolved_at: new Date().toISOString(),
+                resolved_by: "user",
+                resolution_note: "일괄 해결 처리",
+              }
+            : issue
+        )
+      );
+    } catch (err) {
+      console.error("bulkResolve error:", err);
+    }
     setSelectedIssues([]);
   }
 
   async function ignoreIssue(issueId: string) {
-    setIssues(
-      issues.map((issue) =>
-        issue.id === issueId ? { ...issue, status: "ignored" as const } : issue
-      )
-    );
+    try {
+      const response = await fetch("/api/issues/batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ issue_ids: [issueId], action: "ignore" }),
+      });
+      if (!response.ok) throw new Error("이슈 무시 실패");
+      setIssues(
+        issues.map((issue) =>
+          issue.id === issueId ? { ...issue, status: "ignored" as const } : issue
+        )
+      );
+    } catch (err) {
+      console.error("ignoreIssue error:", err);
+    }
   }
 
   async function retryFix(issue: DeviceIssue) {
-    const actions: Record<string, string> = {
-      app_crash: "YouTube 앱 재시작",
-      low_battery: "충전 상태 확인",
-      disconnected: "ADB 재연결 시도",
-      overheating: "작업 일시 중지",
-      storage_full: "캐시 삭제",
-      memory_full: "백그라운드 앱 정리",
-      task_stuck: "작업 취소 및 재할당",
-      network_error: "WiFi 재연결",
-    };
-
-    alert(`${actions[issue.issue_type]} 명령을 전송했습니다`);
-
-    setIssues(
-      issues.map((i) =>
-        i.id === issue.id
-          ? { ...i, status: "in_progress" as const, auto_retry_count: i.auto_retry_count + 1 }
-          : i
-      )
-    );
+    try {
+      const response = await fetch("/api/issues/batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ issue_ids: [issue.id], action: "retry" }),
+      });
+      if (!response.ok) throw new Error("재시도 실패");
+      setIssues(
+        issues.map((i) =>
+          i.id === issue.id
+            ? { ...i, status: "in_progress" as const, auto_retry_count: i.auto_retry_count + 1 }
+            : i
+        )
+      );
+    } catch (err) {
+      console.error("retryFix error:", err);
+    }
   }
 
   function openDetail(issue: DeviceIssue) {

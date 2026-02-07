@@ -120,7 +120,7 @@ CREATE TABLE IF NOT EXISTS devices (
 
     -- 연결
     connection_type VARCHAR(10) DEFAULT 'usb'
-        CHECK (connection_type IN ('usb', 'wifi', 'both', 'adb_wifi')),
+        CHECK (connection_type IN ('usb', 'wifi', 'otg')),
     usb_port INT,
 
     -- 상태 (모니터링)
@@ -134,6 +134,19 @@ CREATE TABLE IF NOT EXISTS devices (
     -- 배터리
     battery INT CHECK (battery IS NULL OR (battery >= 0 AND battery <= 100)),
     battery_level INT CHECK (battery_level IS NULL OR (battery_level >= 0 AND battery_level <= 100)),
+
+    -- 모니터링 (에이전트 하트비트로 갱신)
+    cpu_usage NUMERIC(5,2) DEFAULT 0,
+    memory_used INT DEFAULT 0,
+    memory_total INT DEFAULT 4096,
+    storage_used INT DEFAULT 0,
+    storage_total INT DEFAULT 64,
+    temperature NUMERIC(4,1) DEFAULT 0,
+    wifi_signal INT DEFAULT 0,
+    is_charging BOOLEAN DEFAULT false,
+    uptime_seconds INT DEFAULT 0,
+    total_tasks_completed INT DEFAULT 0,
+    total_tasks_failed INT DEFAULT 0,
 
     -- 에러
     error_count INT DEFAULT 0,
@@ -269,6 +282,29 @@ CREATE TABLE IF NOT EXISTS device_states (
 );
 
 -- -----------------------------------------
+-- 2.7b Nodes 테이블 (데스크톱 에이전트 노드)
+-- -----------------------------------------
+CREATE TABLE IF NOT EXISTS nodes (
+    id TEXT PRIMARY KEY,
+    name TEXT,
+    status TEXT DEFAULT 'offline'
+        CHECK (status IN ('online', 'offline', 'error')),
+    ip_address TEXT,
+    connected_at TIMESTAMPTZ,
+    total_devices INT DEFAULT 0,
+    active_devices INT DEFAULT 0,
+    idle_devices INT DEFAULT 0,
+    error_devices INT DEFAULT 0,
+    tasks_per_minute NUMERIC(6,2) DEFAULT 0,
+    cpu_usage NUMERIC(5,2) DEFAULT 0,
+    memory_usage NUMERIC(5,2) DEFAULT 0,
+    metadata JSONB DEFAULT '{}',
+    last_heartbeat TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- -----------------------------------------
 -- 2.8 Workflows 테이블 (워크플로우 정의)
 -- -----------------------------------------
 CREATE TABLE IF NOT EXISTS workflows (
@@ -392,6 +428,8 @@ CREATE TABLE IF NOT EXISTS videos (
         CHECK (status IN ('active', 'paused', 'completed', 'archived')),
     priority TEXT DEFAULT 'normal'
         CHECK (priority IN ('urgent', 'high', 'normal', 'low')),
+    priority_enabled BOOLEAN DEFAULT false,
+    priority_updated_at TIMESTAMPTZ,
     tags TEXT[] DEFAULT '{}',
     metadata JSONB DEFAULT '{}',
     last_scheduled_at TIMESTAMPTZ,
@@ -422,6 +460,9 @@ CREATE TABLE IF NOT EXISTS channels (
     default_prob_like INT DEFAULT 0,
     default_prob_comment INT DEFAULT 0,
     default_prob_subscribe INT DEFAULT 0,
+    push_status TEXT DEFAULT 'none'
+        CHECK (push_status IN ('active', 'pending', 'expired', 'none')),
+    push_expires_at TIMESTAMPTZ,
     status TEXT DEFAULT 'active'
         CHECK (status IN ('active', 'paused', 'archived')),
     metadata JSONB DEFAULT '{}',

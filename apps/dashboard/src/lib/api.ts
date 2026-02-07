@@ -34,7 +34,9 @@ export interface DeviceRaw {
   failed_jobs?: number;
   error_message?: string | null;
   created_at?: string;
-  connection_type?: 'usb' | 'wifi' | 'adb_wifi';
+  serial_number?: string;
+  ip_address?: string;
+  connection_type?: 'usb' | 'wifi' | 'otg';
   usb_port?: number;
 }
 
@@ -62,10 +64,10 @@ export interface NodeRow {
 export interface TodayStats {
   completed: Array<{
     id: string;
-    watch_duration_sec: number | null;
-    liked: boolean | null;
-    commented: boolean | null;
-    subscribed: boolean | null;
+    actual_watch_duration_sec: number | null;
+    did_like: boolean | null;
+    did_comment: boolean | null;
+    did_subscribe: boolean | null;
   }>;
   failed: Array<{ id: string }>;
 }
@@ -150,7 +152,7 @@ export async function fetchTodayStats(): Promise<TodayStats> {
     await Promise.all([
       supabase
         .from('video_executions')
-        .select('id, watch_duration_sec, liked, commented, subscribed')
+        .select('id, actual_watch_duration_sec, did_like, did_comment, did_subscribe')
         .eq('status', 'completed')
         .gte('completed_at', today.toISOString()),
       supabase
