@@ -499,28 +499,43 @@ CREATE TABLE IF NOT EXISTS schedules (
     id SERIAL PRIMARY KEY,
     name TEXT NOT NULL,
     description TEXT,
-    cron_expression TEXT NOT NULL,
+    schedule_type TEXT DEFAULT 'interval'
+        CHECK (schedule_type IN ('interval', 'cron', 'once')),
+    cron_expression TEXT,
+    interval_minutes INT,
     timezone TEXT DEFAULT 'Asia/Seoul',
-    schedule_type TEXT DEFAULT 'workflow'
-        CHECK (schedule_type IN ('workflow', 'video_batch', 'channel_collect', 'keyword_collect', 'maintenance')),
-    workflow_id TEXT,
-    video_id TEXT,
-    video_filter JSONB DEFAULT '{}',
-    batch_size INT DEFAULT 100,
-    params JSONB DEFAULT '{}',
-    max_concurrent INT DEFAULT 50,
+    target_type TEXT DEFAULT 'all_videos'
+        CHECK (target_type IN ('all_videos', 'by_channel', 'by_keyword', 'specific_videos')),
+    target_ids TEXT[],
+    task_config JSONB DEFAULT '{}',
     is_active BOOLEAN DEFAULT true,
     run_count INT DEFAULT 0,
     success_count INT DEFAULT 0,
     fail_count INT DEFAULT 0,
     last_run_at TIMESTAMPTZ,
-    last_status TEXT,
     last_run_status TEXT,
     last_run_result JSONB,
     next_run_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     CONSTRAINT schedules_name_unique UNIQUE (name)
+);
+
+-- -----------------------------------------
+-- 2.16b Schedule Runs 테이블 (실행 이력)
+-- -----------------------------------------
+CREATE TABLE IF NOT EXISTS schedule_runs (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    schedule_id INT NOT NULL REFERENCES schedules(id) ON DELETE CASCADE,
+    started_at TIMESTAMPTZ DEFAULT NOW(),
+    completed_at TIMESTAMPTZ,
+    status TEXT DEFAULT 'running'
+        CHECK (status IN ('running', 'completed', 'failed')),
+    tasks_created INT DEFAULT 0,
+    tasks_completed INT DEFAULT 0,
+    tasks_failed INT DEFAULT 0,
+    error_message TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- -----------------------------------------
@@ -1840,6 +1855,10 @@ ALTER TABLE device_onboarding_states ENABLE ROW LEVEL SECURITY;
 ALTER TABLE scripts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE script_executions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE script_device_results ENABLE ROW LEVEL SECURITY;
+ALTER TABLE nodes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE schedule_runs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE device_commands ENABLE ROW LEVEL SECURITY;
+ALTER TABLE scrcpy_commands ENABLE ROW LEVEL SECURITY;
 
 -- -----------------------------------------
 -- Service Role 전체 접근 정책
@@ -1852,9 +1871,10 @@ BEGIN
         'pcs', 'devices', 'device_states', 'jobs', 'job_assignments',
         'monitored_channels', 'workflows', 'workflow_executions',
         'execution_logs', 'settings', 'alerts', 'videos', 'channels',
-        'keywords', 'schedules', 'daily_stats', 'video_executions',
+        'keywords', 'schedules', 'schedule_runs', 'daily_stats', 'video_executions',
         'tasks', 'system_logs', 'device_issues', 'device_onboarding_states',
-        'scripts', 'script_executions', 'script_device_results'
+        'scripts', 'script_executions', 'script_device_results',
+        'nodes', 'device_commands', 'scrcpy_commands'
     ])
     LOOP
         EXECUTE format(
@@ -1876,9 +1896,10 @@ BEGIN
         'pcs', 'devices', 'device_states', 'jobs', 'job_assignments',
         'monitored_channels', 'workflows', 'workflow_executions',
         'execution_logs', 'alerts', 'videos', 'channels',
-        'keywords', 'schedules', 'daily_stats', 'video_executions',
+        'keywords', 'schedules', 'schedule_runs', 'daily_stats', 'video_executions',
         'tasks', 'system_logs', 'device_issues', 'device_onboarding_states',
-        'scripts', 'script_executions', 'script_device_results'
+        'scripts', 'script_executions', 'script_device_results',
+        'nodes', 'device_commands', 'scrcpy_commands'
     ])
     LOOP
         EXECUTE format(
@@ -2107,11 +2128,106 @@ COMMENT ON TABLE script_executions IS '스크립트 실행 인스턴스';
 COMMENT ON TABLE script_device_results IS '디바이스별 스크립트 실행 결과';
 COMMENT ON COLUMN devices.management_code IS '관리번호 (PC01-001 형태) - 트리거로 자동 계산';
 
+-- -----------------------------------------
+-- 2.26 Device Commands 테이블 (디바이스 명령 큐)
+-- -----------------------------------------
+CREATE TABLE IF NOT EXISTS device_commands (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    device_id TEXT NOT NULL,
+    command_type TEXT NOT NULL
+        CHECK (command_type IN ('reboot', 'clear_cache', 'kill_app', 'screenshot', 'enable', 'disable')),
+    options JSONB DEFAULT '{}',
+    status TEXT DEFAULT 'pending'
+        CHECK (status IN ('pending', 'running', 'completed', 'failed', 'cancelled')),
+    result JSONB,
+    error_message TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    completed_at TIMESTAMPTZ
+);
+
+-- -----------------------------------------
+-- 2.27 Scrcpy Commands 테이블 (스크린 제어 명령)
+-- -----------------------------------------
+CREATE TABLE IF NOT EXISTS scrcpy_commands (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    device_id TEXT NOT NULL,
+    pc_id TEXT,
+    command_type TEXT NOT NULL
+        CHECK (command_type IN ('input', 'screenshot', 'scrcpy_start', 'scrcpy_stop', 'stream_start', 'stream_stop', 'frame')),
+    command_data JSONB DEFAULT '{}',
+    options JSONB DEFAULT '{}',
+    result_data JSONB,
+    status TEXT DEFAULT 'pending'
+        CHECK (status IN ('pending', 'running', 'completed', 'failed', 'cancelled')),
+    error_message TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    completed_at TIMESTAMPTZ
+);
+
+-- device_commands indexes
+CREATE INDEX IF NOT EXISTS idx_device_commands_device ON device_commands(device_id);
+CREATE INDEX IF NOT EXISTS idx_device_commands_status ON device_commands(status);
+CREATE INDEX IF NOT EXISTS idx_device_commands_created ON device_commands(created_at DESC);
+
+-- scrcpy_commands indexes
+CREATE INDEX IF NOT EXISTS idx_scrcpy_commands_device ON scrcpy_commands(device_id);
+CREATE INDEX IF NOT EXISTS idx_scrcpy_commands_status ON scrcpy_commands(status);
+CREATE INDEX IF NOT EXISTS idx_scrcpy_commands_type ON scrcpy_commands(command_type);
+CREATE INDEX IF NOT EXISTS idx_scrcpy_commands_created ON scrcpy_commands(created_at DESC);
+
+-- RLS
+ALTER TABLE device_commands ENABLE ROW LEVEL SECURITY;
+ALTER TABLE scrcpy_commands ENABLE ROW LEVEL SECURITY;
+
+-- Service role full access
+DO $$
+DECLARE
+    t TEXT;
+BEGIN
+    FOR t IN SELECT unnest(ARRAY['device_commands', 'scrcpy_commands'])
+    LOOP
+        EXECUTE format(
+            'DROP POLICY IF EXISTS "Service role full access on %s" ON %s;
+             CREATE POLICY "Service role full access on %s" ON %s FOR ALL USING (auth.role() = ''service_role'');',
+            t, t, t, t
+        );
+    END LOOP;
+END $$;
+
+-- Public read
+DO $$
+DECLARE
+    t TEXT;
+BEGIN
+    FOR t IN SELECT unnest(ARRAY['device_commands', 'scrcpy_commands'])
+    LOOP
+        EXECUTE format(
+            'DROP POLICY IF EXISTS "Public read %s" ON %s;
+             CREATE POLICY "Public read %s" ON %s FOR SELECT USING (true);',
+            t, t, t, t
+        );
+    END LOOP;
+END $$;
+
+-- Realtime
+DO $$
+BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE device_commands;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$
+BEGIN
+    ALTER PUBLICATION supabase_realtime ADD TABLE scrcpy_commands;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+COMMENT ON TABLE device_commands IS '디바이스 명령 큐 (reboot, clear_cache 등)';
+COMMENT ON TABLE scrcpy_commands IS '스크린 제어 명령 (scrcpy, screenshot, stream)';
+
 -- =============================================
 -- 완료
 -- =============================================
 DO $$
 BEGIN
     RAISE NOTICE 'DoAi.Me Consolidated Schema - 설치 완료';
-    RAISE NOTICE '테이블 25개, 함수 30+개, 뷰 10개, RLS 정책 전체 적용';
+    RAISE NOTICE '테이블 27개, 함수 30+개, 뷰 10개, RLS 정책 전체 적용';
 END $$;
