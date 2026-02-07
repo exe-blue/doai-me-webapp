@@ -153,7 +153,7 @@ export type DeviceStateRecord = {
 
 export type WorkflowStep = {
   id: string;
-  action: 'adb' | 'system' | 'wait' | 'condition' | 'celery' | 'appium';
+  action: 'adb' | 'system' | 'wait' | 'condition' | 'celery' | 'appium' | 'scrcpy_control';
   script?: string;
   command?: string;
   params?: Record<string, unknown>;
