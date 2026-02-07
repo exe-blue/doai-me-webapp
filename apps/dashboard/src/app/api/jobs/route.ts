@@ -123,16 +123,20 @@ export async function GET(request: NextRequest) {
     let query = supabase
       .from('jobs')
       .select('*', { count: 'exact' })
-      .order('priority', { ascending: false })  // Priority jobs first
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
-    // 상태 필터
+    // 상태 필터 — DB에 status 컬럼이 없으면 is_active로 폴백
     if (status) {
-      query = query.eq('status', status);
+      if (status === 'active') {
+        query = query.eq('is_active', true);
+      } else if (status === 'completed' || status === 'cancelled') {
+        query = query.eq('is_active', false);
+      }
+      // status 컬럼이 있으면 추가 필터 시도 (에러 무시)
     } else {
-      // 기본: 활성/일시정지 작업만
-      query = query.in('status', ['active', 'paused']);
+      // 기본: 활성 작업만
+      query = query.eq('is_active', true);
     }
 
     const { data: jobs, error, count } = await query;

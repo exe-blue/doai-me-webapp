@@ -17,7 +17,8 @@
     "clean": "rimraf dist",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": {
+  "dependencies": {},
+  "optionalDependencies": {
     "isolated-vm": "^5.0.0"
   },
   "devDependencies": {
