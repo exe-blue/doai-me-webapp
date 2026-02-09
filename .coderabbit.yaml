@@ -76,7 +76,7 @@ reviews:
     - "!**/storybook-static/**"
     - "!**/*.lock"
     - "!**/package-lock.json"
-    - "!infra/database/supabase-schema.sql"
+    - "!supabase-schema.sql"
 
   # ─── 경로별 리뷰 지침 ───────────────────────────────────
   path_instructions:
@@ -175,7 +175,7 @@ reviews:
     eslint:
       enabled: true
     biome:
-      enabled: true
+      enabled: false
     markdownlint:
       enabled: true
     languagetool:
