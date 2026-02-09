@@ -144,7 +144,7 @@ Any -> DISCONNECTED (heartbeat_timeout, 30s)
 | Functions | Keep under 50 lines |
 | Logging | Use `logger`, never `console.log` in production |
 | Constants | No magic numbers; use named constants |
-| Exports | Named exports only (no default exports) |
+| Exports | Libraries: prefer named exports; Next.js App Router pages/layouts (and other framework-required modules) may use `export default` as required. |
 
 ## UI Component Conventions
 
@@ -199,7 +199,7 @@ Husky + lint-staged runs on `*.{ts,tsx,js,jsx}` files:
 
 - Creating code files in the project root directory
 - `console.log` in production code
-- Importing from `_archive/` or `_references/` directories
+- Importing from `_archive/` or `_reference/` directories
 - Absolute system paths (`C:\`, `/Users/`)
 - Nodes deciding device state (server-only responsibility)
 - Undefined state transitions
